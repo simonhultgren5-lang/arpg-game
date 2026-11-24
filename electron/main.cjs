@@ -122,6 +122,7 @@ ipcMain.handle('launcher:check-updates', () => updates.check({ force: true }));
 ipcMain.handle('launcher:retry-game-update', () => updates.check({ force: true }));
 ipcMain.handle('launcher:install-launcher-update', () => updates.installLauncher());
 ipcMain.on('launcher:open-releases', () => shell.openExternal(updates.releasesPage));
+ipcMain.handle('launcher:patch-notes', () => updates.getPatchNotes());
 
 ipcMain.handle('launcher:get-state', () => servers.publicState());
 ipcMain.handle('launcher:select-server', (_e, id) => servers.selectServer(id));

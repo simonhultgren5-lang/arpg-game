@@ -4,7 +4,7 @@
   "description": "Dark fantasy top-down dungeon crawler",
   "author": "afiniel",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "main": "electron/main.cjs",
   "desktop": {
@@ -16,10 +16,10 @@
     "bump:patch": "npm version patch --no-git-tag-version && node scripts/sync-version.mjs",
     "bump:minor": "npm version minor --no-git-tag-version && node scripts/sync-version.mjs",
     "bump:major": "npm version major --no-git-tag-version && node scripts/sync-version.mjs",
-    "game": "node scripts/sync-version.mjs && electron .",
-    "game:offline": "node scripts/sync-version.mjs && electron . --offline",
-    "dist": "node scripts/sync-version.mjs && electron-builder --win",
-    "dist:dir": "node scripts/sync-version.mjs && electron-builder --win --dir",
+    "game": "node scripts/sync-version.mjs && node scripts/patch-notes.mjs && electron .",
+    "game:offline": "node scripts/sync-version.mjs && node scripts/patch-notes.mjs && electron . --offline",
+    "dist": "node scripts/sync-version.mjs && node scripts/patch-notes.mjs && electron-builder --win",
+    "dist:dir": "node scripts/sync-version.mjs && node scripts/patch-notes.mjs && electron-builder --win --dir",
     "release": "node scripts/release.mjs",
     "release:launcher": "node scripts/release.mjs --launcher",
     "dev": "node scripts/sync-version.mjs && tsx server.ts",
@@ -30,7 +30,8 @@
     "lint": "tsc --noEmit",
     "server": "node --no-warnings game-server/server.mjs",
     "server:pack": "node scripts/pack-server.mjs",
-    "server:image": "node scripts/pack-server.mjs --image"
+    "server:image": "node scripts/pack-server.mjs --image",
+    "patch-notes": "node scripts/patch-notes.mjs"
   },
   "build": {
     "appId": "com.afiniel.depthsofdarkness",

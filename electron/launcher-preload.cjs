@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('launcher', {
   retryGameUpdate: call('launcher:retry-game-update'),
   installLauncherUpdate: call('launcher:install-launcher-update'),
   openReleasesPage: () => ipcRenderer.send('launcher:open-releases'),
+  getPatchNotes: call('launcher:patch-notes'),
   onUpdateStatus: (callback) => {
     if (typeof callback !== 'function') return;
     ipcRenderer.on('launcher:update-status', (_event, status) => callback(status));

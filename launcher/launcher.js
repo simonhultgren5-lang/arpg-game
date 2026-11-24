@@ -178,12 +178,186 @@
   }
 
   // ---------------------------------------------------------------- updates
-  const notesToList = (text) =>
-    String(text || '')
-      .split('\n')
-      .map((line) => line.replace(/^\s*[-*]\s*/, '').trim())
+  // ---------------------------------------------------------------- patch notes
+  // Notes come from CHANGELOG.md: "### " subheadings, "- " bullets, paragraphs and **bold**.
+  // Rendered with DOM text nodes only, so nothing in the notes can inject HTML.
+  const SEEN_KEY = 'dodPatchNotesSeenV1';
+  let patchNotes = { versions: [], source: 'none' };
+  let notesReturnFocus = null;
+
+  function appendInline(parent, text) {
+    String(text)
+      .split(/(\*\*[^*]+\*\*)/g)
       .filter(Boolean)
-      .slice(0, 8);
+      .forEach((part) => {
+        if (/^\*\*[^*]+\*\*$/.test(part)) {
+          const strong = document.createElement('strong');
+          strong.textContent = part.slice(2, -2);
+          parent.append(strong);
+        } else parent.append(document.createTextNode(part));
+      });
+  }
+
+  function renderNotesBody(container, body) {
+    container.textContent = '';
+    let list = null;
+    for (const raw of String(body || '').split('\n')) {
+      const line = raw.trim();
+      if (!line) {
+        list = null;
+        continue;
+      }
+      if (line.startsWith('### ')) {
+        list = null;
+        const h = document.createElement('h4');
+        appendInline(h, line.slice(4));
+        container.append(h);
+      } else if (/^[-*]\s+/.test(line)) {
+        if (!list) {
+          list = document.createElement('ul');
+          container.append(list);
+        }
+        const li = document.createElement('li');
+        appendInline(li, line.replace(/^[-*]\s+/, ''));
+        list.append(li);
+      } else {
+        list = null;
+        const p = document.createElement('p');
+        appendInline(p, line);
+        container.append(p);
+      }
+    }
+  }
+
+  const bulletsOf = (body) =>
+    String(body || '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => /^[-*]\s+/.test(l))
+      .map((l) => l.replace(/^[-*]\s+/, ''));
+
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    const d = new Date(`${iso}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const readSeen = () => {
+    try {
+      return localStorage.getItem(SEEN_KEY) || '';
+    } catch {
+      return '';
+    }
+  };
+  const markSeen = (version) => {
+    try {
+      localStorage.setItem(SEEN_KEY, version);
+    } catch {
+      // Storage unavailable: the NEW badge just stays.
+    }
+  };
+
+  function renderNotesCard() {
+    const latest = patchNotes.versions[0];
+    const card = $('notesCard');
+    // While an update card is already showing notes, don't repeat them.
+    const updateShowsNotes = !$('updateCard').hidden && $('updateNotes').childElementCount > 0;
+    card.hidden = !latest || updateShowsNotes;
+    $('btnFooterNotes').hidden = !latest;
+    if (!latest) return;
+    $('notesNew').hidden = readSeen() === latest.version;
+    $('notesCardTitle').textContent = `Version ${latest.version}${latest.date ? ` · ${formatDate(latest.date)}` : ''}`;
+    const list = $('notesHighlights');
+    list.textContent = '';
+    for (const item of bulletsOf(latest.body).slice(0, 3)) {
+      const li = document.createElement('li');
+      appendInline(li, item);
+      list.append(li);
+    }
+  }
+
+  function showNotesVersion(version) {
+    const entry = patchNotes.versions.find((v) => v.version === version) || patchNotes.versions[0];
+    if (!entry) return;
+    for (const btn of $('notesVersions').querySelectorAll('button')) {
+      btn.setAttribute('aria-current', String(btn.dataset.version === entry.version));
+    }
+    $('notesArticleTitle').textContent = `Version ${entry.version}`;
+    $('notesArticleDate').textContent = formatDate(entry.date);
+    renderNotesBody($('notesArticleBody'), entry.body);
+    $('notesArticle').scrollTop = 0;
+  }
+
+  function openNotes(version) {
+    if (!patchNotes.versions.length) return;
+    notesReturnFocus = document.activeElement;
+    const nav = $('notesVersions');
+    nav.textContent = '';
+    const seen = readSeen();
+    patchNotes.versions.forEach((entry, index) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.version = entry.version;
+      const title = document.createElement('b');
+      title.textContent = `v${entry.version}`;
+      if (index === 0 && seen !== entry.version) {
+        const badge = document.createElement('span');
+        badge.className = 'badge-new';
+        badge.textContent = 'New';
+        title.append(badge);
+      }
+      const date = document.createElement('small');
+      date.textContent = entry.date ? formatDate(entry.date) : index === 0 ? 'Latest' : '';
+      btn.append(title, date);
+      btn.addEventListener('click', () => showNotesVersion(entry.version));
+      nav.append(btn);
+    });
+    $('notesSource').textContent =
+      patchNotes.source === 'online' ? '' : "Showing the patch notes included with this launcher. Newer notes appear here once they're published.";
+    $('notesPanel').hidden = false;
+    showNotesVersion(version || patchNotes.versions[0].version);
+    $('btnCloseNotes').focus();
+    markSeen(patchNotes.versions[0].version);
+    renderNotesCard();
+  }
+
+  function closeNotes() {
+    $('notesPanel').hidden = true;
+    if (notesReturnFocus && document.contains(notesReturnFocus)) notesReturnFocus.focus();
+  }
+
+  $('btnAllNotes').addEventListener('click', () => openNotes());
+  $('btnFooterNotes').addEventListener('click', () => openNotes());
+  $('btnCloseNotes').addEventListener('click', closeNotes);
+  $('notesPanel').addEventListener('click', (e) => {
+    if (e.target === $('notesPanel')) closeNotes();
+  });
+  document.addEventListener('keydown', (e) => {
+    if ($('notesPanel').hidden) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeNotes();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      // Step through versions with the arrow keys.
+      const buttons = [...$('notesVersions').querySelectorAll('button')];
+      const current = buttons.findIndex((b) => b.getAttribute('aria-current') === 'true');
+      const next = buttons[current + (e.key === 'ArrowDown' ? 1 : -1)];
+      if (next) {
+        e.preventDefault();
+        showNotesVersion(next.dataset.version);
+        next.focus();
+      }
+    }
+  });
+
+  async function loadPatchNotes() {
+    try {
+      patchNotes = (await api.getPatchNotes()) || patchNotes;
+    } catch {
+      // Keep whatever we had.
+    }
+    renderNotesCard();
+  }
 
   function updateButton(label, onClick, ghost = false) {
     const b = document.createElement('button');
@@ -267,13 +441,7 @@
     $('updateTitle').textContent = title;
     $('updateProgress').hidden = progress === null;
     $('updateBar').style.width = `${Math.round((progress || 0) * 100)}%`;
-    const list = $('updateNotes');
-    list.textContent = '';
-    for (const line of notesToList(notes)) {
-      const li = document.createElement('li');
-      li.textContent = line;
-      list.append(li);
-    }
+    renderNotesBody($('updateNotes'), notes);
     $('updateError').hidden = !error;
     $('updateError').textContent = error;
   }
@@ -283,6 +451,7 @@
     renderAccount();
     renderMotd();
     renderUpdates();
+    renderNotesCard();
     renderPlay();
   }
 
@@ -441,12 +610,16 @@
     state = await api.getState();
     upd = await api.getUpdateStatus();
     api.onUpdateStatus((next) => {
+      const justUpdated = next.game.state === 'updated' && upd?.game.state !== 'updated';
       upd = next;
       renderUpdates();
+      renderNotesCard();
       renderPlay();
+      if (justUpdated) loadPatchNotes();
     });
     setAuthMode('login');
     render();
+    loadPatchNotes();
     await checkAll();
     setInterval(() => {
       if (!busy) checkAll();
