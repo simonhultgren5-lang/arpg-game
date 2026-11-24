@@ -1,0 +1,7 @@
+{
+  "SERVER_NAME": "Raspberry Pi",
+  "MOTD": "Welcome to the Depths. Dev server, progress may be reset.",
+  "PORT": 4100,
+  "HOST": "0.0.0.0",
+  "DATA_DIR": "data"
+}
