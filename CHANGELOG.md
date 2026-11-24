@@ -11,8 +11,14 @@ How to write a section:
 
 ## 0.2.1 (2026-11-24)
 
+### New
+- **Characters:** create up to 5 characters per account right in the launcher. Pick a class, a name and an armor color, with a live preview.
+- Your current hero is kept and becomes your first character. Offline play gets its own 5 characters too.
+- A new **Depths of Darkness emblem** in the launcher, on the title screen and as the app icon.
+
 ### Changes
-- Launcher fixes. No gameplay changes in this patch.
+- Choosing a character in the launcher takes you straight into the game.
+- Launcher fixes.
 
 ### Coming soon
 - A complete **3D engine** rework of the game is on the way, so stay tuned!
