@@ -1,0 +1,92 @@
+/* ===== Title screen ===== */
+#titleScreen .shell{box-sizing:border-box;max-width:760px!important;width:min(760px,100%)!important}
+#titleScreen .d3-actions,#titleScreen .tm-foot{box-sizing:border-box;width:100%}
+#titleScreen h1{animation:tmRise .9s cubic-bezier(.2,.7,.2,1) both;font-size:clamp(40px,min(8.4vw,11vh),126px)!important}
+#titleScreen .shell{max-height:100%!important;overflow:auto!important;scrollbar-width:none}
+#titleScreen .shell::-webkit-scrollbar{display:none}
+#titleScreen .sub{animation:tmFade 1s .25s both}
+#titleScreen .d3-actions{display:flex!important;flex-direction:column;align-items:stretch;gap:8px!important;max-width:340px!important;margin:30px auto 14px!important;animation:tmFade .8s .4s both}
+#titleScreen .d3-actions button,#tmModal .tm-menu button{position:relative;width:100%;min-height:46px;font:600 13px var(--book-type,system-ui)!important;letter-spacing:.14em;text-transform:uppercase;transition:transform .12s,border-color .12s,background .12s,box-shadow .12s}
+#titleScreen .d3-actions :is(#d3Begin,#d3Continue,#d3How,#d3AdminEndgame,#d3Settings,#d3Quit):not(.tm-primary),#tmModal .tm-menu button:not(.tm-primary){background:#1b1524cc!important;border:1px solid #5c4457!important;border-radius:5px;box-shadow:none!important;color:#e6d8e4!important;cursor:pointer}
+#titleScreen .d3-actions button:is(:hover,:focus-visible),#tmModal .tm-menu button:is(:hover,:focus-visible){transform:translateX(3px);border-color:#e3b67e!important;outline:none!important}
+#titleScreen .d3-actions :is(#d3Begin,#d3Continue,#d3How,#d3AdminEndgame,#d3Settings,#d3Quit):not(.tm-primary):is(:hover,:focus-visible),#tmModal .tm-menu button:not(.tm-primary):is(:hover,:focus-visible){background:#2d2236!important;border-color:#e3b67e!important}
+#titleScreen .d3-actions button:focus::before,#tmModal .tm-menu button:focus::before{content:"";position:absolute;left:-16px;top:50%;width:7px;height:7px;transform:translateY(-50%) rotate(45deg);background:#f1cc8d;box-shadow:0 0 10px #f1cc8d}
+#titleScreen .d3-actions .tm-primary,#tmModal .tm-menu .tm-primary{min-height:58px;border:1px solid #e3b67e!important;border-radius:5px;background:linear-gradient(135deg,#986549,#583550)!important;box-shadow:inset 0 1px #ffdd9638,0 6px 22px #0007,0 0 28px #d5865933!important;color:#fff2de!important;font-size:15px!important;cursor:pointer}
+#titleScreen .d3-actions .tm-primary:is(:hover,:focus-visible),#tmModal .tm-menu .tm-primary:is(:hover,:focus-visible){box-shadow:inset 0 1px #ffdd9650,0 6px 22px #0007,0 0 36px #e3b67e66!important}
+#titleScreen .tm-hero{display:block;margin-top:4px;font:500 11px var(--book-type,system-ui);letter-spacing:.06em;text-transform:none;color:#f3dcc1;opacity:.85}
+#titleScreen .tm-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;max-width:340px;margin:18px auto 0;padding-top:12px;border-top:1px solid #ffffff14;animation:tmFade .8s .55s both}
+#titleScreen .tm-foot .d3-muted{margin:0;text-align:left}
+#titleScreen #d3New{background:none!important;border:0!important;padding:4px 0!important;min-height:0!important;font:500 11px var(--book-type,system-ui)!important;color:#b98a8a!important;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+#titleScreen #d3New:hover,#titleScreen #d3New:focus-visible{color:#ffb0a8!important}
+.tm-keys{margin-top:12px;font:500 10px var(--book-type,system-ui);letter-spacing:.12em;color:#8e8096;text-transform:uppercase;text-align:center}
+#titleScreen .tm-keys{animation:tmFade .8s .7s both}
+.tm-keys kbd{display:inline-block;min-width:16px;padding:1px 5px;margin:0 2px;border:1px solid #4e4059;border-radius:3px;background:#1b1524;color:#d3c4d7;font:600 10px var(--book-type,system-ui)}
+
+.tm-version{position:absolute;right:18px;bottom:14px;font:600 11px var(--book-type,system-ui);letter-spacing:.14em;color:#8e8096;pointer-events:none;user-select:none}
+#tmModal .tm-version-inline{position:static;margin-top:8px;text-align:center}
+
+/* ===== Shared dialog (How to Play, confirmations, pause menu) ===== */
+#tmModal{position:fixed;inset:0;z-index:400;box-sizing:border-box;width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;display:none;place-items:center;padding:16px;background:#07060bcc;backdrop-filter:blur(3px);color:var(--ivory,#f3e6d5)}
+#tmModal[open]{display:grid}
+#tmModal::backdrop{background:transparent}
+#tmModal .tm-card{box-sizing:border-box;width:min(520px,100%);max-height:88vh;overflow:auto;padding:22px 22px 18px;border:1px solid #816b85;border-radius:8px;background:linear-gradient(145deg,#252130,#131119 65%);box-shadow:0 20px 80px #000b;color:var(--ivory,#f3e6d5);animation:tmRise .25s both}
+#tmModal .tm-card.tm-narrow{width:min(380px,100%);padding:26px 26px 20px;text-align:center}
+#tmModal h2{margin:0 0 4px;font:600 22px var(--display-type,Georgia,serif);color:#f1cf9c;letter-spacing:.04em}
+#tmModal p{margin:0 0 14px;color:#d3c4d7;font:14px/1.5 var(--book-type,system-ui)}
+#tmModal .tm-grid{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;align-items:center;margin:10px 0 16px;font:13px var(--book-type,system-ui)}
+#tmModal .tm-grid dt{text-align:right;white-space:nowrap}
+#tmModal .tm-grid dd{margin:0;color:#d3c4d7}
+#tmModal kbd{display:inline-block;min-width:20px;padding:2px 6px;margin:1px;border:1px solid #6a5872;border-bottom-width:2px;border-radius:4px;background:#1b1524;color:#f3e6d5;font:600 11px var(--book-type,system-ui);text-align:center}
+#tmModal h3{margin:14px 0 2px;font:600 11px var(--book-type,system-ui);letter-spacing:.16em;text-transform:uppercase;color:#bc90bd}
+#tmModal .tm-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+#tmModal .tm-btns button{min-height:38px;padding:8px 16px;border-radius:5px;border:1px solid #615069;background:#2b2334;color:#ede1eb;font:600 12px var(--book-type,system-ui);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+#tmModal .tm-btns button.tm-danger{border-color:#c46a5f;background:linear-gradient(135deg,#7b3a35,#4b2230);color:#ffe9e2}
+#tmModal .tm-btns button:is(:hover,:focus-visible){border-color:#e3b67e;outline:none}
+#tmModal .tm-kicker{font:600 10px var(--book-type,system-ui);letter-spacing:.22em;text-transform:uppercase;color:#bc90bd;margin-bottom:2px}
+#tmModal .tm-sub{font-size:12px;margin-bottom:18px}
+#tmModal .tm-menu{display:flex;flex-direction:column;gap:7px;text-align:left}
+#tmModal .tm-menu button{min-height:40px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px!important}
+#tmModal .tm-menu button kbd{font-size:10px;min-width:14px;padding:1px 5px;opacity:.8;letter-spacing:0}
+#tmModal .tm-menu .tm-primary{min-height:48px;justify-content:center}
+#tmModal .tm-menu .tm-sep{height:1px;margin:5px 0;background:#ffffff14}
+#tmModal .tm-menu .tm-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#tmModal .tm-menu .tm-quit{color:#e3b3ad!important}
+@media (max-height:760px){#titleScreen .d3-actions{gap:6px!important;margin:18px auto 10px!important}#titleScreen .d3-actions button{min-height:38px}#titleScreen .d3-actions .tm-primary{min-height:50px}#titleScreen h1{margin-bottom:14px!important}#tmModal .tm-card.tm-narrow{padding:16px 22px 12px}#tmModal .tm-sub{margin-bottom:10px}#tmModal .tm-menu{gap:5px}#tmModal .tm-menu button{min-height:34px}#tmModal .tm-menu .tm-primary{min-height:40px}#tmModal .tm-menu .tm-sep{margin:3px 0}#tmModal .tm-keys{margin-top:8px}}
+@keyframes tmRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes tmFade{from{opacity:0}to{opacity:1}}
+
+/* ===== In-game panels: shared backdrop, entrance, close buttons, scrollbars ===== */
+#dmScrim{position:fixed;inset:0;z-index:120;display:none;background:#07060b8c;backdrop-filter:blur(1.5px)}
+body.dm-panel-open #dmScrim{display:block;animation:tmFade .18s both}
+:is(#inv,#progPanel,#enchanterPanel,#codexPanel,#worldPanel,#d3service){animation:dmIn .2s ease-out both;scrollbar-width:thin;scrollbar-color:#6a5872 transparent}
+@keyframes dmIn{from{opacity:0}to{opacity:1}}
+:is(#inv,#progPanel,#enchanterPanel,#codexPanel,#worldPanel,#d3service) ::-webkit-scrollbar,:is(#inv,#progPanel,#enchanterPanel,#codexPanel,#worldPanel,#d3service)::-webkit-scrollbar{width:8px;height:8px}
+:is(#inv,#progPanel,#enchanterPanel,#codexPanel,#worldPanel,#d3service) ::-webkit-scrollbar-thumb,:is(#inv,#progPanel,#enchanterPanel,#codexPanel,#worldPanel,#d3service)::-webkit-scrollbar-thumb{background:#6a5872;border-radius:8px}
+body :is([data-inv-close],#progClose,[data-enchant-close],[data-codex-close],[data-world="close"],.dm-close){display:inline-grid!important;place-items:center;box-sizing:border-box;width:34px!important;height:34px!important;min-width:34px;min-height:34px!important;padding:0!important;border:1px solid #6a5872!important;border-radius:6px!important;background:#1b1524!important;color:#e6d8e4!important;font:600 15px/1 var(--book-type,system-ui)!important;cursor:pointer;transition:border-color .12s,background .12s,color .12s}
+body :is([data-inv-close],#progClose,[data-enchant-close],[data-codex-close],[data-world="close"],.dm-close):is(:hover,:focus-visible){border-color:#e3b67e!important;background:#2d2236!important;color:#fff2de!important;outline:none}
+#d3service{padding-top:20px!important}
+#d3service .dm-close{position:absolute;top:14px;right:14px;z-index:2}
+#d3service h2{padding-right:44px}
+#d3service button:disabled{cursor:not-allowed}
+
+/* ===== Top bar: menu button ===== */
+#top #dmMenuBtn{display:inline-flex;align-items:center;gap:6px}
+#top #dmMenuBtn span{font-size:14px;line-height:1}
+
+/* ===== Hero creation ===== */
+#classStart .dm-create-actions{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:4px}
+#classStart #createHeroBtn{min-width:180px;min-height:44px;font:600 14px var(--book-type,system-ui)!important;letter-spacing:.14em;text-transform:uppercase;border-radius:5px!important}
+#classStart #dmBackToTitle{min-height:44px;padding:8px 18px;border-radius:5px;border:1px solid #5c4457;background:#1b1524cc;color:#e6d8e4;font:600 12px var(--book-type,system-ui);letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+#classStart #dmBackToTitle:is(:hover,:focus-visible){border-color:#e3b67e;background:#2d2236;outline:none}
+#classStart .classPickCard:focus-visible{outline:2px solid #f4ce94;outline-offset:2px}
+
+/* ===== Death screen ===== */
+#dead .f{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 34px;animation:tmRise .5s both}
+#dead h1{font-family:var(--display-type,Georgia,serif)!important;margin:0!important}
+#dead #dt{margin:2px 0 18px!important;font:600 13px var(--book-type,system-ui)!important;letter-spacing:.18em;text-transform:uppercase;color:#e6c5cf}
+#dead #rv{min-width:220px;min-height:48px;padding:10px 22px!important;border:1px solid #e3b67e!important;border-radius:5px;background:linear-gradient(135deg,#986549,#583550)!important;box-shadow:inset 0 1px #ffdd9638,0 6px 22px #0007!important;color:#fff2de!important;font:600 14px var(--book-type,system-ui)!important;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
+#dead #rv:is(:hover,:focus-visible){box-shadow:inset 0 1px #ffdd9650,0 6px 22px #0007,0 0 30px #e3b67e66!important;outline:none}
+#dead .tm-keys{margin-top:10px}
+
+@media (prefers-reduced-motion:reduce){#titleScreen *,#tmModal *,#dead *,#dmScrim,:is(#inv,#progPanel,#enchanterPanel,#codexPanel,#worldPanel,#d3service){animation:none!important;transition:none!important}}
+@media (max-width:560px){.tm-keys{display:none}#titleScreen .tm-foot{flex-direction:column;align-items:center;text-align:center}#titleScreen .tm-foot .d3-muted{text-align:center}#titleScreen .d3-actions{margin-top:22px!important}#top #dmMenuBtn b{display:none}#tmModal .tm-menu kbd{display:none}#classStart .dm-create-actions{flex-direction:column-reverse;align-items:stretch}}

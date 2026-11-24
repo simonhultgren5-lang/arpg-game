@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' app://game; style-src 'self' app://game 'unsafe-inline'; font-src data:; img-src 'self' data:">
+<title>Depths of Darkness — Launcher</title>
+<link rel="stylesheet" href="app://game/css/11-fonts.css">
+<link rel="stylesheet" href="launcher.css">
+</head>
+<body>
+<header class="titlebar">
+  <div class="titlebar-brand"><span class="sigil" aria-hidden="true">◆</span> Depths of Darkness</div>
+  <div class="titlebar-buttons">
+    <button type="button" id="btnMinimize" aria-label="Minimize">&#x2013;</button>
+    <button type="button" id="btnClose" class="close" aria-label="Close">&#x2715;</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="hero" aria-label="Game">
+    <div class="arch" aria-hidden="true"></div>
+    <div class="hero-content">
+      <p class="kicker">Dark Fantasy Dungeon Crawler</p>
+      <h1>Depths<br>of Darkness</h1>
+      <div class="motd" id="motd" hidden>
+        <span class="motd-label" id="motdLabel">Message from the server</span>
+        <p id="motdText"></p>
+      </div>
+    </div>
+    <footer class="hero-foot">
+      <span id="versionLabel">v—</span>
+      <span class="dot-sep" aria-hidden="true">·</span>
+      <span>Progress saves to your account on the selected server</span>
+    </footer>
+  </section>
+
+  <aside class="side">
+    <!-- Servers -->
+    <section class="card" aria-labelledby="serversTitle">
+      <div class="card-head">
+        <h2 id="serversTitle">Server</h2>
+        <div class="card-actions">
+          <button type="button" class="icon-btn" id="btnRefresh" title="Check servers again" aria-label="Check servers again">&#x21bb;</button>
+          <button type="button" class="icon-btn" id="btnAddServer" title="Add a server" aria-label="Add a server">+</button>
+        </div>
+      </div>
+      <ul class="server-list" id="serverList" role="listbox" aria-label="Servers"></ul>
+      <form class="add-server" id="addServerForm" hidden>
+        <label>Name<input name="name" maxlength="40" placeholder="My Raspberry Pi" autocomplete="off"></label>
+        <label>Address<input name="url" required placeholder="192.168.1.50:4100" autocomplete="off" spellcheck="false"></label>
+        <p class="form-error" id="addServerError" hidden></p>
+        <div class="row-end">
+          <button type="button" class="btn ghost" id="btnCancelAdd">Cancel</button>
+          <button type="submit" class="btn">Add server</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Account -->
+    <section class="card account" aria-labelledby="accountTitle">
+      <div class="card-head"><h2 id="accountTitle">Account</h2></div>
+
+      <div id="accountOffline" class="account-note" hidden>
+        <p>This server is offline. Check that it's running, or play offline with local saves.</p>
+      </div>
+
+      <div id="accountSignedIn" hidden>
+        <div class="signed-in">
+          <div class="avatar" id="avatar" aria-hidden="true">?</div>
+          <div>
+            <b id="signedInName">—</b>
+            <small id="signedInHero">No hero yet</small>
+          </div>
+          <button type="button" class="btn ghost small" id="btnLogout">Log out</button>
+        </div>
+      </div>
+
+      <div id="accountForms" hidden>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" id="tabLogin" aria-selected="true">Log in</button>
+          <button type="button" role="tab" id="tabRegister" aria-selected="false">Register</button>
+        </div>
+        <form id="authForm" novalidate>
+          <label>Username<input name="username" autocomplete="username" maxlength="20" spellcheck="false" required></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+          <label id="confirmRow" hidden>Confirm password<input name="confirm" type="password" autocomplete="new-password" maxlength="128"></label>
+          <p class="form-hint" id="authHint" hidden>3–20 letters, numbers or _ · password 6+ characters</p>
+          <p class="form-error" id="authError" role="alert" hidden></p>
+          <button type="submit" class="btn wide" id="authSubmit">Log in</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Play -->
+    <section class="play">
+      <button type="button" class="play-btn" id="btnPlay" disabled>
+        <span id="playLabel">Play</span>
+        <small id="playSub">Select a server</small>
+      </button>
+      <button type="button" class="link-btn" id="btnOffline">Play offline (local saves)</button>
+    </section>
+  </aside>
+</main>
+<script src="launcher.js"></script>
+</body>
+</html>

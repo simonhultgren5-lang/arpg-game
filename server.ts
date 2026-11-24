@@ -446,6 +446,9 @@ async function startServer() {
     }
   });
 
+  // The game itself lives in game/ (plain HTML, CSS and JS) and is shared with the desktop app.
+  app.use('/game', express.static(path.resolve(__dirname, 'game')));
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

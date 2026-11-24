@@ -6,3 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Desktop builds (electron-builder)
+release/
+
+# Game server database (game-server/data) and local server config
+game-server/data/
+game-server/config.json

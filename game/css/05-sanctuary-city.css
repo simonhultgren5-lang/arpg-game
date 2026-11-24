@@ -1,0 +1,24 @@
+#sanctuary.has-city{position:fixed;inset:0;z-index:17!important;display:none;padding:0;overflow:hidden;background:transparent!important}
+#sanctuary.has-city>.shell{display:none}
+.city-module,.city-scene{position:absolute;inset:0}
+.city-scene{touch-action:none;cursor:crosshair}
+.city-header{position:absolute;right:14px;top:calc(env(safe-area-inset-top,0px) + 110px);width:185px;padding:8px 10px;border:1px solid #6b5874;border-left:3px solid #d7ac81;border-radius:5px;background:linear-gradient(105deg,#282136f5,#181421f5);pointer-events:none}
+#sanctuary .city-header h2{margin:0;color:#ffe1b4;font:17px Georgia,serif}
+.city-header p{margin:3px 0 0;color:#d4c4d7;font-size:11px}
+.city-interact{position:absolute;left:50%;bottom:calc(166px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:8px;align-items:center;padding:4px 6px 4px 9px;background:#16111ef5;border:1px solid #ac84ad;border-radius:5px;color:#ffe6c5;white-space:nowrap;cursor:auto}
+.city-interact[hidden]{display:none}
+.city-interact kbd{margin-left:3px;color:#d2afd9}
+.city-navigation{position:absolute;left:50%;bottom:calc(115px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:5px;padding:4px;border:1px solid #5c486b;border-radius:6px;background:#17131de8}
+.city-navigation button,.city-atlas{background:#2a2034;color:#eee1f0;border-color:#604b6a;min-height:32px;white-space:nowrap}
+.city-navigation button b{color:var(--station);margin-right:2px}
+.city-navigation button:hover{border-color:var(--station)}
+#cityOpen{color:#ffdcab!important;border-color:#9c748c!important}
+.in-sanctuary #cityOpen,.in-sanctuary #bn,.in-sanctuary #help,.in-sanctuary #boss{visibility:hidden}
+.in-sanctuary :is(#mm,#bar){z-index:24;pointer-events:none}
+.in-sanctuary #sk{opacity:.5;pointer-events:none}
+@media(max-width:760px){
+ .city-header{display:none}
+ .city-navigation{left:auto;right:8px;top:calc(env(safe-area-inset-top,0px) + 89px);bottom:auto;transform:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:133px;gap:3px}
+ .city-navigation button,.city-atlas{min-height:35px;padding:4px;font-size:10px}
+ .city-interact{bottom:calc(80px + env(safe-area-inset-bottom,0px));gap:4px;font-size:10px}
+}

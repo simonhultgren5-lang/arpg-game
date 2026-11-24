@@ -74,7 +74,7 @@ import {
   type StashItemRecord,
 } from './lib/gameCloudSync';
 
-const GAME_ASSET_PATH = '/assets/aistudio/depths-darkness-3d_0d5cca2e.html';
+const GAME_ASSET_PATH = '/game/index.html';
 const RUN_MODE_STORAGE_KEY = 'dodRunModeV1';
 
 function workshopRunActive() {
@@ -182,6 +182,14 @@ export default function App() {
       // Ignore cross-context focus restrictions
     }
   }, []);
+
+  // When the in-game pause menu opens Options, focus the panel so Esc closes it instead of reaching the game.
+  const focusPanelOnOpenRef = useRef(false);
+  useEffect(() => {
+    if (!panelOpen || !focusPanelOnOpenRef.current) return;
+    focusPanelOnOpenRef.current = false;
+    controlRef.current?.querySelector<HTMLButtonElement>('section button')?.focus();
+  }, [panelOpen]);
 
   useEffect(() => {
     syncToWindow(iframeRef.current?.contentWindow, preferences);
@@ -866,6 +874,11 @@ export default function App() {
       if (!event.data || typeof event.data !== 'object') return;
       if (event.data.type === 'dod:toggle-mute') {
         toggleMute();
+      } else if (event.data.type === 'dod:open-settings') {
+        // Opened from the in-game pause menu: move focus out of the game frame so Esc reaches this panel.
+        focusPanelOnOpenRef.current = true;
+        setActiveTab('settings');
+        setPanelOpen(true);
       } else if (event.data.type === 'dod:loot-filter-changed') {
         const nextMode = event.data.autoSalvage;
         if (nextMode === 'off' || nextMode === 'common' || nextMode === 'magic') {
