@@ -1,0 +1,24 @@
+# Depths of Darkness game server
+#
+#   docker compose up -d --build     start (or update) the server
+#   docker compose logs -f           live log
+#   docker compose down              stop it (accounts and saves are kept in the volume)
+#
+# Change the name and message below, then run `docker compose up -d` again.
+services:
+  depths-server:
+    build: .
+    image: depths-server:latest
+    container_name: depths-server
+    restart: unless-stopped
+    ports:
+      - "4100:4100"
+    environment:
+      SERVER_NAME: "Raspberry Pi"
+      MOTD: "Welcome to the Depths. Dev server, progress may be reset."
+    volumes:
+      - depths-data:/data
+
+volumes:
+  # All accounts and saves (the SQLite database). Survives updates and `docker compose down`.
+  depths-data:

@@ -1,0 +1,3 @@
+# Scripts and files that run on the Raspberry Pi must keep Linux line endings
+*.sh text eol=lf
+game-server/** text eol=lf
