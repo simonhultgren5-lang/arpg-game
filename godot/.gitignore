@@ -1,0 +1,8 @@
+# Godot 4 generated files
+.godot/
+/android/
+*.translation
+export.cfg
+export_credentials.cfg
+# Exports
+/build/
