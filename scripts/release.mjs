@@ -11,6 +11,7 @@
 //   depths-game-<v>.pak       the game files (what launchers download)
 //   game-update.json          { version, url, size, sha256, minLauncher, notes }
 //   launcher-update.json      newest launcher installer (copied from the previous release if unchanged)
+//   patch-notes.json          every version's notes from CHANGELOG.md (the launcher's Patch Notes panel)
 // Launchers read both .json files from https://github.com/<repo>/releases/latest/download/
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -18,6 +19,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildGamePak } from './build-game-pak.mjs';
+import { writePatchNotes } from './patch-notes.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -64,6 +66,12 @@ const uploadDir = path.join(root, 'release', 'upload');
 fs.rmSync(uploadDir, { recursive: true, force: true });
 fs.mkdirSync(uploadDir, { recursive: true });
 const uploads = [];
+
+// Patch notes: bundled into the launcher (for offline use) and uploaded so every launcher shows the newest notes.
+writePatchNotes();
+writePatchNotes(path.join(uploadDir, 'patch-notes.json'));
+uploads.push(path.join(uploadDir, 'patch-notes.json'));
+console.log('✓ Patch notes from CHANGELOG.md');
 
 const pak = buildGamePak();
 fs.copyFileSync(pak.file, path.join(uploadDir, pak.name));

@@ -56,6 +56,49 @@ h1{margin:0;font:600 clamp(44px,6.2vw,76px)/.86 var(--display);letter-spacing:-.
 .update-error{margin:8px 0 0;color:#ffb8b0;font-size:12px}
 .update-actions{display:flex;gap:8px;margin-top:10px}
 .update-actions:empty{display:none}
+/* ---- patch notes: shared text styles ---- */
+.notes-body{color:var(--text);font-size:13px;line-height:1.5;user-select:text}
+.notes-body h4{margin:12px 0 4px;font:600 10px var(--body);letter-spacing:.18em;text-transform:uppercase;color:#bc90bd}
+.notes-body h4:first-child{margin-top:0}
+.notes-body ul{margin:0;padding-left:18px}
+.notes-body li{margin:3px 0}
+.notes-body p{margin:6px 0}
+.notes-body strong{color:var(--ivory)}
+.update-notes{margin-top:8px}
+.update-notes:empty{display:none}
+
+/* ---- "What's new" card on the main screen ---- */
+.notes-card{margin-top:14px;max-width:420px;padding:14px 16px;border:1px solid #816b8566;border-left:3px solid var(--gold-2);border-radius:6px;background:#12101acc;backdrop-filter:blur(4px);animation:fade .4s both}
+.notes-card-head{display:flex;align-items:center;gap:8px}
+.notes-label{font:600 10px var(--body);letter-spacing:.18em;text-transform:uppercase;color:#bc90bd}
+.badge-new{padding:1px 7px;border-radius:999px;background:linear-gradient(135deg,#e3b67e,#b4785a);color:#21151d;font:700 9px var(--body);letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 12px #e3b67e66}
+.notes-card-title{display:block;margin-top:3px;color:var(--ivory);font-size:15px}
+.notes-highlights{margin:8px 0 2px;padding-left:18px;color:var(--text);font-size:13px}
+.notes-highlights li{margin:3px 0}
+.notes-highlights strong{color:var(--ivory)}
+.notes-more{padding:4px 0;margin-top:2px;font-size:12px}
+.foot-link{margin-left:auto;padding:2px 0;border:0;background:none;color:var(--dim);font:600 11px var(--body);letter-spacing:.06em;text-decoration:underline;text-underline-offset:3px}
+.foot-link:hover{color:var(--gold)}
+
+/* ---- Patch Notes panel ---- */
+.notes-panel{position:fixed;inset:38px 0 0;z-index:20;display:grid;place-items:center;padding:22px;background:#07060bcc;backdrop-filter:blur(4px);animation:fade .18s both}
+.notes-sheet{width:min(920px,100%);height:100%;max-height:560px;display:flex;flex-direction:column;border:1px solid #816b85;border-radius:10px;background:linear-gradient(145deg,#252130,#131119 65%);box-shadow:0 20px 80px #000b;overflow:hidden;animation:rise .25s both}
+.notes-sheet-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #ffffff12}
+.notes-sheet-head h2{margin:2px 0 0;font:600 24px var(--display);color:var(--title);letter-spacing:.03em}
+.notes-sheet-body{flex:1;min-height:0;display:grid;grid-template-columns:200px 1fr}
+.notes-versions{display:flex;flex-direction:column;gap:4px;padding:12px;border-right:1px solid #ffffff12;overflow-y:auto}
+.notes-versions button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 10px;border:1px solid transparent;border-radius:6px;background:none;color:var(--text);text-align:left}
+.notes-versions button:hover{background:#ffffff0a}
+.notes-versions button[aria-current="true"]{border-color:var(--gold-2);background:linear-gradient(135deg,#3a283a,#211a2b)}
+.notes-versions b{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ivory)}
+.notes-versions small{color:var(--faint);font-size:11px}
+.notes-article{padding:18px 24px;overflow-y:auto;outline:none}
+.notes-article header{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.notes-article h3{margin:0;font:600 22px var(--display);color:var(--gold)}
+.notes-date{color:var(--faint);font-size:12px}
+.notes-article .notes-body{font-size:14px}
+.notes-sheet-foot{padding:9px 20px;border-top:1px solid #ffffff12;color:var(--faint);font-size:11px}
+.notes-sheet-foot:empty{display:none}
 .hero-foot{display:flex;gap:8px;align-items:center;font-size:11px;letter-spacing:.06em;color:var(--faint)}
 .hero-foot #versionLabel{color:var(--dim);font-weight:600;letter-spacing:.14em}
 

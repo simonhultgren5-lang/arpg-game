@@ -262,7 +262,52 @@ function installLauncher() {
   return true;
 }
 
+// ---------------------------------------------------------------- patch notes
+// Bundled with the launcher (built from CHANGELOG.md) and uploaded with every release. The newest
+// copy wins, so a game-only patch still brings its notes to launchers that are a version behind.
+const BUNDLED_NOTES = path.join(__dirname, '..', 'launcher', 'patch-notes.json');
+const VERSION_RE = /^\d+\.\d+\.\d+$/;
+
+function cleanNotes(raw) {
+  if (!raw || raw.format !== 1 || !Array.isArray(raw.versions)) return null;
+  const versions = raw.versions
+    .filter((v) => v && VERSION_RE.test(v.version) && typeof v.body === 'string')
+    .slice(0, 100)
+    .map((v) => ({
+      version: v.version,
+      date: typeof v.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : null,
+      body: v.body.slice(0, 20000),
+    }))
+    .sort((a, b) => compare(b.version, a.version));
+  if (!versions.length) return null;
+  return { latest: versions[0].version, generatedAt: String(raw.generatedAt || ''), versions };
+}
+
+let remoteNotes = null; // cached for this run
+async function getPatchNotes() {
+  let bundled = null;
+  try {
+    bundled = cleanNotes(JSON.parse(fs.readFileSync(BUNDLED_NOTES, 'utf8')));
+  } catch {
+    // Not generated (e.g. started without `bun run game`): rely on the online copy.
+  }
+  if (!remoteNotes) {
+    try {
+      const res = await fetch(`${BASE}patch-notes.json`, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) remoteNotes = cleanNotes(await res.json());
+    } catch {
+      // Offline: the bundled notes are shown.
+    }
+  }
+  const pick = [bundled, remoteNotes]
+    .filter(Boolean)
+    .sort((a, b) => compare(b.latest, a.latest) || b.generatedAt.localeCompare(a.generatedAt))[0];
+  if (!pick) return { versions: [], source: 'none' };
+  return { versions: pick.versions, latest: pick.latest, source: pick === remoteNotes ? 'online' : 'bundled' };
+}
+
 module.exports = {
+  getPatchNotes,
   loadActive,
   gameRoot,
   gameVersion,

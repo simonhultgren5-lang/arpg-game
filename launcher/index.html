@@ -30,15 +30,25 @@
         <span class="update-label" id="updateLabel">Update</span>
         <b class="update-title" id="updateTitle"></b>
         <div class="update-progress" id="updateProgress" hidden><span id="updateBar"></span></div>
-        <ul class="update-notes" id="updateNotes"></ul>
+        <div class="update-notes notes-body" id="updateNotes"></div>
         <p class="update-error" id="updateError" hidden></p>
         <div class="update-actions" id="updateActions"></div>
       </div>
+      <section class="notes-card" id="notesCard" aria-labelledby="notesCardTitle" hidden>
+        <div class="notes-card-head">
+          <span class="notes-label">What's new</span>
+          <span class="badge-new" id="notesNew" hidden>New</span>
+        </div>
+        <b class="notes-card-title" id="notesCardTitle"></b>
+        <ul class="notes-highlights" id="notesHighlights"></ul>
+        <button type="button" class="link-btn notes-more" id="btnAllNotes">Read the full patch notes →</button>
+      </section>
     </div>
     <footer class="hero-foot">
       <span id="versionLabel">v—</span>
       <span class="dot-sep" aria-hidden="true">·</span>
       <span id="updateState">Progress saves to your account on the selected server</span>
+      <button type="button" class="foot-link" id="btnFooterNotes">Patch notes</button>
     </footer>
   </section>
 
@@ -109,6 +119,30 @@
     </section>
   </aside>
 </main>
+
+<!-- Patch Notes panel: every version from CHANGELOG.md -->
+<div class="notes-panel" id="notesPanel" role="dialog" aria-modal="true" aria-labelledby="notesPanelTitle" hidden>
+  <div class="notes-sheet">
+    <header class="notes-sheet-head">
+      <div>
+        <span class="notes-label">Depths of Darkness</span>
+        <h2 id="notesPanelTitle">Patch Notes</h2>
+      </div>
+      <button type="button" class="icon-btn" id="btnCloseNotes" aria-label="Close patch notes">✕</button>
+    </header>
+    <div class="notes-sheet-body">
+      <nav class="notes-versions" id="notesVersions" aria-label="Versions"></nav>
+      <article class="notes-article" id="notesArticle" tabindex="-1">
+        <header>
+          <h3 id="notesArticleTitle"></h3>
+          <span class="notes-date" id="notesArticleDate"></span>
+        </header>
+        <div class="notes-body" id="notesArticleBody"></div>
+      </article>
+    </div>
+    <footer class="notes-sheet-foot" id="notesSource"></footer>
+  </div>
+</div>
 <script src="launcher.js"></script>
 </body>
 </html>

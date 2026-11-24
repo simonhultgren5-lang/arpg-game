@@ -13,3 +13,6 @@ release/
 # Game server database (game-server/data) and local server config
 game-server/data/
 game-server/config.json
+
+# Generated from CHANGELOG.md by scripts/patch-notes.mjs
+launcher/patch-notes.json
