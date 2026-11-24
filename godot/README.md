@@ -120,11 +120,11 @@ The game keeps the hero's progress as **one JSON object** (level, XP, gold, drau
 
 `meta.depth` is 1 until the hero has entered the crypt, then 2.
 
-### Things the launcher and server still need
+### How the launcher runs it
 
-- **Launch the Godot export.** The launcher currently opens the 2D game window. To switch, spawn the exported `DepthsOfDarkness.exe` with the boot file as above (for example with `child_process.spawn`), and refresh the character list when the process exits so the level shown is current.
-- **2D and 3D saves share one slot.** `PUT /api/characters/:id/save` replaces the character's whole `data` object. If the same character is played in both the 2D game and the 3D game, each save drops the other's keys. Either merge `data` on the server instead of replacing it, or keep 3D characters separate until the 2D game is retired.
-- **Exporting.** No export preset is committed. In Godot use **Project → Export → Add… → Windows Desktop**, install the export templates when asked, and export to `DepthsOfDarkness.exe`.
+- **Export:** `bun run godot:export` (repo root) exports the **Windows Desktop** preset in `export_presets.cfg` to `build/DepthsOfDarkness.exe`. The installer bundles it as `resources/game3d/DepthsOfDarkness.exe`.
+- **Launch:** the launcher's **Play Act I in 3D** button writes the boot file to `<launcher userData>/boot-character.json`, starts the exe, hides itself, and comes back (refreshing the character list) when the game exits. The boot file is deleted then. See `play3d()` in `electron/main.cjs`.
+- **Saves:** the server merges a character's save instead of replacing it: a write with only `dod3d*` keys replaces the 3D keys and keeps the 2D game's keys, and the other way round. 3D writes don't change the level and depth the launcher shows. The launcher only starts the 3D game online when the server's `/api/status` lists the `save-merge` feature.
 
 ## Layout
 

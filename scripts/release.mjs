@@ -80,6 +80,9 @@ console.log(`✓ Game patch ${pak.name} (${(pak.size / 1024).toFixed(0)} KB)`);
 
 let launcherManifest = null;
 if (withLauncher) {
+  // The installer bundles the 3D preview (godot/), so export it first.
+  const exported = sh('node', ['scripts/export-godot.mjs'], { stdio: 'inherit' });
+  if (!exported.ok) fail('Exporting the 3D game failed (see above).');
   console.log('Building the launcher installer (this takes a few minutes)…');
   const build = sh('npx', ['electron-builder', '--win'], { stdio: 'inherit', shell: process.platform === 'win32' });
   if (!build.ok) fail('electron-builder failed.');

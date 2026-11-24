@@ -69,6 +69,12 @@ The first build downloads Electron's packaging tools, so it takes a few minutes.
 
 For a faster test build that only produces `release/win-unpacked/`, run `bun run dist:dir`.
 
+### The 3D preview (`godot/`)
+
+The installer also bundles the 3D version of the game, made with Godot 4 (see [godot/README.md](godot/README.md)). The launcher's **Play Act I in 3D** button starts it with the selected character. `bun run dist` and `bun run release:launcher` export it first with `bun run godot:export`, which needs **Godot 4.7+ with its Windows export templates** (in Godot: Editor → Manage Export Templates). The script finds Godot through the `GODOT` environment variable, `godot` on your PATH, or a Godot download in your Downloads folder.
+
+Online, the 3D preview needs a game server from 0.3.0 or newer: older servers would let a 3D save replace the character's main-game save, so the launcher refuses to start the 3D game there.
+
 ## Version number
 
 The version lives in **one place: `version` in `package.json`**. It shows in the bottom-right corner of the main menu, at the bottom of the pause menu, in the window title, and in the installer's file names.

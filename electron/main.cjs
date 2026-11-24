@@ -11,6 +11,7 @@ const { app, BrowserWindow, Menu, ipcMain, net, protocol, session, shell } = req
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { spawn } = require('node:child_process');
 const servers = require('./servers.cjs');
 const characters = require('./characters.cjs');
 const { CloudSync } = require('./cloud-sync.cjs');
@@ -195,6 +196,7 @@ ipcMain.handle('launcher:play', async (_e, options = {}) => {
   if (['downloading', 'installing'].includes(updates.getStatus().game.state)) {
     return { error: 'Wait for the update to finish.' };
   }
+  if (options.engine === '3d') return play3d(options);
   if (options.offline) {
     const character = characters.getOffline(String(options.characterId));
     if (!character) return { error: 'Pick a character first.' };
@@ -231,6 +233,73 @@ ipcMain.handle('launcher:play', async (_e, options = {}) => {
   launcherWindow?.close();
   return { ok: true };
 });
+
+// ---------------------------------------------------------------- 3D preview (godot/)
+// The Godot export ships in the installer as resources/game3d/DepthsOfDarkness.exe (see "extraResources"
+// in package.json); from source it is godot/build/DepthsOfDarkness.exe (`bun run godot:export`).
+const GAME3D_EXE = app.isPackaged
+  ? path.join(process.resourcesPath, 'game3d', 'DepthsOfDarkness.exe')
+  : path.join(__dirname, '..', 'godot', 'build', 'DepthsOfDarkness.exe');
+let game3d = null; // the running 3D game process
+
+ipcMain.handle('launcher:3d-status', () => ({ available: fs.existsSync(GAME3D_EXE), running: Boolean(game3d) }));
+
+// Starts the 3D game with a boot file (godot/README.md, "Launcher contract"). The token goes in the
+// file rather than on the command line, where other programs could read it.
+function launch3d(boot) {
+  const bootFile = path.join(app.getPath('userData'), 'boot-character.json');
+  fs.writeFileSync(bootFile, JSON.stringify(boot), { mode: 0o600 });
+  const child = spawn(GAME3D_EXE, ['--', '--character-json', bootFile], {
+    cwd: path.dirname(GAME3D_EXE),
+    stdio: 'ignore',
+    windowsHide: false,
+  });
+  game3d = child;
+  launcherWindow?.hide();
+  const finished = () => {
+    if (game3d !== child) return;
+    game3d = null;
+    fs.rmSync(bootFile, { force: true });
+    if (launcherWindow) {
+      launcherWindow.show();
+      launcherWindow.webContents.send('launcher:game-closed');
+    } else openLauncher();
+  };
+  child.once('exit', finished);
+  child.once('error', (error) => {
+    console.error('Could not start the 3D game:', error);
+    finished();
+  });
+}
+
+async function play3d(options) {
+  if (game3d) return { error: 'The 3D game is already running.' };
+  if (!fs.existsSync(GAME3D_EXE)) return { error: 'The 3D preview is not installed with this launcher.' };
+  if (options.offline) {
+    const character = characters.getOffline(String(options.characterId));
+    if (!character) return { error: 'Pick a character first.' };
+    launch3d(characters.bootCharacter(character));
+    return { ok: true };
+  }
+  const server = servers.getServer(options.serverId);
+  const login = server && servers.sessionFor(server.id);
+  if (!server || !login) return { error: 'Log in first.' };
+  try {
+    // Without save merging, a 3D save would overwrite the character's 2D progress on this server.
+    const status = await servers.request(server.url, '/api/status', { timeoutMs: 6000 });
+    if (!status.features?.includes('save-merge')) {
+      return { error: 'This server needs an update before it can save 3D progress. Ask its owner to install the latest server.' };
+    }
+    const list = await servers.request(server.url, '/api/characters', { token: login.token, timeoutMs: 10000 });
+    const character = list.characters.find((c) => String(c.id) === String(options.characterId));
+    if (!character) return { error: 'That character no longer exists.' };
+    launch3d({ ...characters.bootCharacter(character), serverUrl: server.url, token: login.token });
+    return { ok: true };
+  } catch (error) {
+    if (error.status === 401) servers.forgetSession(server.id);
+    return { error: error.message };
+  }
+}
 
 // ---------------------------------------------------------------- game window
 const WINDOW_FILE = () => path.join(app.getPath('userData'), 'window.json');

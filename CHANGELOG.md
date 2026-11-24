@@ -9,6 +9,16 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.3.0 (2026-11-25)
+
+### New
+- **Act I in 3D (preview):** press **Play Act I in 3D** in the launcher to try the new 3D version of Depths of Darkness with your character. Explore the cursed town of Hollowmere, descend into the Sunken Crypt and face Hask, the Bell-Warden.
+- The preview uses simple placeholder art while the 3D world is being built. More acts and real art are on the way.
+- Your 3D progress is saved separately, so playing the preview never touches your hero in the main game.
+
+### Changes
+- Game servers now keep a character's main-game and 3D progress side by side. Server owners: update your server to play the 3D preview online.
+
 ## 0.2.1 (2026-11-24)
 
 ### New

@@ -1,4 +1,5 @@
-// Copies the version from package.json into the game (game/js/00-version.js).
+// Copies the version from package.json into the game (game/js/00-version.js) and the 3D game
+// (config/version in godot/project.godot).
 // package.json is the single source of truth — bump it with `npm run bump:patch|minor|major`.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,4 +19,15 @@ if (current.replace(/\r\n/g, '\n') !== contents) {
   // Keep whichever line endings the file already uses.
   fs.writeFileSync(target, current.includes('\r\n') ? contents.replace(/\n/g, '\r\n') : contents);
   console.log(`Game version set to ${version}`);
+}
+
+// The 3D game shows the same version on its title screen.
+const godotProject = path.join(root, 'godot', 'project.godot');
+if (fs.existsSync(godotProject)) {
+  const text = fs.readFileSync(godotProject, 'utf8');
+  const next = text.replace(/^config\/version=".*"$/m, `config/version=${JSON.stringify(version)}`);
+  if (next !== text) {
+    fs.writeFileSync(godotProject, next);
+    console.log(`3D game version set to ${version}`);
+  }
 }

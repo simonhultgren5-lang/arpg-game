@@ -69,6 +69,7 @@
   let busy = false;
   let upd = null; // update status from electron/updates.cjs
   let playAction = 'play'; // 'play' | 'install-launcher' | 'open-releases'
+  let has3d = false; // the 3D preview (godot/) is installed with this launcher
   let playError = '';
 
   function readPref(key) {
@@ -382,6 +383,9 @@
     $('playLabel').textContent = label;
     $('playSub').textContent = sub;
     btn.disabled = !enabled;
+    // The 3D preview plays the same character; only when the normal Play would work too.
+    $('btnPlay3d').hidden = !has3d;
+    $('btnPlay3d').disabled = !(enabled && playAction === 'play' && currentCharacter());
     btn.classList.toggle('busy', busy || ['downloading', 'installing'].includes(game?.state));
     $('btnOffline').disabled = Boolean(game && ['downloading', 'installing'].includes(game.state));
   }
@@ -814,6 +818,21 @@
     }
     render();
   });
+  $('btnPlay3d').addEventListener('click', async () => {
+    const scope = currentScope();
+    const character = currentCharacter();
+    if (!scope || !character || busy) return;
+    busy = true;
+    renderPlay();
+    const result = await api.play(
+      scope.offline
+        ? { engine: '3d', offline: true, characterId: character.id }
+        : { engine: '3d', serverId: scope.serverId, characterId: character.id },
+    );
+    busy = false;
+    if (result?.error) showPlayError(result.error);
+    render();
+  });
   $('btnOffline').addEventListener('click', async () => {
     mode = mode === 'offline' ? 'online' : 'offline';
     writePref('dodLauncherModeV1', mode);
@@ -1056,6 +1075,12 @@
       if (justUpdated) loadPatchNotes();
     });
     setAuthMode('login');
+    has3d = Boolean((await api.get3dStatus?.())?.available);
+    api.onGameClosed?.(() => {
+      // Back from the 3D game: refresh the character list.
+      if (mode === 'offline') loadOfflineCharacters();
+      else checkAll();
+    });
     render();
     loadPatchNotes();
     if (mode === 'offline') loadOfflineCharacters();
