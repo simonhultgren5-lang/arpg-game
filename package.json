@@ -4,7 +4,7 @@
   "description": "Dark fantasy top-down dungeon crawler",
   "author": "afiniel",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "main": "electron/main.cjs",
   "desktop": {
@@ -31,7 +31,8 @@
     "server": "node --no-warnings game-server/server.mjs",
     "server:pack": "node scripts/pack-server.mjs",
     "server:image": "node scripts/pack-server.mjs --image",
-    "patch-notes": "node scripts/patch-notes.mjs"
+    "patch-notes": "node scripts/patch-notes.mjs",
+    "icons": "electron scripts/build-icons.cjs"
   },
   "build": {
     "appId": "com.afiniel.depthsofdarkness",
@@ -47,6 +48,7 @@
       "!node_modules/**/*"
     ],
     "npmRebuild": false,
+    "icon": "launcher/assets/icon.ico",
     "win": {
       "target": [
         "nsis",

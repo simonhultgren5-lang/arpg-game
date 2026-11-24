@@ -7,8 +7,9 @@ const MIN_GAP_MS = 8000; // shortest time between two uploads
 const RETRY_MS = 20000; // wait before retrying after the server was unreachable
 
 class CloudSync {
-  constructor({ serverUrl, token, webContents }) {
+  constructor({ serverUrl, token, webContents, savePath = '/api/save' }) {
     this.serverUrl = serverUrl;
+    this.savePath = savePath; // /api/characters/<id>/save for a character
     this.token = token;
     this.webContents = webContents;
     this.pending = null;
@@ -37,7 +38,7 @@ class CloudSync {
     if (!snapshot) return true;
     this.pending = null;
     this.status({ state: 'saving' });
-    this.inFlight = request(this.serverUrl, '/api/save', {
+    this.inFlight = request(this.serverUrl, this.savePath, {
       method: 'PUT',
       token: this.token,
       body: snapshot,

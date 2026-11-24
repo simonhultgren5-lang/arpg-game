@@ -13,6 +13,10 @@ contextBridge.exposeInMainWorld('launcher', {
   login: call('launcher:login'),
   logout: call('launcher:logout'),
   play: call('launcher:play'),
+  // Characters: scope is { offline: true } or { serverId }
+  listCharacters: call('launcher:characters'),
+  createCharacter: call('launcher:create-character'),
+  deleteCharacter: call('launcher:delete-character'),
   // Updates (electron/updates.cjs)
   getUpdateStatus: call('launcher:update-status'),
   checkForUpdates: call('launcher:check-updates'),

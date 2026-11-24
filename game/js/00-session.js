@@ -7,6 +7,8 @@
  let boot=null;
  try{boot=desktop?.boot?.()||null}catch(e){}
  window.dodSession=boot?.session||{mode:desktop?'offline':'web'};
+ // The character picked in the launcher ({id,name,heroClass,color}); see js/23-character.js.
+ window.dodCharacter=boot?.character||null;
 
  const cloud=boot?.cloudSave;
  if(!cloud||!cloud.data)return;

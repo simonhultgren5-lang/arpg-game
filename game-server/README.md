@@ -144,12 +144,18 @@ All responses are JSON. Logged-in requests send `Authorization: Bearer <token>`.
 | Method | Path | Body | Returns |
 | --- | --- | --- | --- |
 | GET | `/api/status` | | `online`, `name`, `motd`, `version`, `accounts`, `uptimeSeconds` |
-| POST | `/api/auth/register` | `username`, `password` | `token`, `user`, `save` |
-| POST | `/api/auth/login` | `username`, `password` | `token`, `user`, `save` (hero summary) |
+| POST | `/api/auth/register` | `username`, `password` | `token`, `user`, `characters`, `maxCharacters` |
+| POST | `/api/auth/login` | `username`, `password` | `token`, `user`, `characters`, `maxCharacters` |
 | POST | `/api/auth/logout` | | `ok` |
-| GET | `/api/auth/me` | | `user`, `save` (hero summary) |
-| GET | `/api/save` | | `save` with `data` (the full hero), or `null` |
-| PUT | `/api/save` | `data` (game keys), `meta` (hero summary) | `updatedAt` |
+| GET | `/api/auth/me` | | `user`, `characters`, `maxCharacters` |
+| GET | `/api/characters` | | `characters`, `maxCharacters` |
+| POST | `/api/characters` | `name`, `heroClass`, `color` | `character`, `characters` |
+| DELETE | `/api/characters/:id` | | `ok`, `characters` |
+| GET | `/api/characters/:id/save` | | `save` with `data` (the full hero), or `null` |
+| PUT | `/api/characters/:id/save` | `data` (game keys), `meta` (level, depth) | `updatedAt` |
+| GET / PUT | `/api/save` | as above | For launchers before 0.3: reads and writes the account's first character |
+
+Each account has up to **5 characters**. Names are 2–18 letters (spaces, `-` and `'` allowed) and unique per account; classes are `warrior`, `pyromancer` and `rogue`. A server upgraded from an older version moves each account's existing hero into its first character slot on start-up.
 
 Usernames are 3–20 letters, numbers or `_` (not case-sensitive). Passwords need 6+ characters and are stored as salted scrypt hashes. Logins last 30 days. After 10 failed attempts from one address, logins pause for 10 minutes.
 

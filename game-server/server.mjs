@@ -37,6 +37,8 @@ const MOTD = String(setting('MOTD', '')).slice(0, 200);
 const SERVER_VERSION = '0.1.0'; // set to the game version by scripts/pack-server.mjs
 const SESSION_DAYS = 30;
 const MAX_BODY = 4 * 1024 * 1024; // a full save snapshot is well under this
+const MAX_CHARACTERS = 5; // characters per account
+const HERO_CLASSES = ['warrior', 'pyromancer', 'rogue'];
 const STARTED_AT = Date.now();
 
 // ---------------------------------------------------------------- database
@@ -67,6 +69,34 @@ db.exec(`
     depth      INTEGER,
     updated_at INTEGER NOT NULL
   );
+  -- Up to MAX_CHARACTERS heroes per account, each with its own save.
+  -- legacy = 1 marks the hero moved over from the old one-save-per-account table, so the
+  -- desktop app keeps using the storage that hero already had on the PC.
+  CREATE TABLE IF NOT EXISTS characters (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    hero_class TEXT NOT NULL,
+    color      TEXT NOT NULL,
+    hero_level INTEGER NOT NULL DEFAULT 1,
+    depth      INTEGER NOT NULL DEFAULT 1,
+    data       TEXT,
+    legacy     INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS characters_account ON characters(account_id);
+`);
+
+// Move heroes from the old one-save-per-account table into characters (once per account).
+db.exec(`
+  INSERT INTO characters (account_id, name, hero_class, color, hero_level, depth, data, legacy, created_at, updated_at)
+  SELECT s.account_id, COALESCE(NULLIF(TRIM(s.hero_name), ''), 'Hero'), COALESCE(s.hero_class, 'warrior'), '#8d3430',
+         COALESCE(s.hero_level, 1), COALESCE(s.depth, 1), s.data, 1, s.updated_at, s.updated_at
+  FROM saves s
+  WHERE NOT EXISTS (SELECT 1 FROM characters c WHERE c.account_id = s.account_id);
+  -- The hero now lives in characters, so a character deleted later stays deleted.
+  DELETE FROM saves WHERE account_id IN (SELECT account_id FROM characters);
 `);
 
 const q = {
@@ -79,13 +109,17 @@ const q = {
                               WHERE s.token_hash = ? AND s.expires_at > ?`),
   deleteSession: db.prepare('DELETE FROM sessions WHERE token_hash = ?'),
   purgeSessions: db.prepare('DELETE FROM sessions WHERE expires_at <= ?'),
-  getSave: db.prepare('SELECT * FROM saves WHERE account_id = ?'),
-  getSaveMeta: db.prepare('SELECT hero_name, hero_class, hero_level, depth, updated_at FROM saves WHERE account_id = ?'),
-  putSave: db.prepare(`INSERT INTO saves (account_id, data, hero_name, hero_class, hero_level, depth, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)
-                       ON CONFLICT(account_id) DO UPDATE SET data = excluded.data, hero_name = excluded.hero_name,
-                         hero_class = excluded.hero_class, hero_level = excluded.hero_level, depth = excluded.depth,
-                         updated_at = excluded.updated_at`),
+  listCharacters: db.prepare(`SELECT id, name, hero_class, color, hero_level, depth, legacy, created_at, updated_at
+                               FROM characters WHERE account_id = ? ORDER BY created_at, id`),
+  countCharacters: db.prepare('SELECT COUNT(*) AS n FROM characters WHERE account_id = ?'),
+  characterByName: db.prepare('SELECT id FROM characters WHERE account_id = ? AND name = ? COLLATE NOCASE'),
+  getCharacter: db.prepare('SELECT * FROM characters WHERE id = ? AND account_id = ?'),
+  firstCharacter: db.prepare('SELECT * FROM characters WHERE account_id = ? ORDER BY created_at, id LIMIT 1'),
+  createCharacter: db.prepare(`INSERT INTO characters (account_id, name, hero_class, color, legacy, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?)`),
+  deleteCharacter: db.prepare('DELETE FROM characters WHERE id = ? AND account_id = ?'),
+  putCharacterSave: db.prepare(`UPDATE characters SET data = ?, hero_level = COALESCE(?, hero_level),
+                                  depth = COALESCE(?, depth), updated_at = ? WHERE id = ? AND account_id = ?`),
 };
 q.purgeSessions.run(Date.now());
 
@@ -183,16 +217,67 @@ function validateCredentials(body) {
   }
   return { username, password };
 }
-const publicSave = (row) =>
-  row
-    ? {
-        heroName: row.hero_name,
-        heroClass: row.hero_class,
-        heroLevel: row.hero_level,
-        depth: row.depth,
-        updatedAt: row.updated_at,
-      }
+// ---------------------------------------------------------------- characters
+const NAME_RE = /^[A-Za-z][A-Za-z '-]{1,17}$/;
+const COLOR_RE = /^#[0-9a-f]{6}$/i;
+function validateNewCharacter(body) {
+  const name = typeof body.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
+  if (!NAME_RE.test(name)) throw new HttpError(400, "Name must be 2–18 letters (spaces, - and ' allowed).");
+  const heroClass = HERO_CLASSES.includes(body.heroClass) ? body.heroClass : null;
+  if (!heroClass) throw new HttpError(400, 'Pick a class.');
+  const color = COLOR_RE.test(body.color) ? body.color.toLowerCase() : '#8d3430';
+  return { name, heroClass, color };
+}
+const publicCharacter = (row) => ({
+  id: row.id,
+  name: row.name,
+  heroClass: row.hero_class,
+  color: row.color,
+  level: row.hero_level,
+  depth: row.depth,
+  legacy: Boolean(row.legacy),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+const characterList = (accountId) => ({
+  characters: q.listCharacters.all(accountId).map(publicCharacter),
+  maxCharacters: MAX_CHARACTERS,
+});
+function cleanSaveData(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new HttpError(400, 'Save data is missing.');
+  const clean = {};
+  for (const [key, value] of Object.entries(data)) {
+    if ((key === 'mdjup' || key.startsWith('dod')) && typeof value === 'string') clean[key] = value;
+  }
+  return clean;
+}
+const intOrNull = (v) => (v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
+function writeCharacterSave(accountId, characterId, body) {
+  const clean = cleanSaveData(body.data);
+  const meta = body.meta && typeof body.meta === 'object' ? body.meta : {};
+  const updatedAt = Date.now();
+  const { changes } = q.putCharacterSave.run(
+    JSON.stringify(clean),
+    intOrNull(meta.heroLevel),
+    intOrNull(meta.depth),
+    updatedAt,
+    characterId,
+    accountId,
+  );
+  if (!changes) throw new HttpError(404, 'That character no longer exists.');
+  return { updatedAt };
+}
+const characterSave = (row) =>
+  row?.data
+    ? { ...publicCharacter(row), heroName: row.name, heroLevel: row.hero_level, data: JSON.parse(row.data) }
     : null;
+// Launchers before 0.3 know one hero per account: show them the account's first character.
+function legacySaveMeta(accountId) {
+  const row = q.firstCharacter.get(accountId);
+  return row?.data
+    ? { heroName: row.name, heroClass: row.hero_class, heroLevel: row.hero_level, depth: row.depth, updatedAt: row.updated_at }
+    : null;
+}
 
 // ---------------------------------------------------------------- routes
 const routes = {
@@ -218,7 +303,7 @@ const routes = {
     const id = Number(lastInsertRowid);
     q.touchLogin.run(now, id);
     console.log(`[account] registered ${username}`);
-    return { token: newSession(id), user: { username }, save: null };
+    return { token: newSession(id), user: { username }, save: null, ...characterList(id) };
   },
 
   'POST /api/auth/login': async (req) => {
@@ -236,7 +321,8 @@ const routes = {
     return {
       token: newSession(account.id),
       user: { username: account.username },
-      save: publicSave(q.getSaveMeta.get(account.id)),
+      save: legacySaveMeta(account.id),
+      ...characterList(account.id),
     };
   },
 
@@ -248,42 +334,78 @@ const routes = {
 
   'GET /api/auth/me': (req) => {
     const { account } = requireAccount(req);
-    return { user: { username: account.username }, save: publicSave(q.getSaveMeta.get(account.id)) };
+    return { user: { username: account.username }, save: legacySaveMeta(account.id), ...characterList(account.id) };
   },
 
+  // ---- one save per account (launchers before 0.3): the account's first character
   'GET /api/save': (req) => {
     const { account } = requireAccount(req);
-    const row = q.getSave.get(account.id);
-    return { save: row ? { ...publicSave(row), data: JSON.parse(row.data) } : null };
+    return { save: characterSave(q.firstCharacter.get(account.id)) };
   },
 
   'PUT /api/save': async (req) => {
     const { account } = requireAccount(req);
     const body = await readJson(req);
-    const data = body.data;
-    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new HttpError(400, 'Save data is missing.');
-    const clean = {};
-    for (const [key, value] of Object.entries(data)) {
-      if ((key === 'mdjup' || key.startsWith('dod')) && typeof value === 'string') clean[key] = value;
+    let row = q.firstCharacter.get(account.id);
+    if (!row) {
+      const meta = body.meta && typeof body.meta === 'object' ? body.meta : {};
+      const wanted = typeof meta.heroName === 'string' ? meta.heroName.trim() : '';
+      const name = NAME_RE.test(wanted) ? wanted : 'Hero';
+      const heroClass = HERO_CLASSES.includes(meta.heroClass) ? meta.heroClass : 'warrior';
+      const { lastInsertRowid } = q.createCharacter.run(account.id, name, heroClass, '#8d3430', 1, Date.now());
+      row = { id: Number(lastInsertRowid) };
     }
-    const meta = body.meta && typeof body.meta === 'object' ? body.meta : {};
-    const updatedAt = Date.now();
-    q.putSave.run(
-      account.id,
-      JSON.stringify(clean),
-      typeof meta.heroName === 'string' ? meta.heroName.slice(0, 32) : null,
-      typeof meta.heroClass === 'string' ? meta.heroClass.slice(0, 20) : null,
-      Number.isFinite(Number(meta.heroLevel)) ? Math.trunc(Number(meta.heroLevel)) : null,
-      Number.isFinite(Number(meta.depth)) ? Math.trunc(Number(meta.depth)) : null,
-      updatedAt,
-    );
-    return { updatedAt };
+    return writeCharacterSave(account.id, row.id, body);
+  },
+
+  // ---- characters (launcher 0.3+)
+  'GET /api/characters': (req) => characterList(requireAccount(req).account.id),
+
+  'POST /api/characters': async (req) => {
+    const { account } = requireAccount(req);
+    const { name, heroClass, color } = validateNewCharacter(await readJson(req));
+    if (q.countCharacters.get(account.id).n >= MAX_CHARACTERS) {
+      throw new HttpError(409, `You already have ${MAX_CHARACTERS} characters. Delete one to make room.`);
+    }
+    if (q.characterByName.get(account.id, name)) throw new HttpError(409, 'You already have a character with that name.');
+    const { lastInsertRowid } = q.createCharacter.run(account.id, name, heroClass, color, 0, Date.now());
+    console.log(`[character] ${account.username} created ${name} (${heroClass})`);
+    return { character: publicCharacter(q.getCharacter.get(Number(lastInsertRowid), account.id)), ...characterList(account.id) };
   },
 };
 
+// Routes with a character id: DELETE /api/characters/:id, GET|PUT /api/characters/:id/save
+function paramRoute(method, pathname) {
+  const m = /^\/api\/characters\/(\d{1,12})(\/save)?$/.exec(pathname);
+  if (!m) return null;
+  const id = Number(m[1]);
+  const owned = (req) => {
+    const { account } = requireAccount(req);
+    const row = q.getCharacter.get(id, account.id);
+    if (!row) throw new HttpError(404, 'That character no longer exists.');
+    return { account, row };
+  };
+  if (m[2] && method === 'GET') return (req) => ({ save: characterSave(owned(req).row) });
+  if (m[2] && method === 'PUT') {
+    return async (req) => {
+      const { account } = owned(req);
+      return writeCharacterSave(account.id, id, await readJson(req));
+    };
+  }
+  if (!m[2] && method === 'DELETE') {
+    return (req) => {
+      const { account, row } = owned(req);
+      q.deleteCharacter.run(id, account.id);
+      console.log(`[character] ${account.username} deleted ${row.name}`);
+      return { ok: true, ...characterList(account.id) };
+    };
+  }
+  return null;
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://local');
-  const handler = routes[`${req.method} ${url.pathname}`];
+  const handler = routes[`${req.method} ${url.pathname}`] || paramRoute(req.method, url.pathname);
   if (!handler) return send(res, 404, { error: 'Not found.' });
   try {
     send(res, 200, await handler(req));
