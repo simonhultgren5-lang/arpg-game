@@ -1,18 +1,18 @@
 // Depths of Darkness — desktop app (Electron main process).
 //
 // Flow: the launcher window opens first (launcher/). The player picks a server, logs in or
-// registers, and presses Play. The launcher closes and the game window opens (game/).
-// "Play offline" skips the server and uses local saves only.
+// registers, picks or creates one of up to 5 characters, and presses Play. The launcher closes and
+// the game window opens (game/) with that character. Offline mode has its own local characters.
 //
 // Both are served over a private app:// scheme (app://launcher/…, app://game/…) so the game
-// gets a stable origin for its localStorage saves. Each online account gets its own storage
-// partition, so different accounts on one PC never overwrite each other's heroes.
+// gets a stable origin for its localStorage saves. Each character gets its own storage partition
+// (see electron/characters.cjs), so heroes on one PC never overwrite each other.
 const { app, BrowserWindow, Menu, ipcMain, net, protocol, session, shell } = require('electron');
-const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const servers = require('./servers.cjs');
+const characters = require('./characters.cjs');
 const { CloudSync } = require('./cloud-sync.cjs');
 const updates = require('./updates.cjs');
 
@@ -24,6 +24,7 @@ const ROOTS = {
   launcher: path.join(__dirname, '..', 'launcher'),
 };
 const SCHEME = 'app';
+const ICON = path.join(__dirname, '..', 'launcher', 'assets', 'icon.png');
 const isDev = !app.isPackaged;
 // `npm run game:offline` (or the --offline flag) skips the launcher while developing.
 const skipLauncher = process.argv.includes('--offline');
@@ -37,6 +38,7 @@ protocol.registerSchemesAsPrivileged([
 
 // ---------------------------------------------------------------- app:// file serving
 const servedSessions = new WeakSet();
+const PROBE_PAGE = '__probe.html';
 function serveAppScheme(sess) {
   if (servedSessions.has(sess)) return;
   servedSessions.add(sess);
@@ -44,6 +46,10 @@ function serveAppScheme(sess) {
     const { host, pathname } = new URL(request.url);
     const root = ROOTS[host];
     const relative = decodeURIComponent(pathname).replace(/^\/+/, '') || 'index.html';
+    // Blank page on the game's origin, used to read saves made before characters existed.
+    if (host === 'game' && relative === PROBE_PAGE) {
+      return new Response('<!doctype html><title></title>', { headers: { 'Content-Type': 'text/html' } });
+    }
     const file = root && path.normalize(path.join(root, relative));
     if (!file || !file.startsWith(root + path.sep)) return new Response('Not found', { status: 404 });
     return net.fetch(pathToFileURL(file).toString()).then((response) => {
@@ -90,13 +96,14 @@ function openLauncher() {
   launcherWindow = new BrowserWindow({
     title: 'Depths of Darkness — Launcher',
     width: 1080,
-    height: 660,
+    height: 700,
     minWidth: 900,
-    minHeight: 600,
+    minHeight: 640,
     frame: false,
     resizable: true,
     maximizable: false,
     backgroundColor: '#0c0b13',
+    icon: ICON,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'launcher-preload.cjs'),
@@ -135,31 +142,90 @@ ipcMain.handle('launcher:logout', (_e, id) => servers.logout(id));
 ipcMain.on('launcher:minimize', () => launcherWindow?.minimize());
 ipcMain.on('launcher:close', () => launcherWindow?.close());
 
+// ---- characters (electron/characters.cjs). `scope` is { offline: true } or { serverId }.
+// Reads the hero offline play stored before characters existed, from the default session.
+function probeLegacyOfflineSave() {
+  return new Promise((resolve, reject) => {
+    serveAppScheme(session.defaultSession);
+    const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true } });
+    const done = (fn) => (value) => {
+      if (!win.isDestroyed()) win.destroy();
+      fn(value);
+    };
+    win.webContents
+      .loadURL(`${SCHEME}://game/${PROBE_PAGE}`)
+      .then(() =>
+        win.webContents.executeJavaScript(
+          "({save:localStorage.getItem('mdjup'),heroClass:localStorage.getItem('dodClass'),started:localStorage.getItem('dodHeroStartedV1')})",
+        ),
+      )
+      .then(done(resolve), done(reject));
+  });
+}
+
+ipcMain.handle('launcher:characters', async (_e, scope = {}) => {
+  if (scope.offline) {
+    await characters.adoptLegacyOfflineHero(probeLegacyOfflineSave);
+    return characters.offlineList();
+  }
+  return servers.listCharacters(scope.serverId);
+});
+ipcMain.handle('launcher:create-character', (_e, scope = {}, input = {}) => {
+  const valid = characters.validateNew(input);
+  if (valid.error) return { error: valid.error };
+  if (scope.offline) return characters.createOffline(valid);
+  return servers.createCharacter(scope.serverId, valid);
+});
+ipcMain.handle('launcher:delete-character', async (_e, scope = {}, id) => {
+  if (scope.offline) return characters.deleteOffline(String(id));
+  const server = servers.getServer(scope.serverId);
+  const login = server && servers.sessionFor(server.id);
+  if (!login) return { error: 'Log in first.' };
+  const list = await servers.listCharacters(server.id);
+  if (list.error) return list;
+  const character = list.characters.find((c) => String(c.id) === String(id));
+  if (!character) return { error: 'That character no longer exists.' };
+  const result = await servers.deleteCharacter(server.id, character.id);
+  // Also remove the copy of the hero stored on this PC.
+  if (!result.error) await characters.clearGameStorage(characters.onlinePartition(server.url, login.username, character));
+  return result;
+});
+
 ipcMain.handle('launcher:play', async (_e, options = {}) => {
   if (['downloading', 'installing'].includes(updates.getStatus().game.state)) {
     return { error: 'Wait for the update to finish.' };
   }
   if (options.offline) {
-    openGame({ mode: 'offline' });
+    const character = characters.getOffline(String(options.characterId));
+    if (!character) return { error: 'Pick a character first.' };
+    openGame({ mode: 'offline', character });
     launcherWindow?.close();
     return { ok: true };
   }
   const server = servers.getServer(options.serverId);
   const login = server && servers.sessionFor(server.id);
   if (!server || !login) return { error: 'Log in first.' };
+  let character = null;
   let cloudSave = null;
   try {
-    const result = await servers.request(server.url, '/api/save', { token: login.token, timeoutMs: 10000 });
+    const list = await servers.request(server.url, '/api/characters', { token: login.token, timeoutMs: 10000 });
+    character = list.characters.find((c) => String(c.id) === String(options.characterId));
+    if (!character) return { error: 'That character no longer exists.' };
+    const result = await servers.request(server.url, `/api/characters/${character.id}/save`, {
+      token: login.token,
+      timeoutMs: 10000,
+    });
     cloudSave = result.save;
   } catch (error) {
     if (error.status === 401) servers.forgetSession(server.id);
-    return { error: error.message };
+    return { error: error.status === 404 ? servers.OLD_SERVER : error.message };
   }
   openGame({
     mode: 'online',
     server: { id: server.id, name: server.name, url: server.url },
     username: login.username,
     token: login.token,
+    character,
     cloudSave,
   });
   launcherWindow?.close();
@@ -189,14 +255,14 @@ function writeWindowSettings(win) {
 let gameWindow = null;
 const games = new Map(); // webContents.id -> { boot, cloud }
 
-function partitionFor(serverUrl, username) {
-  const key = crypto.createHash('sha256').update(`${serverUrl}|${username.toLowerCase()}`).digest('hex').slice(0, 16);
-  return `persist:account-${key}`;
-}
-
-function openGame({ mode, server, username, token, cloudSave }) {
+// `character` is missing only for `bun run game:offline`, which plays the original offline hero.
+function openGame({ mode, server, username, token, character, cloudSave }) {
   const online = mode === 'online';
-  const partition = online ? partitionFor(server.url, username) : undefined; // offline uses the default storage
+  const partition = online
+    ? characters.onlinePartition(server.url, username, character)
+    : character
+      ? characters.offlinePartition(character)
+      : undefined;
   serveAppScheme(partition ? session.fromPartition(partition) : session.defaultSession);
 
   const saved = readWindowSettings();
@@ -208,6 +274,7 @@ function openGame({ mode, server, username, token, cloudSave }) {
     minHeight: 600,
     fullscreen: saved.fullscreen,
     backgroundColor: '#0b080a',
+    icon: ICON,
     autoHideMenuBar: true,
     show: false,
     webPreferences: {
@@ -225,9 +292,18 @@ function openGame({ mode, server, username, token, cloudSave }) {
       session: online
         ? { mode: 'online', serverName: server.name, serverUrl: server.url, username }
         : { mode: 'offline' },
+      character: character ? characters.bootCharacter(character) : null,
       cloudSave: online ? cloudSave : null,
     },
-    cloud: online ? new CloudSync({ serverUrl: server.url, token, webContents: win.webContents }) : null,
+    cloud: online
+      ? new CloudSync({
+          serverUrl: server.url,
+          token,
+          webContents: win.webContents,
+          savePath: `/api/characters/${character.id}/save`,
+        })
+      : null,
+    offlineCharacterId: !online && character ? character.id : null,
   });
 
   guardWindow(win, `${SCHEME}://game/`);
@@ -272,9 +348,13 @@ const gameFor = (event) => games.get(event.sender.id);
 const windowFor = (event) => BrowserWindow.fromWebContents(event.sender);
 
 ipcMain.on('dod:boot', (event) => {
-  event.returnValue = gameFor(event)?.boot || { session: { mode: 'offline' }, cloudSave: null };
+  event.returnValue = gameFor(event)?.boot || { session: { mode: 'offline' }, character: null, cloudSave: null };
 });
-ipcMain.on('dod:cloud-push', (event, snapshot) => gameFor(event)?.cloud?.push(snapshot));
+ipcMain.on('dod:cloud-push', (event, snapshot) => {
+  const game = gameFor(event);
+  if (game?.cloud) game.cloud.push(snapshot);
+  else if (game?.offlineCharacterId) characters.updateOfflineMeta(game.offlineCharacterId, snapshot?.meta);
+});
 ipcMain.handle('dod:is-fullscreen', (event) => Boolean(windowFor(event)?.isFullScreen()));
 ipcMain.handle('dod:set-fullscreen', (event, on) => {
   const win = windowFor(event);

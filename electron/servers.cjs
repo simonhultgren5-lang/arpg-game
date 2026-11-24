@@ -175,7 +175,7 @@ async function checkServer(serverId) {
   if (session) {
     try {
       const me = await request(server.url, '/api/auth/me', { token: session.token, timeoutMs: 3500 });
-      result.account = { username: me.user.username, save: me.save };
+      result.account = accountInfo(me);
     } catch (error) {
       if (error.status === 401) {
         forgetSession(serverId);
@@ -196,11 +196,41 @@ async function authenticate(kind, serverId, username, password) {
     });
     load().sessions[serverId] = { username: data.user.username, token: sealToken(data.token) };
     persist();
-    return { user: data.user, save: data.save, state: publicState() };
+    return { user: data.user, account: accountInfo(data), state: publicState() };
   } catch (error) {
     return { error: error.message };
   }
 }
+
+// What the launcher shows for a signed-in account. Servers before 0.3 have no characters list.
+function accountInfo(data) {
+  return {
+    username: data.user.username,
+    characters: Array.isArray(data.characters) ? data.characters : null,
+    maxCharacters: data.maxCharacters || 5,
+    save: data.save || null,
+  };
+}
+
+// ---------------------------------------------------------------- characters on a server
+const OLD_SERVER = 'This server needs an update before it supports characters. Ask its owner to install the latest server.';
+async function characterRequest(serverId, pathname, options) {
+  const server = getServer(serverId);
+  const session = sessionFor(serverId);
+  if (!server || !session) return { error: 'Log in first.' };
+  try {
+    return await request(server.url, pathname, { ...options, token: session.token });
+  } catch (error) {
+    if (error.status === 401) forgetSession(serverId);
+    if (error.status === 404 && !/character/i.test(error.message)) return { error: OLD_SERVER };
+    return { error: error.message, status: error.status };
+  }
+}
+const listCharacters = (serverId) => characterRequest(serverId, '/api/characters');
+const createCharacter = (serverId, input) =>
+  characterRequest(serverId, '/api/characters', { method: 'POST', body: input });
+const deleteCharacter = (serverId, id) =>
+  characterRequest(serverId, `/api/characters/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
 async function logout(serverId) {
   const server = getServer(serverId);
@@ -224,4 +254,8 @@ module.exports = {
   sessionFor,
   forgetSession,
   request,
+  listCharacters,
+  createCharacter,
+  deleteCharacter,
+  OLD_SERVER,
 };

@@ -16,9 +16,9 @@
   const data={};
   for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(isGameKey(k))data[k]=localStorage.getItem(k)}
   let meta={};
-  try{const s=JSON.parse(localStorage.getItem('mdjup')||'null');if(s)meta={heroName:s.heroName,heroLevel:s.lv,depth:s.depth,heroClass:localStorage.getItem('dodClass')||'warrior'}}catch(e){}
-  return {data,meta};
+  return {data,meta:heroMeta()};
  }
+ function heroMeta(){try{const s=JSON.parse(localStorage.getItem('mdjup')||'null');if(s)return{heroName:s.heroName,heroLevel:s.lv,depth:s.depth,heroClass:localStorage.getItem('dodClass')||'warrior'}}catch(e){}return {}}
 
  let state=online?'connected':'local',message='';
  window.dodCloud={online,session:ses,snapshot,getState:()=>({state,message})};
@@ -33,6 +33,10 @@
    if(s.state==='synced'&&s.updatedAt)try{localStorage.setItem(MARK,String(s.updatedAt))}catch(e){}
    renderChips();
   });
+ }else if(window.dodCharacter){
+  // Offline character: only tell the launcher its level and depth for the character list.
+  let timer=null;
+  if(typeof save==='function'){const prior=save;save=function(){const r=prior.apply(this,arguments);clearTimeout(timer);timer=setTimeout(()=>desktop.cloudPush({meta:heroMeta()}),1500);return r}}
  }
 
  // ---- status chip ----

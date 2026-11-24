@@ -44,11 +44,14 @@ The desktop app opens a launcher first:
 
 - **Server list** with a live online/offline dot and ping for each server. **+** adds a server by address (`192.168.1.50` or `my-pi.local:4100`; port 4100 is assumed). Hover a server and press ✕ to remove it.
 - **Log in / Register** for the selected server. Accounts live on that server, so each server has its own accounts.
-- **Play** downloads your hero from the server and starts the game. While you play, every save is uploaded in the background. The title screen and pause menu show the account and whether the last save reached the server.
-- **Play offline** skips the server and uses saves stored on this PC only.
+- **Characters:** each account has up to **5 characters**. Create one in the launcher (name, class, armor color), select it, and press **Play**. Delete a character by hovering it and pressing ✕, then typing its name to confirm. Double-click a character to play it straight away.
+- **Play** downloads the selected character from the server and starts the game with them. While you play, every save is uploaded in the background. The title screen and pause menu show the account and whether the last save reached the server. **Change Character** on the title screen returns to the launcher.
+- **Play offline** switches the launcher to characters stored on this PC only (also up to 5).
 - **What's new** shows the highlights of the newest version, with a NEW badge until the player opens the notes. **Patch notes** (on the card or in the footer) opens every version's notes.
 
-Each account (and offline play) has its own separate save storage on the PC, so switching accounts never overwrites another hero. If the same account plays on two PCs, the most recent upload wins. **Switch Account / Server** on the title screen returns to the launcher.
+Every character has its own separate save storage on the PC, so switching characters or accounts never overwrites another hero. Heroes from before characters existed show up as the first character, on the server and offline. If the same character plays on two PCs, the most recent upload wins.
+
+The app icon and logo come from `game/img/emblem.svg`. After changing it, run `bun run icons` to regenerate `launcher/assets/icon.ico` and `icon.png`.
 
 To host the server on your Raspberry Pi, follow [game-server/README.md](game-server/README.md).
 

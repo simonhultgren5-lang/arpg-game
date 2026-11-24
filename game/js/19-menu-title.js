@@ -33,6 +33,7 @@
  if(del&&save){del.textContent='Erase hero';del.removeAttribute('class');foot.appendChild(del)}
  actions.after(foot);
  const keys=document.createElement('div');keys.className='tm-keys';keys.innerHTML=`${k('↑')}${k('↓')} Navigate &nbsp; ${k('Enter')} Select`;foot.after(keys);
+ const h1=title.querySelector('h1');if(h1&&!title.querySelector('.tm-emblem')){const em=document.createElement('img');em.className='tm-emblem';em.src='img/emblem.svg';em.alt='';em.width=em.height=96;h1.before(em);const st=document.createElement('style');st.textContent='#titleScreen .tm-emblem{display:block;width:96px;height:96px;margin:0 auto 10px;filter:drop-shadow(0 6px 18px #000a) drop-shadow(0 0 28px #d5865955)}';document.head.appendChild(st)}
  const ver=document.createElement('div');ver.className='tm-version';ver.textContent='v'+(window.DOD_VERSION||'dev');title.appendChild(ver);
 
  // Remember which hero the player chose to play.

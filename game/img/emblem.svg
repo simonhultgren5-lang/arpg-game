@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Depths of Darkness emblem: a gothic gate over stairs descending into an ember abyss, a sword planted at the threshold. -->
+  <defs>
+    <radialGradient id="abyss" cx="50%" cy="78%" r="62%">
+      <stop offset="0" stop-color="#ffb35c"/>
+      <stop offset=".18" stop-color="#d9532b"/>
+      <stop offset=".45" stop-color="#5a1d2e"/>
+      <stop offset="1" stop-color="#120c18"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe7b8"/>
+      <stop offset=".5" stop-color="#e3b67e"/>
+      <stop offset="1" stop-color="#9b6a45"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241b2e"/>
+      <stop offset="1" stop-color="#0c0a12"/>
+    </linearGradient>
+    <clipPath id="gate"><path d="M136 448V230C136 150 190 92 256 60c66 32 120 90 120 170v218Z"/></clipPath>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#5c4457" stroke-width="6"/>
+  <!-- the gate -->
+  <g clip-path="url(#gate)">
+    <rect x="120" y="40" width="272" height="420" fill="url(#abyss)"/>
+    <!-- stairs, narrowing toward the glow -->
+    <g fill="#0c0a12" opacity=".92">
+      <path d="M136 448h240v-26H136Z"/>
+      <path d="M156 410h200v-20H156Z" opacity=".85"/>
+      <path d="M176 378h160v-15H176Z" opacity=".7"/>
+      <path d="M194 352h124v-11H194Z" opacity=".55"/>
+      <path d="M210 332h92v-8h-92Z" opacity=".4"/>
+    </g>
+  </g>
+  <path d="M136 448V230C136 150 190 92 256 60c66 32 120 90 120 170v218" fill="none" stroke="url(#gold)" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M164 448V236c0-60 38-106 92-134 54 28 92 74 92 134v212" fill="none" stroke="#e3b67e" stroke-opacity=".35" stroke-width="5"/>
+  <path d="M104 448h304" stroke="url(#gold)" stroke-width="16" stroke-linecap="round"/>
+  <!-- the sword -->
+  <g>
+    <path d="M256 96 270 120V360L256 392 242 360V120Z" fill="#f6ead6" stroke="#2a1c22" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M256 104V380" stroke="#b9a58e" stroke-width="3"/>
+    <path d="M206 128h100l-10 16H216Z" fill="url(#gold)" stroke="#2a1c22" stroke-width="5" stroke-linejoin="round"/>
+    <rect x="248" y="70" width="16" height="44" rx="4" fill="#5a2233" stroke="#2a1c22" stroke-width="5"/>
+    <circle cx="256" cy="62" r="13" fill="url(#gold)" stroke="#2a1c22" stroke-width="5"/>
+  </g>
+</svg>
