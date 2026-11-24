@@ -1,0 +1,92 @@
+:root{--bg:#0b080a;--bone:#e8dcc0;--blood:#b3202a;--ember:#ff8a1f;--gold:#c9a24a;--mana:#2f6bd6;color-scheme:dark;box-sizing:border-box}
+html{height:100%;background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;height:100%;background:var(--bg);color:var(--bone);font:13px/1.4 system-ui,sans-serif;overflow:hidden;user-select:none;touch-action:none}
+.f{font-family:'IM Fell English SC',Georgia,serif;letter-spacing:.04em}
+#c{position:fixed;inset:0;display:block}
+#top{position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);font-size:16px;text-shadow:0 2px 6px #000;display:flex;gap:10px;align-items:center}
+button{font:inherit;background:#1e1614;color:#f2e7cf;border:1px solid #594635;padding:5px 11px;border-radius:3px;cursor:pointer}
+#mm{position:fixed;right:10px;top:calc(env(safe-area-inset-top,0px) + 10px);width:112px;height:112px;border:1px solid #68523d;background:#0a0809;pointer-events:none}
+#boss{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);width:min(380px,50vw);text-align:center;display:none;pointer-events:none;font-size:18px;text-shadow:0 2px 6px #000}
+#boss div{height:8px;background:#0b090a;border:1px solid #5a2a2a;margin-top:3px;border-radius:2px;overflow:hidden}#bi{display:block;height:100%;width:100%;background:linear-gradient(90deg,#9c1922,#d6363f);transition:width .14s ease-out}
+#bn{position:fixed;left:0;right:0;top:58px;text-align:center;font-size:clamp(14px,2vw,19px);color:#ecd5a4;text-shadow:0 2px 10px #000;opacity:0;pointer-events:none;transition:opacity .35s;letter-spacing:.04em}
+#help{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);width:min(520px,92vw);text-align:center;opacity:.9;transition:opacity 2s;pointer-events:none;text-shadow:0 1px 5px #000}
+#bar{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);transform:translateX(-50%);display:flex;align-items:flex-end;gap:10px}
+.orb{width:96px;height:96px;border-radius:50%;border:3px solid #4a382c;position:relative;overflow:hidden;background:#120a0c;box-shadow:inset 0 0 16px #000,0 0 18px #000;transition:transform .16s cubic-bezier(0.16,1,0.3,1),box-shadow .2s}
+.orb i{position:absolute;inset:0;transform:translateY(calc((1 - var(--v,1)) * 100%));transition:transform .15s}
+#hp i{background:radial-gradient(circle at 35% 30%,#ff6a5e,var(--blood) 55%,#4a0a10)}
+#mp i{background:radial-gradient(circle at 35% 30%,#8fbaff,var(--mana) 55%,#0e2a66)}
+.orb b{position:absolute;inset:0;display:grid;place-items:center;font-size:13px;text-shadow:0 1px 3px #000;font-variant-numeric:tabular-nums}
+.orb:after{content:"";position:absolute;inset:6% 18% 55%;border-radius:50%;background:linear-gradient(#fff6,#fff0)}
+#sk{display:flex;gap:6px;padding-bottom:6px}
+.s{width:56px;height:56px;border:2px solid #4a382c;background:#1a1114;border-radius:6px;position:relative;display:grid;place-items:center;font-size:23px;cursor:pointer;overflow:hidden;transition:transform .12s cubic-bezier(0.16,1,0.3,1),border-color .15s}
+.s:active,#mobileAutoAttack:active,#mobileAutoAttack.pressed{transform:scale(0.93);border-color:#c9a24a}
+.s small{position:absolute;left:2px;top:1px;padding:1px 3px;border:1px solid #d8b87588;border-radius:4px;background:#100b0ddd;font:800 10px/1.1 system-ui;color:#ffe6a4;text-shadow:0 1px 2px #000;z-index:2}
+.s i{position:absolute;inset:0;background:#000b;transform-origin:bottom;transform:scaleY(var(--c,0))}
+#xp{position:fixed;left:0;right:0;bottom:0;height:5px;background:#000}#xp i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s ease-out}
+#inv{position:fixed;z-index:10000!important;left:10px;top:calc(env(safe-area-inset-top,0px) + 48px);width:min(330px,92vw);background:#0f0c0e;border:1px solid #8a6d45;padding:10px 12px;border-radius:3px;display:none;max-height:80vh;overflow:auto}
+#inv h3{margin:0 0 6px;font-weight:400;font-size:18px}.st{margin:2px 0 6px;color:#bfae90}
+.g{display:grid;grid-template-columns:repeat(6,44px);gap:5px;margin:6px 0}
+.c{width:40px;height:40px;border:1px solid #4a3a2d;background:#161113;border-radius:3px;display:grid;place-items:center;font-size:19px;cursor:pointer;position:relative}
+.c em{position:absolute;right:1px;top:-3px;font-size:10px;color:#6f6;font-style:normal}.c span{opacity:.25}
+#tip{position:fixed;display:none;pointer-events:none;background:#0b090a;border:1px solid #8a6d45;padding:8px 10px;border-radius:3px;max-width:390px;max-height:72vh;overflow:auto;z-index:10001;box-shadow:0 8px 24px #000d}
+#dead{position:fixed;inset:0;display:none;place-items:center;text-align:center;background:radial-gradient(#4a0a10cc,#000e)}
+#dead h1{font-size:56px;color:var(--blood);margin:0;font-weight:400}
+@media(max-width:960px){#boss{top:calc(env(safe-area-inset-top,0px) + 52px);width:min(320px,58vw);font-size:15px}#bn{top:84px}}
+@media(max-width:560px){.orb{width:62px;height:62px}.s,#mobileAutoAttack{width:46px;height:46px;font-size:18px}#bar{gap:5px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px)}#sk{gap:4px}#mm{width:82px;height:82px}#boss{top:calc(env(safe-area-inset-top,0px) + 58px);width:min(260px,62vw)}}
+
+#adv{position:fixed;right:10px;top:calc(env(safe-area-inset-top,0px) + 48px);width:min(360px,94vw);max-height:78vh;overflow:auto;background:#0f0c0e;border:1px solid #8a6d45;border-radius:3px;padding:12px;display:none;z-index:8;box-shadow:0 12px 32px #000c}
+#adv h2{font:22px 'IM Fell English SC',Georgia,serif;margin:0 0 8px;color:#ead08b}
+#adv p{margin:6px 0;color:#bfb097}#adv .arow{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0}#adv button{margin:2px 0}#adv .muted{color:#9e8f7a;font-size:11px}
+#top button{padding:4px 8px}
+#admin .lab-scenario{border:1px solid #896e52;padding:14px;margin-bottom:14px;background:#211b23}#admin .lab-scenario h3{margin:0}#admin .lab-scenario p{color:#d4c7bb}#admin .lab-scenario input[type=checkbox]{width:auto}#admin{z-index:380!important;position:fixed;inset:4vh 3vw;width:min(900px,94vw);max-height:92vh;margin:auto;overflow:auto;display:none;z-index:20;background:#0f0c0e;border:1px solid #8a6d45;border-radius:3px;padding:14px;box-shadow:0 12px 32px #000d;touch-action:pan-y}
+#admin h2{font:24px 'IM Fell English SC',Georgia,serif;color:#ead08b;margin:4px 0 10px}
+#admin h3{color:#ead08b;margin:12px 0 5px}
+#admin .agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px}
+#admin .aitem{border:1px solid #4a3a2d;background:#161113;border-radius:3px;padding:7px}
+#admin input,#admin select{background:#0b090a;color:#f2e7cf;border:1px solid #594635;border-radius:3px;padding:7px;max-width:100%;width:100%;box-sizing:border-box}
+#admin label{display:block;color:#c7b697;font-size:11px;margin:5px 0}
+#admin .arow{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0}
+#admin button{margin:2px 0}
+#admin .muted{color:#9b8d79;font-size:11px}
+@media(max-width:560px){#adv{top:calc(env(safe-area-inset-top,0px) + 46px);max-height:65vh}}
+
+/* Depths of Darkness — expansion pack */
+#upgradePanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,92vw);max-height:82vh;overflow:auto;z-index:30;background:#0f0c0e;border:1px solid #8a6d45;border-radius:3px;padding:16px;box-shadow:0 12px 32px #000c;display:none;touch-action:pan-y}#upgradePanel:empty{display:none!important}
+#upgradePanel h2{font:25px 'IM Fell English SC',Georgia,serif;color:#ead08b;margin:0 0 8px}#upgradePanel p{color:#bfb097}
+#upgradePanel .upgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px}#upgradePanel button{padding:9px;text-align:left;background:#161113;border:1px solid #4a3a2d;border-radius:3px}#upgradePanel button b{color:#ead08b}#upgradePanel .closeup{float:right}
+#top{flex-wrap:wrap;max-width:calc(100vw - 145px)}
+#adv,#admin,#inv,#upgradePanel{backdrop-filter:none}
+#lootHint{border-color:#c9a24a!important}
+#classStart{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:rgba(8,6,7,.93);padding:18px;touch-action:pan-y}
+#classStart .pick{width:min(760px,96vw);border:1px solid #8a6d45;border-radius:3px;padding:20px;background:#0f0c0e;box-shadow:0 12px 32px #000d;max-height:90vh;overflow:auto}
+#classStart h1{font:clamp(28px,5vw,42px) 'IM Fell English SC',Georgia,serif;color:#eac879;text-align:center;margin:0 0 6px}
+#classStart .choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}
+#classStart .choice{background:#161113;border:1px solid #4a3a2d;border-radius:3px;padding:14px;text-align:center;min-height:190px}
+#classStart .choice .ico{font-size:38px}.choice h2{font:22px 'IM Fell English SC',Georgia,serif;color:#eac879;margin:7px 0}
+#classStart .choice p{font-size:12px;color:#c9b99d;min-height:58px}
+#classStart .choice button{width:100%;padding:9px;font-weight:bold}
+@media(max-width:600px){#classStart .choices{grid-template-columns:1fr}#classStart .choice{min-height:0}#classStart .choice p{min-height:0}}
+
+/* Loot 5.0 — restrained item hierarchy and readable inventory */
+#inv{width:min(400px,94vw);padding:14px;background:#0f0c0e;border:1px solid #8a6d45;border-radius:3px}
+.loot-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #3c2f27;padding-bottom:9px;margin-bottom:10px}
+.loot-head h3{margin:0!important;font-size:21px!important;color:#ead08b}.loot-head small,.loot-section small{color:#bfb097}
+.loot-close{min-width:28px;height:28px;padding:0 8px;border:1px solid #594635;border-radius:3px;background:#1e1614;color:#f2e7cf;font-size:13px;cursor:pointer}
+.loot-section{margin:10px 0}.loot-section h4{font:15px 'IM Fell English SC',Georgia,serif;color:#ead08b;margin:0 0 7px;letter-spacing:.05em}
+.loot-equip{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.loot-slot{position:relative;min-width:0;display:flex;align-items:center;gap:8px;padding:7px;border:1px solid #3c2f27;border-radius:3px;background:#161113;cursor:pointer}
+.upgrade-arrow{position:absolute;right:7px;top:3px;color:#74f58a;font:900 16px/1 system-ui}
+.loot-slot.has-item{border-color:color-mix(in srgb,var(--rarity) 55%,#3c2f27);background:#181315}
+.loot-icon{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border:1px solid #4a3a2d;border-radius:3px;background:#0b090a;font-size:19px}
+.loot-weapon{width:27px;height:27px;display:block;filter:drop-shadow(0 1px 2px #000)}
+.loot-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}.loot-copy b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--rarity,#b7aa96)}
+.loot-copy small{font-size:10px;color:#bfb097}.loot-copy .item-stat-preview{display:flex;flex-wrap:wrap;gap:2px 7px;font-size:9px}
+.loot-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 8px;padding:8px 10px;background:#0b090a;border:1px solid #3c2f27;border-radius:3px;font-size:11px;color:#e5d8be;font-variant-numeric:tabular-nums}.stat-crit{color:#ffd54a}.stat-leech{color:#62ed88}.stat-stamina{color:#65bdff}.stat-strength{color:#ff6868}
+.loot-section-head{display:flex;align-items:baseline;justify-content:space-between}.loot-bag{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:260px;overflow:auto}
+.loot-filters{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}.loot-filters button{padding:4px 9px;border:1px solid #4a3a2d;border-radius:3px;background:#161113;color:#bfb097;font-size:11px;cursor:pointer}.loot-filters button.active{border-color:#c9a24a;background:#2c1f19;color:#f5e3b8}.loot-sort{padding:4px 8px;border:1px solid #4a3a2d;border-radius:3px;background:#161113;color:#f2e7cf;font-size:11px}.loot-copy .item-compare-preview{display:flex;flex-wrap:wrap;gap:2px 7px;font-size:9px}
+.loot-empty{grid-column:1/-1;text-align:center;padding:20px 8px;color:#8e806f;font-size:12px}
+.loot-help{display:block;color:#9e8f7a;margin-top:8px;font-size:11px}
+@media(max-width:420px){.loot-equip,.loot-bag{grid-template-columns:1fr}#inv{max-height:76vh}}
+
+
+#progressionCard,#expeditionPanel{display:none!important}

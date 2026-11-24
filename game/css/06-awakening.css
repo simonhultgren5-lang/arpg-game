@@ -1,0 +1,18 @@
+.awaken-page h3,.awaken-cards h4{margin:0;color:#f7dfbd;font:23px Georgia,serif}
+.awaken-page p{color:#ded3cb;line-height:1.45}
+.awaken-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:10px}
+.awaken-cards article{display:flex;flex-direction:column;padding:14px;border:1px solid #62505b;border-top:2px solid var(--rune);border-radius:6px;background:linear-gradient(155deg,#322635,#17151f)}
+.awaken-cards h4{font-size:19px}.awaken-glyph{color:var(--rune);font:32px Georgia,serif;text-shadow:0 0 12px var(--rune)}
+.awaken-cards article>div{border-top:1px solid #534550;padding-top:8px}.awaken-cards b,.awaken-cards label{color:var(--rune)}
+.awaken-cards label{margin-top:auto;font:12px system-ui}.awaken-cards progress{display:block;width:100%;height:5px;margin:5px 0 10px;accent-color:var(--rune)}
+.awaken-cards button[aria-pressed=true]{border-color:var(--rune);color:var(--rune);opacity:1}
+#progPanel .skillTabs{flex-wrap:wrap}
+.focus-picker{margin:0 0 14px;padding:10px;border:1px solid #604b6b;border-radius:6px;background:#1b1724}
+.focus-picker header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.focus-picker header button{padding:4px 8px;font-size:11px}
+.focus-picker h3{margin:0;color:#f2cca0;font:17px Georgia,serif}
+.focus-picker>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.focus-picker button{display:grid;gap:4px;text-align:left;padding:9px;background:#241d30;border-color:#5f4b6d;color:#eedeea}
+.focus-picker button[aria-pressed=true]{background:#3b2b42;border-color:#edb985;box-shadow:inset 0 -2px #b08067}
+.focus-picker button small{color:#e1cfe0;font-size:11px}
+@media(max-width:430px){.focus-picker>div{grid-template-columns:1fr}}
