@@ -42,6 +42,20 @@ h1{margin:0;font:600 clamp(44px,6.2vw,76px)/.86 var(--display);letter-spacing:-.
 .motd{margin-top:28px;max-width:420px;padding:14px 16px;border:1px solid #816b8566;border-left:3px solid var(--gold-2);border-radius:6px;background:#12101acc;backdrop-filter:blur(4px);animation:fade .5s both}
 .motd-label{display:block;margin-bottom:4px;font:600 10px var(--body);letter-spacing:.18em;text-transform:uppercase;color:#bc90bd}
 .motd p{margin:0;color:var(--ivory);user-select:text}
+/* update card */
+.update-card{margin-top:14px;max-width:420px;padding:14px 16px;border:1px solid #816b8566;border-left:3px solid #bc90bd;border-radius:6px;background:#12101acc;backdrop-filter:blur(4px);animation:fade .4s both}
+.update-card.ready{border-left-color:var(--ok)}
+.update-card.problem{border-left-color:var(--bad)}
+.update-label{display:block;margin-bottom:3px;font:600 10px var(--body);letter-spacing:.18em;text-transform:uppercase;color:#bc90bd}
+.update-title{display:block;color:var(--ivory);font-size:15px}
+.update-progress{height:6px;margin:10px 0 2px;border-radius:6px;background:#2a2234;overflow:hidden}
+.update-progress span{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#986549,#e3b67e);transition:width .2s}
+.update-notes{margin:8px 0 0;padding-left:18px;color:var(--text);font-size:13px;user-select:text}
+.update-notes:empty{display:none}
+.update-notes li{margin:2px 0}
+.update-error{margin:8px 0 0;color:#ffb8b0;font-size:12px}
+.update-actions{display:flex;gap:8px;margin-top:10px}
+.update-actions:empty{display:none}
 .hero-foot{display:flex;gap:8px;align-items:center;font-size:11px;letter-spacing:.06em;color:var(--faint)}
 .hero-foot #versionLabel{color:var(--dim);font-weight:600;letter-spacing:.14em}
 

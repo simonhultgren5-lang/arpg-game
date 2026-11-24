@@ -59,8 +59,8 @@ bun run dist
 
 The first build downloads Electron's packaging tools, so it takes a few minutes. When it finishes, `release/` contains:
 
-- `Depths of Darkness Setup <version>.exe`: installer with Start menu and desktop shortcuts
-- `Depths of Darkness-<version>-portable.exe`: a single file that runs without installing
+- `Depths-of-Darkness-Setup-<version>.exe`: installer with Start menu and desktop shortcuts. Updates itself.
+- `Depths-of-Darkness-<version>-portable.exe`: a single file that runs without installing. Gets game patches, but needs a manual download for launcher updates.
 - `win-unpacked/`: the unpacked app, handy for quick testing
 
 For a faster test build that only produces `release/win-unpacked/`, run `bun run dist:dir`.
@@ -101,11 +101,16 @@ electron/               Desktop app wrapper
   main.cjs              Opens the launcher and game windows, serves files, per-account storage
   servers.cjs           Server list, saved logins (encrypted) and requests to game servers
   cloud-sync.cjs        Uploads the hero to the server while playing online
+  updates.cjs           Checks GitHub for game patches and launcher updates and installs them
   preload.cjs           Bridge the game uses for fullscreen, Quit and cloud saves
   launcher-preload.cjs  Bridge the launcher uses
 game-server/            Self-hosted game server (accounts, cloud saves, status); see its README
 scripts/
   sync-version.mjs      Copies the version from package.json into the game
+  build-game-pak.mjs    Packs game/ into a patch file (depths-game-<version>.pak)
+  release.mjs           Publishes a release to GitHub (bun run release / release:launcher)
+  pack-server.mjs       Packages the game server for the Raspberry Pi
+CHANGELOG.md            Patch notes; the launcher shows them to players
 src/                    Website shell (React): login, cloud saves, leaderboard, options
 server.ts               Website server (API + serves game/ at /game)
 release/                Desktop builds (created by `bun run dist`, not committed)
@@ -152,11 +157,30 @@ $env:NODE_ENV = "production"; bun run start
 
 ## Releasing an update
 
+Players don't download anything by hand. When the launcher starts, it checks your latest GitHub release and updates itself and the game.
+
+| What changed | Command | What players get |
+| --- | --- | --- |
+| Only `game/` (gameplay, menus, balance, art) | `bun run release` | A ~0.6 MB game patch, installed automatically when the launcher opens |
+| `electron/` or `launcher/` too | `bun run release:launcher` | The game patch, plus a new launcher that downloads in the background and installs with **Restart to update** |
+
+Steps:
+
 1. Bump the version: `bun run bump:patch` (or `minor` / `major`).
 2. Make and test your changes with `bun run game`.
-3. Build: `bun run dist`.
-4. Test `release/Depths of Darkness-<version>-portable.exe`.
-5. Commit, then share the installer or portable `.exe` from `release/`.
+3. Add a `## <version>` section to [CHANGELOG.md](CHANGELOG.md). Players see these notes in the launcher.
+4. Commit and push.
+5. Run `bun run release` (or `bun run release:launcher`). It builds the patch, writes the update files and creates the GitHub release `v<version>`. Add `-- --dry-run` to build into `release/upload/` without publishing.
+
+The release script needs the GitHub CLI logged in (`gh auth login`), and it refuses to publish if the version already has a release, the changelog section is missing, or your changes aren't committed and pushed.
+
+**How it works:** every release carries `game-update.json` and `launcher-update.json`. Launchers read them from `https://github.com/<repo>/releases/latest/download/`, so the newest release is always the one players get. A game patch is the whole `game/` folder, checked against its SHA-256 before it's used. It's unpacked to `%APPDATA%\Depths of Darkness\game-versions\` and replaces the bundled game. If a download fails, the launcher keeps the current version and offers **Retry update**. Saves are never touched.
+
+**When the game needs a newer launcher:** if new game code relies on something only a newer launcher provides (for example a new `window.dodDesktop` feature), raise `desktop.minLauncherVersion` in `package.json` and use `release:launcher`. Older launchers then install the launcher update first.
+
+**Testing updates locally:** `bun run game` never patches itself. To try the whole flow, serve a folder containing a `.pak` file and a `game-update.json` whose `version` is higher than the current one and whose `url` is just the `.pak` file name (for example with `python -m http.server 5555`). Then start the game with `$env:DOD_UPDATES="1"; $env:DOD_UPDATE_URL="http://127.0.0.1:5555/"; bun run game`.
+
+**First updater release:** the v0.1.0 installer has no updater, so players on it must install the next version once by hand. Make that next release with `bun run release:launcher`. Every update after that arrives through the launcher.
 
 ## Troubleshooting
 

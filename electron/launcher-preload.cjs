@@ -13,6 +13,16 @@ contextBridge.exposeInMainWorld('launcher', {
   login: call('launcher:login'),
   logout: call('launcher:logout'),
   play: call('launcher:play'),
+  // Updates (electron/updates.cjs)
+  getUpdateStatus: call('launcher:update-status'),
+  checkForUpdates: call('launcher:check-updates'),
+  retryGameUpdate: call('launcher:retry-game-update'),
+  installLauncherUpdate: call('launcher:install-launcher-update'),
+  openReleasesPage: () => ipcRenderer.send('launcher:open-releases'),
+  onUpdateStatus: (callback) => {
+    if (typeof callback !== 'function') return;
+    ipcRenderer.on('launcher:update-status', (_event, status) => callback(status));
+  },
   minimize: () => ipcRenderer.send('launcher:minimize'),
   close: () => ipcRenderer.send('launcher:close'),
 });

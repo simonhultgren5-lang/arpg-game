@@ -14,9 +14,13 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const servers = require('./servers.cjs');
 const { CloudSync } = require('./cloud-sync.cjs');
+const updates = require('./updates.cjs');
 
+// app://game is served from the newest installed game patch, or the game bundled with the app.
 const ROOTS = {
-  game: path.join(__dirname, '..', 'game'),
+  get game() {
+    return updates.gameRoot();
+  },
   launcher: path.join(__dirname, '..', 'launcher'),
 };
 const SCHEME = 'app';
@@ -43,8 +47,8 @@ function serveAppScheme(sess) {
     const file = root && path.normalize(path.join(root, relative));
     if (!file || !file.startsWith(root + path.sep)) return new Response('Not found', { status: 404 });
     return net.fetch(pathToFileURL(file).toString()).then((response) => {
-      if (!isDev) return response;
-      // While developing, always serve fresh files so a reload (F5) picks up edits.
+      // Never cache: files are local, and after a game patch every file must come from the new version.
+      // (Also lets a reload with F5 pick up edits while developing.)
       const headers = new Headers(response.headers);
       headers.set('Cache-Control', 'no-store');
       return new Response(response.body, { status: response.status, headers });
@@ -107,7 +111,17 @@ function openLauncher() {
     launcherWindow = null;
   });
   launcherWindow.loadURL(`${SCHEME}://launcher/index.html`);
+  updates.check(); // at most every 10 minutes unless forced
 }
+
+// ---- updates (see electron/updates.cjs)
+updates.onChange((status) => launcherWindow?.webContents.send('launcher:update-status', status));
+ipcMain.handle('launcher:update-status', () => updates.getStatus());
+ipcMain.handle('launcher:check-updates', () => updates.check({ force: true }));
+// Retry re-reads the update info too, in case the release was fixed in the meantime.
+ipcMain.handle('launcher:retry-game-update', () => updates.check({ force: true }));
+ipcMain.handle('launcher:install-launcher-update', () => updates.installLauncher());
+ipcMain.on('launcher:open-releases', () => shell.openExternal(updates.releasesPage));
 
 ipcMain.handle('launcher:get-state', () => servers.publicState());
 ipcMain.handle('launcher:select-server', (_e, id) => servers.selectServer(id));
@@ -121,6 +135,9 @@ ipcMain.on('launcher:minimize', () => launcherWindow?.minimize());
 ipcMain.on('launcher:close', () => launcherWindow?.close());
 
 ipcMain.handle('launcher:play', async (_e, options = {}) => {
+  if (['downloading', 'installing'].includes(updates.getStatus().game.state)) {
+    return { error: 'Wait for the update to finish.' };
+  }
   if (options.offline) {
     openGame({ mode: 'offline' });
     launcherWindow?.close();
@@ -183,7 +200,7 @@ function openGame({ mode, server, username, token, cloudSave }) {
 
   const saved = readWindowSettings();
   const win = new BrowserWindow({
-    title: `Depths of Darkness v${app.getVersion()}`,
+    title: `Depths of Darkness v${updates.gameVersion()}`,
     width: saved.width,
     height: saved.height,
     minWidth: 960,
@@ -283,6 +300,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
+    updates.loadActive();
     if (skipLauncher) openGame({ mode: 'offline' });
     else openLauncher();
   });
