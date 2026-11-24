@@ -1,0 +1,72 @@
+extends Node
+## Renders a few screenshots of the slice (needs a window, not --headless):
+##   godot --path godot res://tests/screenshots.tscn -- --out C:/some/folder [--class rogue]
+
+var _out := "user://screenshots"
+var _class := "warrior"
+
+
+func _ready() -> void:
+	if has_meta("runner"):
+		_run()
+		return
+	var runner := Node.new()
+	runner.set_script(get_script())
+	runner.set_meta("runner", true)
+	get_tree().root.add_child.call_deferred(runner)
+
+
+func _frames(n: int) -> void:
+	for i in n:
+		await get_tree().process_frame
+
+
+func _shot(name: String) -> void:
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	img.save_png("%s/%s.png" % [_out, name])
+	print("saved ", name)
+
+
+func _run() -> void:
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--out" and i + 1 < args.size():
+			_out = args[i + 1]
+		if args[i] == "--class" and i + 1 < args.size():
+			_class = args[i + 1]
+	DirAccess.make_dir_recursive_absolute(_out)
+	get_window().size = Vector2i(1600, 900)
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	await _frames(30)
+	await _shot("0_menu")
+	Boot.set_test_hero(_class)
+	Boot.character["id"] = "shots-" + _class
+	await Game.load_hero()
+	Game.area = "town"
+	get_tree().change_scene_to_file("res://scenes/world.tscn")
+	await _frames(90)
+	await _shot("1_town")
+	var w = get_tree().current_scene
+	w.hud.open_dialogue("maud")
+	await _frames(5)
+	await _shot("2_dialogue")
+	Game.run_action("accept_quest")
+	w.hud.close_dialogue()
+	Game.enter_area("catacomb")
+	await _frames(90)
+	w = get_tree().current_scene
+	await _shot("3_crypt")
+	# fight in the boss room
+	w.player.global_position = w.boss.global_position + Vector3(0, 0, 5)
+	w.boss.set_aggro()
+	w.player.hp = 99999.0
+	await _frames(40)
+	w.player.mana = 999.0
+	w.player.cast_skill(0)
+	await _frames(8)
+	await _shot("4_boss")
+	w.hud._inventory.visible = true
+	await _frames(5)
+	await _shot("5_pack")
+	get_tree().quit(0)
