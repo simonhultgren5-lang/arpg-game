@@ -26,11 +26,19 @@
         <span class="motd-label" id="motdLabel">Message from the server</span>
         <p id="motdText"></p>
       </div>
+      <div class="update-card" id="updateCard" role="status" aria-live="polite" hidden>
+        <span class="update-label" id="updateLabel">Update</span>
+        <b class="update-title" id="updateTitle"></b>
+        <div class="update-progress" id="updateProgress" hidden><span id="updateBar"></span></div>
+        <ul class="update-notes" id="updateNotes"></ul>
+        <p class="update-error" id="updateError" hidden></p>
+        <div class="update-actions" id="updateActions"></div>
+      </div>
     </div>
     <footer class="hero-foot">
       <span id="versionLabel">v—</span>
       <span class="dot-sep" aria-hidden="true">·</span>
-      <span>Progress saves to your account on the selected server</span>
+      <span id="updateState">Progress saves to your account on the selected server</span>
     </footer>
   </section>
 

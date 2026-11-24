@@ -10,6 +10,8 @@
   const status = {}; // serverId -> { state: 'checking'|'online'|'offline', info, pingMs, account }
   let authMode = 'login';
   let busy = false;
+  let upd = null; // update status from electron/updates.cjs
+  let playAction = 'play'; // 'play' | 'install-launcher' | 'open-releases'
   let playError = '';
 
   // ---------------------------------------------------------------- rendering
@@ -134,6 +136,35 @@
       sub = playError;
       enabled = false;
     }
+    // Updates take priority over playing.
+    playAction = 'play';
+    const game = upd?.game;
+    if (game && ['downloading', 'installing'].includes(game.state)) {
+      label = 'Updating';
+      sub = game.state === 'installing'
+        ? `Installing v${game.latest}…`
+        : `Downloading v${game.latest} · ${Math.round(game.progress * 100)}%`;
+      enabled = false;
+    } else if (game?.state === 'needs-launcher') {
+      label = 'Update';
+      if (upd.launcher.state === 'ready') {
+        sub = `Restart to install v${game.latest}`;
+        enabled = true;
+        playAction = 'install-launcher';
+      } else if (upd.launcher.state === 'manual') {
+        sub = `Download v${game.latest} to keep playing online`;
+        enabled = true;
+        playAction = 'open-releases';
+      } else if (upd.launcher.state === 'downloading') {
+        sub = `Downloading the new launcher… ${Math.round((upd.launcher.progress || 0) * 100)}%`;
+        enabled = false;
+      } else {
+        // The patch needs a newer launcher than any published one: send the player to the download page.
+        sub = `Get the new launcher to install v${game.latest}`;
+        enabled = true;
+        playAction = 'open-releases';
+      }
+    }
     if (busy) {
       label = 'Loading';
       sub = 'Downloading your hero…';
@@ -142,14 +173,116 @@
     $('playLabel').textContent = label;
     $('playSub').textContent = sub;
     btn.disabled = !enabled;
-    btn.classList.toggle('busy', busy);
+    btn.classList.toggle('busy', busy || ['downloading', 'installing'].includes(game?.state));
+    $('btnOffline').disabled = Boolean(game && ['downloading', 'installing'].includes(game.state));
+  }
+
+  // ---------------------------------------------------------------- updates
+  const notesToList = (text) =>
+    String(text || '')
+      .split('\n')
+      .map((line) => line.replace(/^\s*[-*]\s*/, '').trim())
+      .filter(Boolean)
+      .slice(0, 8);
+
+  function updateButton(label, onClick, ghost = false) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = ghost ? 'btn ghost small' : 'btn small';
+    b.textContent = label;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function renderUpdates() {
+    if (!upd) return;
+    const { game, launcher } = upd;
+    $('versionLabel').textContent = `Game v${game.current} · Launcher v${launcher.current}`;
+    $('updateState').textContent =
+      {
+        disabled: 'Updates are off when running from source',
+        checking: 'Checking for updates…',
+        'up-to-date': 'Up to date',
+        updated: `Updated to v${game.current}`,
+        downloading: 'Updating…',
+        installing: 'Updating…',
+        'needs-launcher': 'Launcher update needed',
+        error: game.latest && game.latest !== game.current ? 'Update failed' : 'Could not check for updates',
+      }[game.state] || '';
+
+    const card = $('updateCard');
+    const actions = $('updateActions');
+    actions.textContent = '';
+    let label = 'Update';
+    let title = '';
+    let notes = '';
+    let progress = null;
+    let error = '';
+    let tone = '';
+
+    if (launcher.state === 'ready') {
+      label = 'Launcher update';
+      title = `Launcher v${launcher.latest} is ready`;
+      notes = launcher.notes;
+      tone = 'ready';
+      actions.append(updateButton('Restart to update', () => api.installLauncherUpdate()));
+    } else if (launcher.state === 'manual') {
+      label = 'New version';
+      title = `Version ${launcher.latest} is out`;
+      notes = launcher.notes;
+      actions.append(updateButton('Download', () => api.openReleasesPage()));
+    } else if (['downloading', 'installing'].includes(game.state)) {
+      label = 'Updating';
+      title = `Updating to v${game.latest}`;
+      notes = game.notes;
+      progress = game.state === 'installing' ? 1 : game.progress;
+    } else if (game.state === 'needs-launcher') {
+      label = 'Update';
+      title = `v${game.latest} needs the new launcher`;
+      notes = game.notes;
+      if (launcher.state === 'downloading') progress = launcher.progress;
+    } else if (game.state === 'error') {
+      label = 'Update';
+      title = 'Update problem';
+      error = game.error;
+      tone = 'problem';
+      actions.append(updateButton(game.latest && game.latest !== game.current ? 'Retry update' : 'Check again', () =>
+        game.latest && game.latest !== game.current ? api.retryGameUpdate() : api.checkForUpdates(),
+      ));
+    } else if (game.state === 'updated') {
+      label = "What's new";
+      title = `Updated to v${game.current}`;
+      notes = game.notes;
+      tone = 'ready';
+    } else if (launcher.state === 'downloading') {
+      label = 'Launcher update';
+      title = `Downloading launcher v${launcher.latest}`;
+      progress = launcher.progress;
+    }
+
+    card.hidden = !title;
+    if (!title) return;
+    card.className = `update-card ${tone}`.trim();
+    $('updateLabel').textContent = label;
+    $('updateTitle').textContent = title;
+    $('updateProgress').hidden = progress === null;
+    $('updateBar').style.width = `${Math.round((progress || 0) * 100)}%`;
+    const list = $('updateNotes');
+    list.textContent = '';
+    for (const line of notesToList(notes)) {
+      const li = document.createElement('li');
+      li.textContent = line;
+      list.append(li);
+    }
+    $('updateError').hidden = !error;
+    $('updateError').textContent = error;
   }
 
   function render() {
-    $('versionLabel').textContent = `v${state.version}`;
     renderServers();
     renderAccount();
     renderMotd();
+    renderUpdates();
     renderPlay();
   }
 
@@ -275,6 +408,8 @@
 
   // ---------------------------------------------------------------- play
   $('btnPlay').addEventListener('click', async () => {
+    if (playAction === 'install-launcher') return api.installLauncherUpdate();
+    if (playAction === 'open-releases') return api.openReleasesPage();
     const server = selected();
     if (!server || busy) return;
     busy = true;
@@ -304,6 +439,12 @@
   // ---------------------------------------------------------------- start
   (async () => {
     state = await api.getState();
+    upd = await api.getUpdateStatus();
+    api.onUpdateStatus((next) => {
+      upd = next;
+      renderUpdates();
+      renderPlay();
+    });
     setAuthMode('login');
     render();
     await checkAll();

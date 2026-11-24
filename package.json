@@ -7,6 +7,10 @@
   "version": "0.1.0",
   "type": "module",
   "main": "electron/main.cjs",
+  "desktop": {
+    "githubRepo": "simonhultgren5-lang/arpg-game",
+    "minLauncherVersion": "0.1.1"
+  },
   "scripts": {
     "version:sync": "node scripts/sync-version.mjs",
     "bump:patch": "npm version patch --no-git-tag-version && node scripts/sync-version.mjs",
@@ -16,6 +20,8 @@
     "game:offline": "node scripts/sync-version.mjs && electron . --offline",
     "dist": "node scripts/sync-version.mjs && electron-builder --win",
     "dist:dir": "node scripts/sync-version.mjs && electron-builder --win --dir",
+    "release": "node scripts/release.mjs",
+    "release:launcher": "node scripts/release.mjs --launcher",
     "dev": "node scripts/sync-version.mjs && tsx server.ts",
     "start": "node server.ts",
     "build": "node scripts/sync-version.mjs && vite build",
@@ -50,10 +56,11 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Depths of Darkness"
+      "shortcutName": "Depths of Darkness",
+      "artifactName": "Depths-of-Darkness-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
+      "artifactName": "Depths-of-Darkness-${version}-portable.${ext}"
     }
   },
   "dependencies": {
