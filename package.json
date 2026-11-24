@@ -22,7 +22,9 @@
     "preview": "vite preview",
     "clean": "rm -rf dist release server.js",
     "lint": "tsc --noEmit",
-    "server": "node --no-warnings game-server/server.mjs"
+    "server": "node --no-warnings game-server/server.mjs",
+    "server:pack": "node scripts/pack-server.mjs",
+    "server:image": "node scripts/pack-server.mjs --image"
   },
   "build": {
     "appId": "com.afiniel.depthsofdarkness",

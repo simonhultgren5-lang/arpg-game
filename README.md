@@ -30,6 +30,7 @@ Then pick what you want to do:
 | Goal | Command | Result |
 | --- | --- | --- |
 | Run a game server on this PC | `bun run server` | Accounts and cloud saves on <http://localhost:4100> |
+| Package the server for the Raspberry Pi | `bun run server:pack` | `release/depths-server-<version>.tar.gz` (run it with Docker, see [game-server/README.md](game-server/README.md)) |
 | Play the desktop version from source | `bun run game` | Opens the launcher, then the game |
 | Skip the launcher (offline) | `bun run game:offline` | Opens the game directly with local saves |
 | Build the Windows `.exe` | `bun run dist` | Installer and portable `.exe` in `release/` |

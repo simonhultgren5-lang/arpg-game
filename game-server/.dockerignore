@@ -1,0 +1,7 @@
+data
+config.json
+*.md
+*.sh
+*.service
+*.tar
+*.tar.gz
