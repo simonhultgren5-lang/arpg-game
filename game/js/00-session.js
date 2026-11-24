@@ -16,7 +16,7 @@
  const local=Number(localStorage.getItem(MARK)||0);
  if(Number(cloud.updatedAt)<=local)return; // this PC already has this hero, or newer progress still uploading
 
- const isGameKey=k=>k==='mdjup'||k.startsWith('dod');
+ const isGameKey=k=>(k==='mdjup'||k.startsWith('dod'))&&!k.startsWith('dod3d'); // dod3d* belongs to the 3D game
  try{
   Object.keys(localStorage).filter(isGameKey).forEach(k=>localStorage.removeItem(k));
   for(const [k,v] of Object.entries(cloud.data))if(isGameKey(k)&&typeof v==='string')localStorage.setItem(k,v);

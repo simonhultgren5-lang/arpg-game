@@ -11,7 +11,7 @@
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
  // ---- snapshot of every game key in localStorage (what the server stores) ----
- const isGameKey=k=>(k==='mdjup'||k.startsWith('dod'))&&k!==MARK;
+ const isGameKey=k=>(k==='mdjup'||k.startsWith('dod'))&&k!==MARK&&!k.startsWith('dod3d'); // dod3d* belongs to the 3D game
  function snapshot(){
   const data={};
   for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(isGameKey(k))data[k]=localStorage.getItem(k)}

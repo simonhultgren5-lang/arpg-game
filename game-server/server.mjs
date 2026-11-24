@@ -252,12 +252,30 @@ function cleanSaveData(data) {
   return clean;
 }
 const intOrNull = (v) => (v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
+// The 2D game and the 3D game (godot/) share a character's save. The 3D game only writes keys that
+// start with "dod3d"; the 2D game writes everything else. Each write replaces only its own side, so
+// playing one never erases the other's progress.
+const is3dKey = (key) => key.startsWith('dod3d');
 function writeCharacterSave(accountId, characterId, body) {
-  const clean = cleanSaveData(body.data);
-  const meta = body.meta && typeof body.meta === 'object' ? body.meta : {};
+  const incoming = cleanSaveData(body.data);
+  const keys = Object.keys(incoming);
+  const from3d = keys.length > 0 && keys.every(is3dKey);
+  const row = q.getCharacter.get(characterId, accountId);
+  if (!row) throw new HttpError(404, 'That character no longer exists.');
+  let existing = {};
+  try {
+    existing = row.data ? JSON.parse(row.data) : {};
+  } catch {
+    existing = {};
+  }
+  const merged = {};
+  for (const [key, value] of Object.entries(existing)) if (is3dKey(key) !== from3d) merged[key] = value;
+  for (const [key, value] of Object.entries(incoming)) if (is3dKey(key) === from3d) merged[key] = value;
+  // The launcher's level and depth follow the 2D game while 3D is a preview.
+  const meta = !from3d && body.meta && typeof body.meta === 'object' ? body.meta : {};
   const updatedAt = Date.now();
   const { changes } = q.putCharacterSave.run(
-    JSON.stringify(clean),
+    JSON.stringify(merged),
     intOrNull(meta.heroLevel),
     intOrNull(meta.depth),
     updatedAt,
@@ -283,6 +301,8 @@ function legacySaveMeta(accountId) {
 const routes = {
   'GET /api/status': () => ({
     online: true,
+    // What this server supports; the launcher checks it before offering features that need it.
+    features: ['characters', 'save-merge'],
     name: SERVER_NAME,
     motd: MOTD,
     version: SERVER_VERSION,
