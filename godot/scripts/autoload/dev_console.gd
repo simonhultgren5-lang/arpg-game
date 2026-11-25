@@ -33,7 +33,10 @@ const HELP := [
 	["kill", "kill every monster in the area"],
 	["spawn <hollow|archer|crawler|boss> [n] [elite]", "spawn monsters near you"],
 	["tp <town|crypt|boss>", "go to an area (boss: next to the Bell-Warden)"],
-	["quest <0-3>", "set the Act I quest step (3 = done)"],
+	["quest <0-3>", "set The Silent Bell's step (3 = done)"],
+	["quest <silent_bell|lamps|act_end|wardens> <step>", "set any Act I quest's step"],
+	["quests", "list every Act I quest and its step"],
+	["unique <id>|list", "put a unique item in the pack"],
 	["speed <0.1-5>", "game speed"],
 	["fps", "toggle the FPS counter"],
 	["stats", "print the hero's stats"],
@@ -323,9 +326,33 @@ func run(text: String) -> String:
 					return _ok("To the Sunken Crypt%s." % (", next to the boss" if where == "boss" else ""))
 			return _err("tp town|crypt|boss")
 		"quest":
-			var s := clampi(int(_arg(args, 1, "0")), 0, 3)
-			Game.set_quest_state(s)
-			return _ok("Quest step %d: %s" % [s, Game.quest_text()])
+			var first: String = _arg(args, 1, "0")
+			if first.is_valid_int():
+				var s := clampi(int(first), 0, 3)
+				Game.set_quest_state(s)
+				return _ok("Quest step %d: %s" % [s, Game.quest_text()])
+			if not Game.QUESTS.has(first):
+				return _err("quest <%s> <step>" % "|".join(Game.QUESTS.keys()))
+			var step := clampi(int(_arg(args, 2, "0")), 0, int(Game.QUESTS[first]))
+			if first == "wardens":
+				# Step 2 means every name-stone was found; earlier steps start the search over.
+				Game.flags()["warden_stones"] = Game.WARDEN_STONES if step >= 2 else 0
+			Game.set_quest(first, step)
+			var main: Array = Game.main_quest()
+			return _ok("%s step %d. Now: %s: %s" % [first, step, main[0], main[1]])
+		"quests":
+			var lines := PackedStringArray()
+			for q in Game.QUESTS:
+				lines.append("%s %d/%d" % [q, Game.quest(q), int(Game.QUESTS[q])])
+			lines.append("name-stones %d/%d" % [Game.warden_stones(), Game.WARDEN_STONES])
+			return "\n".join(lines)
+		"unique":
+			var id: String = _arg(args, 1, "list")
+			if not Items.UNIQUES.has(id):
+				return "Uniques: " + ", ".join(Items.UNIQUES.keys())
+			if not Game.add_item(Items.make_unique(id)):
+				return _err("The pack is full.")
+			return _ok("Added %s." % Items.UNIQUES[id]["name"])
 		"stats":
 			var dmg: Vector2 = Game.damage_range()
 			return "%s · %s · level %d (%d/%d XP)\nHP %d · mana %d · armor %d · damage %d–%d · crit %d%% · speed %.1f\nGold %d · draughts %d · kills %d · area %s · quest step %d" % [

@@ -7,6 +7,8 @@ signal leveled_up(level: int)
 signal inventory_changed
 signal quest_changed
 signal message(text: String, color: Color)
+## Story moments the world reacts to: "wells_toll" (Lamps Without Oil done), "act_complete".
+signal story_event(id: String)
 
 const Classes = preload("res://scripts/data/classes.gd")
 const Items = preload("res://scripts/data/items.gd")
@@ -17,6 +19,9 @@ const MAX_LEVEL := 20
 const INVENTORY_SIZE := 24
 const POTION_PRICE := 25
 const QUEST := "silent_bell"
+## All Act I quests and their last step (see scripts/data/act1_dialogue.gd for what each step means).
+const QUESTS := {"silent_bell": 3, "lamps": 3, "act_end": 2, "wardens": 3}
+const WARDEN_STONES := 3
 
 var progress: Dictionary = {}
 var hero_class := "warrior"
@@ -54,7 +59,7 @@ func new_progress() -> Dictionary:
 	return {
 		"version": SAVE_VERSION, "level": 1, "xp": 0, "gold": 20, "potions": 3,
 		"inventory": [], "equipped": {"weapon": null, "armor": null, "charm": null},
-		"quests": {QUEST: 0}, "flags": {}, "depth": 1, "kills": 0, "playtime": 0.0,
+		"quests": {"silent_bell": 0, "lamps": 0, "act_end": 0, "wardens": 0}, "flags": {}, "depth": 1, "kills": 0, "playtime": 0.0,
 	}
 
 
@@ -71,7 +76,10 @@ func load_hero() -> void:
 	if not (progress.get("inventory") is Array):
 		progress["inventory"] = []
 	if not (progress.get("quests") is Dictionary):
-		progress["quests"] = {QUEST: 0}
+		progress["quests"] = {}
+	for q in QUESTS:  # saves from before 0.5.0 only have silent_bell
+		if not progress["quests"].has(q):
+			progress["quests"][q] = 0
 	if not (progress.get("flags") is Dictionary):
 		progress["flags"] = {}
 	progress["level"] = clampi(int(progress["level"]), 1, MAX_LEVEL)
@@ -266,11 +274,19 @@ func roll_loot(ilvl: int, bias := 0.0, slot := "") -> Dictionary:
 # ------------------------------------------------------------------ quests & dialogue
 
 func quest_state() -> int:
-	return int(progress["quests"].get(QUEST, 0))
+	return quest(QUEST)
 
 
-func set_quest_state(s: int) -> void:
-	progress["quests"][QUEST] = s
+func set_quest_state(st: int) -> void:
+	set_quest(QUEST, st)
+
+
+func quest(id: String) -> int:
+	return int(progress["quests"].get(id, 0))
+
+
+func set_quest(id: String, st: int) -> void:
+	progress["quests"][id] = clampi(st, 0, int(QUESTS.get(id, 3)))
 	quest_changed.emit()
 	save()
 
@@ -279,16 +295,43 @@ func flags() -> Dictionary:
 	return progress["flags"]
 
 
+func warden_stones() -> int:
+	return int(flags().get("warden_stones", 0))
+
+
+## The main quest shown in the quest log: [title, text].
+func main_quest() -> Array:
+	if quest("silent_bell") < 3:
+		return ["The Silent Bell", quest_text()]
+	if quest("act_end") >= 2:
+		return ["Act I Complete", "The bells of Hollowmere are silent, and the wells toll. The Ossuary of the Thirteen waits below. (Act II is coming.)"]
+	if quest("act_end") == 1:
+		return ["The Wells Toll", "Go down the undercroft stair behind the chapel door."]
+	match quest("lamps"):
+		0: return ["Lamps Without Oil", "A child with a lamp waits in Hollowmere's square. Speak with them."]
+		1: return ["Lamps Without Oil", "Follow the lamps through the graveyard and dig where the last one burns."]
+		2: return ["Lamps Without Oil", "Bring the Founders' Charter to Sister Maud."]
+	return ["Lamps Without Oil", "Speak with Sister Maud."]
+
+
+## The optional quest in progress, if any: [title, text] or [].
+func side_quest() -> Array:
+	match quest("wardens"):
+		1: return ["The Wardens' Oath", "Find the wardens' name-stones in the Sunken Crypt (%d/%d)." % [warden_stones(), WARDEN_STONES]]
+		2: return ["The Wardens' Oath", "Set the name-stones on the plinth by the mausoleum door."]
+	return []
+
+
 func quest_text() -> String:
-	match quest_state():
+	match quest("silent_bell"):
 		0: return "Speak with Sister Maud at the chapel."
 		1: return "Descend through the mausoleum gate and silence the toll beneath St. Aldric's."
 		2: return "Bring the Black Clapper to Sister Maud."
-		_: return "The bell is silent. (End of the Act I slice.)"
+	return main_quest()[1]
 
 
 func dialogue_entry(npc_id: String) -> String:
-	return Dialogue.entry(npc_id, quest_state(), flags())
+	return Dialogue.entry(npc_id, progress["quests"], flags())
 
 
 func dialogue_node(id: String) -> Dictionary:
@@ -300,11 +343,21 @@ func npc_info(npc_id: String) -> Dictionary:
 
 
 func npc_has_news(npc_id: String) -> bool:
-	if npc_id == "maud":
-		return quest_state() == 0 or quest_state() == 2
-	if npc_id == "corwin":
-		return quest_state() >= 1 and not flags().get("corwin_gift", false)
+	match npc_id:
+		"maud":
+			return quest("silent_bell") in [0, 2] or quest("lamps") == 2
+		"corwin":
+			if quest("silent_bell") >= 1 and not flags().get("corwin_gift", false):
+				return true
+			return check_condition("wardens_offer")
+		"lamplighter":
+			return quest("silent_bell") >= 3 and quest("lamps") == 0
 	return false
+
+
+## The Lamplighter only appears once the bell is silent.
+func lamplighter_present() -> bool:
+	return quest("silent_bell") >= 3
 
 
 func check_condition(cond: String) -> bool:
@@ -312,6 +365,7 @@ func check_condition(cond: String) -> bool:
 		"", "none": return true
 		"gold_25": return int(progress["gold"]) >= POTION_PRICE
 		"no_corwin_gift": return not flags().get("corwin_gift", false)
+		"wardens_offer": return quest("silent_bell") >= 1 and quest("wardens") == 0
 	return true
 
 
@@ -336,6 +390,24 @@ func run_action(action: String) -> void:
 				message.emit("Bought a grave-moss draught.", Color(0.85, 0.4, 0.4))
 			elif int(progress["potions"]) >= 9:
 				message.emit("You cannot carry more draughts.", Color(0.9, 0.4, 0.3))
+		"accept_lamps":
+			if quest("lamps") == 0:
+				set_quest("lamps", 1)
+				message.emit("Quest accepted: Lamps Without Oil", Color(0.89, 0.71, 0.49))
+		"complete_lamps":
+			if quest("lamps") == 2:
+				_remove_quest_item("founders_charter")
+				set_quest("lamps", 3)
+				add_xp(200)
+				add_gold(80)
+				add_item(Items.make_unique("lamplighters_wick"))
+				message.emit("Quest complete: Lamps Without Oil (+200 XP). Received: The Lamplighter's Wick", Color(0.97, 0.89, 0.64))
+				set_quest("act_end", 1)
+				story_event.emit("wells_toll")
+		"accept_wardens":
+			if quest("wardens") == 0:
+				set_quest("wardens", 1)
+				message.emit("Quest accepted: The Wardens' Oath (optional)", Color(0.89, 0.71, 0.49))
 		"corwin_gift":
 			if not flags().get("corwin_gift", false):
 				flags()["corwin_gift"] = true
@@ -356,6 +428,75 @@ func on_boss_slain() -> void:
 		})
 		set_quest_state(2)
 		message.emit("You pried the Black Clapper from Hask's chest.", Color(0.92, 0.42, 0.18))
+
+
+## Lamps Without Oil, step 1: dig the unmarked grave. Returns what happened, for the world to show.
+func dig_grave() -> String:
+	match quest("lamps"):
+		1:
+			add_item({
+				"uid": "founders_charter", "name": "The Founders' Charter", "slot": "quest", "rarity": 3, "ilvl": 3,
+				"stats": {}, "lore": "Vellum gone black at the edges. Thirteen names, and thirteen seals beneath them.",
+			})
+			set_quest("lamps", 2)
+			message.emit("Under the soil, a lead box. Inside: the Founders' Charter.", Color(0.92, 0.42, 0.18))
+			return "dug"
+		0:
+			message.emit("An unmarked grave. The earth hasn't been turned in a very long time.", Color(0.8, 0.75, 0.7))
+	return ""
+
+
+## The Wardens' Oath: a name-stone picked up in the crypt.
+func take_warden_stone() -> void:
+	if quest("wardens") != 1:
+		return
+	flags()["warden_stones"] = mini(warden_stones() + 1, WARDEN_STONES)
+	if warden_stones() >= WARDEN_STONES:
+		set_quest("wardens", 2)
+		message.emit("All three name-stones. Return them to the mausoleum.", Color(0.89, 0.71, 0.49))
+	else:
+		message.emit("A warden's name-stone (%d/%d). It hums in your hand." % [warden_stones(), WARDEN_STONES], Color(0.75, 0.8, 0.9))
+		quest_changed.emit()
+		save()
+
+
+## The Wardens' Oath: set the stones on the plinth by the mausoleum.
+func place_warden_stones() -> bool:
+	if quest("wardens") != 2:
+		return false
+	set_quest("wardens", 3)
+	add_xp(200)
+	add_gold(120)
+	add_item(Items.make_unique("wardens_vigil"))
+	message.emit("Quest complete: The Wardens' Oath (+200 XP). Received: The Warden's Vigil", Color(0.97, 0.89, 0.64))
+	return true
+
+
+## The end of Act I: the hero goes down the undercroft stair.
+func descend_undercroft() -> bool:
+	if quest("act_end") != 1:
+		return false
+	set_quest("act_end", 2)
+	add_xp(300)
+	story_event.emit("act_complete")
+	return true
+
+
+func has_unique(id: String) -> bool:
+	for slot in progress["equipped"]:
+		var item = progress["equipped"][slot]
+		if item is Dictionary and item.get("unique", "") == id:
+			return true
+	return false
+
+
+## Whether this hero has ever found a unique (some drop only once for sure).
+func found_unique(id: String) -> bool:
+	return flags().get("found_" + id, false)
+
+
+func mark_unique_found(id: String) -> void:
+	flags()["found_" + id] = true
 
 
 func _remove_quest_item(uid: String) -> void:

@@ -12,6 +12,7 @@ const Loot = preload("res://scripts/actors/loot.gd")
 const CameraRig = preload("res://scripts/world/camera_rig.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 const Interactable = preload("res://scripts/world/interactable.gd")
+const Items = preload("res://scripts/data/items.gd")
 
 var grid  # LevelGrid
 var player: CharacterBody3D
@@ -38,6 +39,7 @@ func _ready() -> void:
 		grid = cat.grid
 		spawn = cat.spawn
 		_spawn_monsters(cat)
+		_spawn_warden_stones(cat)
 	else:
 		rng.seed = 1337  # the town looks the same every visit
 		var town := Town.new()
@@ -63,14 +65,19 @@ func _ready() -> void:
 	add_child(hud)
 
 	Game.leveled_up.connect(_on_level_up)
+	Game.story_event.connect(_on_story_event)
 	hud.banner(Game.area_title(), "Act I · The Tolling of Hollowmere" if Game.area == "town" else "Beneath St. Aldric's")
 	if Game.area == "town" and Game.quest_state() == 0:
 		message("Sister Maud waits by the chapel. Click her to speak.", B.GOLD)
+	elif Game.area == "town" and Game.quest("act_end") == 1:
+		message("The wells of Hollowmere are tolling. The undercroft stair is open behind the chapel door.", Color(0.6, 0.75, 0.95))
 
 
 func _exit_tree() -> void:
 	if Game.leveled_up.is_connected(_on_level_up):
 		Game.leveled_up.disconnect(_on_level_up)
+	if Game.story_event.is_connected(_on_story_event):
+		Game.story_event.disconnect(_on_story_event)
 
 
 func _build_environment() -> void:
@@ -153,7 +160,7 @@ func hovered_interactable() -> Node3D:
 	var best: Node3D = null
 	var best_d := 60.0
 	for it in _interactables:
-		if not is_instance_valid(it):
+		if not is_instance_valid(it) or not it.available():
 			continue
 		var d := _screen_dist(it.global_position + Vector3(0, 1.2, 0))
 		if d < best_d:
@@ -166,7 +173,7 @@ func nearest_interactable(pos: Vector3, max_dist: float) -> Node3D:
 	var best: Node3D = null
 	var best_d := max_dist
 	for it in _interactables:
-		if not is_instance_valid(it):
+		if not is_instance_valid(it) or not it.available():
 			continue
 		var d := Vector2(it.global_position.x - pos.x, it.global_position.z - pos.z).length()
 		if d < best_d:
@@ -280,6 +287,28 @@ func _spawn_monsters(cat) -> void:
 	boss = spawn_enemy("boss", cat.boss_pos, lv + 2, false)
 
 
+## The Wardens' Oath: the name-stones still missing lie in rooms of the crypt (one per room).
+func _spawn_warden_stones(cat) -> void:
+	if Game.quest("wardens") != 1:
+		return
+	var missing := Game.WARDEN_STONES - Game.warden_stones()
+	var rooms: Array = cat.rooms.filter(func(r): return r["kind"] == "normal" or r["kind"] == "side")
+	rooms.shuffle()
+	for i in mini(missing, rooms.size()):
+		var c: Vector2i = grid.random_floor_near(rooms[i]["center"], 2, rng)
+		var stone := Interactable.new()
+		stone.kind = "stone"
+		stone.display_name = "A Warden's Name-Stone"
+		stone.radius = 1.8
+		add_child(stone)
+		stone.global_position = grid.center(c)
+		var slab := B.box(Vector3(0.45, 0.6, 0.14), B.mat(Color(0.5, 0.55, 0.65), 0.6, Color(0.35, 0.45, 0.7), 1.4), Vector3(0, 0.3, 0), stone)
+		slab.rotation = Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * TAU, rng.randf_range(-0.3, 0.3))
+		B.omni(Color(0.55, 0.65, 0.95), 1.0, 3.0, Vector3(0, 0.8, 0), stone)
+		B.label("Name-Stone", Color(0.7, 0.78, 0.95), Vector3(0, 1.2, 0), stone, 30)
+		register_interactable(stone)
+
+
 func spawn_enemy(kind: String, pos: Vector3, lv: int, elite: bool) -> Node3D:
 	var e := Enemy.new()
 	e.world = self
@@ -298,12 +327,15 @@ func _on_enemy_died(e: Node3D) -> void:
 	var xp := int(float(e.data["xp"]) * (1.0 + 0.2 * (lv - 1)) * (2.5 if e.elite else 1.0))
 	Game.add_xp(xp)
 	Game.progress["kills"] = int(Game.progress.get("kills", 0)) + 1
+	_on_kill_powers()
 	var pos := e.global_position
 	if e.is_boss:
 		Fx.pillar(self, pos, 2.0, B.EMBER, 1.2)
 		shake(0.8)
 		for i in 3:
 			drop_item(pos, lv + 1, 0.55)
+		if not Game.found_unique("hasks_toll") or rng.randf() < 0.2:
+			drop_unique(pos, "hasks_toll")
 		drop_gold(pos, rng.randi_range(80, 140))
 		drop_potion(pos)
 		Game.on_boss_slain()
@@ -318,6 +350,14 @@ func _on_enemy_died(e: Node3D) -> void:
 		drop_potion(pos)
 	if rng.randf() < (0.65 if e.elite else 0.14):
 		drop_item(pos, lv, 0.3 if e.elite else 0.0)
+	if e.elite and rng.randf() < 0.08:
+		drop_unique(pos, "saints_knuckle")
+
+
+## Unique powers that react to a kill.
+func _on_kill_powers() -> void:
+	if player and not player.dead and Game.has_unique("saints_knuckle"):
+		player.hp = minf(Game.max_hp(), player.hp + Game.max_hp() * 0.04)
 
 
 func _scatter(pos: Vector3) -> Vector3:
@@ -351,6 +391,12 @@ func drop_item(pos: Vector3, ilvl: int, bias: float) -> void:
 	_drop(pos, "item", 0, Game.roll_loot(ilvl, bias))
 
 
+func drop_unique(pos: Vector3, id: String) -> void:
+	Game.mark_unique_found(id)
+	_drop(pos, "item", 0, Items.make_unique(id))
+	message("Something unique glimmers on the ground.", Items.RARITY_COLORS[Items.UNIQUE])
+
+
 func _open_portal(pos: Vector3) -> void:
 	var portal := Interactable.new()
 	portal.kind = "portal"
@@ -378,6 +424,27 @@ func interact(it: Node3D) -> void:
 				Game.enter_area("catacomb")
 		"stairs", "portal":
 			Game.enter_area("town")
+		"grave":
+			if Game.dig_grave() == "dug":
+				Fx.ring(self, it.global_position, 2.0, Color(1.0, 0.85, 0.55), 0.5)
+			elif Game.quest("lamps") >= 2:
+				message("Only an empty hole, and the smell of old lead.", Color(0.8, 0.75, 0.7))
+		"plinth":
+			if Game.place_warden_stones():
+				Fx.pillar(self, it.global_position, 1.2, Color(0.55, 0.65, 0.95), 1.2)
+				hud.banner("The Wardens' Oath", "Twelve names, spoken aloud. Below, twelve wardens lie down.")
+			elif Game.quest("wardens") == 1:
+				message("The plinth waits for its stones (%d/%d)." % [Game.warden_stones(), Game.WARDEN_STONES], Color(0.75, 0.8, 0.9))
+			elif Game.quest("wardens") == 0:
+				message("A plinth, its niches empty. Old Corwin might know why.", Color(0.8, 0.75, 0.7))
+		"stone":
+			Game.take_warden_stone()
+			Fx.ring(self, it.global_position, 1.5, Color(0.55, 0.65, 0.95), 0.4)
+			_interactables.erase(it)
+			it.queue_free()
+		"undercroft":
+			if Game.descend_undercroft() or Game.quest("act_end") >= 2:
+				hud.show_act_complete()
 
 
 func boss_engaged(e: Node3D) -> void:
@@ -395,6 +462,14 @@ func respawn_in_town() -> void:
 	if lost > 0:
 		message("You lost %d gold in the dark." % lost, Color(0.8, 0.5, 0.4))
 	Game.enter_area("town")
+
+
+func _on_story_event(id: String) -> void:
+	match id:
+		"wells_toll":
+			ActAudio.toll(self)
+			shake(0.4)
+			hud.banner("The Wells Toll", "Far below the water, every well in Hollowmere answers the bell")
 
 
 func _on_level_up(lv: int) -> void:
