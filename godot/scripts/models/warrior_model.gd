@@ -21,13 +21,17 @@ static func build(parent: Node3D, body_mat: StandardMaterial3D, weapon: Node3D) 
 
 	# Legs: tassets, thighs, knee cops, greaves, boots.
 	for side in [-1.0, 1.0]:
-		var foot := K.arm(parent, leather, Vector3(side * 0.16, 0.95, 0), 0.11, 0.09, 0.075, 0.45, 0.45,
+		var leg := Node3D.new()
+		leg.name = "LeftLeg" if side < 0 else "RightLeg"
+		leg.position = Vector3(side * 0.16, 0.95, 0)
+		parent.add_child(leg)
+		var foot := K.arm(leg, leather, Vector3.ZERO, 0.11, 0.09, 0.075, 0.45, 0.45,
 			Vector3.ZERO, 0.0)
 		K.add(foot, K.bevel_box(Vector3(0.17, 0.09, 0.32), 0.03), dark_steel, Vector3(0, -0.005, 0.07))
-		K.add(parent, K.lathe(PackedVector2Array([
+		K.add(leg, K.lathe(PackedVector2Array([
 			Vector2(0, 0), Vector2(0.11, 0), Vector2(0.12, 0.05), Vector2(0.08, 0.12), Vector2(0, 0.13)]), 8),
-			steel, Vector3(side * 0.16, 0.44, 0.04), Vector3(PI * 0.5, 0, 0))  # knee cop
-		K.add(parent, K.limb(0.085, 0.07, 0.4, 8), steel, Vector3(side * 0.16, 0.45, 0.0))  # greave
+			steel, Vector3(0, -0.51, 0.04), Vector3(PI * 0.5, 0, 0))  # knee cop
+		K.add(leg, K.limb(0.085, 0.07, 0.4, 8), steel, Vector3(0, -0.5, 0.0))  # greave
 	K.add(parent, K.bevel_box(Vector3(0.56, 0.3, 0.34), 0.05), leather, Vector3(0, 0.95, 0))  # hips
 	for side in [-1.0, 1.0]:
 		K.add(parent, K.plate(0.22, 0.34, 0.04, 0.03), dark_steel,

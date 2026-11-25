@@ -58,6 +58,10 @@ func _run() -> void:
 	await _frames(90)
 	w = get_tree().current_scene
 	await _shot("3_crypt")
+	w.hud.toggle_map()
+	await _frames(3)
+	await _shot("3_area_map")
+	w.hud.toggle_map()
 	# fight in the boss room
 	w.player.global_position = w.boss.global_position + Vector3(0, 0, 5)
 	w.boss.set_aggro()

@@ -58,6 +58,10 @@ func _run() -> void:
 		_check(ActAudio.music_id() == "hollowmere" and ActAudio._music != null and ActAudio._music.playing, "Hollowmere's music plays")
 		_check(ActAudio._music.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD and ActAudio._ambience != null, "the music loops, with wind")
 		_check(w.grid.walkable_at(w.player.global_position), "hero spawns on walkable ground")
+		w.hud.toggle_map()
+		_check(w.hud.is_blocking() and get_tree().paused, "area map pauses play")
+		w.hud.toggle_map()
+		_check(not get_tree().paused and not w.hud.is_blocking(), "closing area map resumes play")
 		# walk somewhere by path
 		var start: Vector3 = w.player.global_position
 		w.player._path_to(start + Vector3(0, 0, -8))

@@ -83,6 +83,7 @@ Preview the procedural assets with `godot --path godot res://tests/model_gallery
 | I or C | Hero and pack: click an item to equip, right-click to salvage it for gold |
 | Mouse wheel | Zoom |
 | H | Show or hide the controls help |
+| M or click the minimap | Open the area map. M or Esc resumes play. |
 | Esc | Close a panel, or pause (save and return to title, save and quit) |
 | 1Ã¢â‚¬â€œ9 in a dialogue | Pick a reply |
 

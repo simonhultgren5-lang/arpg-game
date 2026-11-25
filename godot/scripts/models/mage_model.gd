@@ -21,6 +21,12 @@ static func build(parent: Node3D, body_mat: StandardMaterial3D, weapon: Node3D) 
 	var ember := B.stylized_mat(B.EMBER, B.EMBER, B.EMBER, 5.0)
 	var eye := B.stylized_mat(Color(1.0, 0.75, 0.3), Color(1.0, 0.7, 0.3), Color(1.0, 0.6, 0.2), 4.0)
 
+	for side in [-1.0, 1.0]:
+		var leg := Node3D.new()
+		leg.name = "LeftLeg" if side < 0 else "RightLeg"
+		leg.position = Vector3(side * 0.17, 0.85, 0)
+		parent.add_child(leg)
+		K.add(leg, K.bevel_box(Vector3(0.18, 0.14, 0.35), 0.035), cloth, Vector3(0, -0.77, 0.12))
 	# Long robe, flared at the hem, with a trimmed border and a hanging sash.
 	K.add(parent, K.lathe(PackedVector2Array([
 		Vector2(0, 0.04), Vector2(0.52, 0.04), Vector2(0.5, 0.3), Vector2(0.38, 0.75),
