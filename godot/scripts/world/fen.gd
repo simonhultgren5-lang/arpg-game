@@ -55,8 +55,8 @@ static func build(world: Node3D, parent: Node3D, grid: Grid, rows: Array) -> voi
 					if rng.randf() < 0.28:
 						var scale_y := rng.randf_range(0.65, 1.25)
 						trunks.append(Transform3D(Basis.IDENTITY.scaled(Vector3(1, scale_y, 1)), base + Vector3.UP * scale_y))
-						for tier in 3:
-							var radius := 1.0 - tier * 0.23
+						for tier in 4:
+							var radius := 1.0 - tier * 0.19
 							var shape := Vector3(radius, scale_y, radius)
 							boughs.append(Transform3D(Basis(Vector3.UP, tier * 1.7).scaled(shape), base + Vector3.UP * (1.6 + tier * 0.9) * scale_y))
 					else:
@@ -83,9 +83,10 @@ static func build(world: Node3D, parent: Node3D, grid: Grid, rows: Array) -> voi
 						stones.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(size), patch))
 				"F": _watchfire(world, fen, p)
 	ground.generate_normals()
-	var earth := StandardMaterial3D.new()
+	# The fen's ground: the shared earth set in PBR, tinted by the painted vertex colours (grass, mud, scree).
+	var earth: StandardMaterial3D = B.pbr("earth", Color.WHITE, 0.22, 1.0, 0.0, 1.3).duplicate()
 	earth.vertex_color_use_as_albedo = true
-	B.surface_grain(earth, Vector3.ONE * 0.45)
+	earth.albedo_color = Color(2.4, 2.4, 2.4)  # the painted vertex colours are dark; lift them to moonlit grass and mud
 	B.mesh_node(ground.commit(), earth, Vector3.ZERO, fen)
 	var water := ShaderMaterial.new()
 	water.shader = preload("res://shaders/fen_river.gdshader")
@@ -100,14 +101,15 @@ static func build(world: Node3D, parent: Node3D, grid: Grid, rows: Array) -> voi
 	_batch(fen, _cone(0.032, 0.94, 0.018), B.mat(Color("#ba995c")), rushes)
 	_batch(fen, _cone(0.055, 0.09, 0.09), B.mat(Color("#d4b3b0")), flowers)
 	_batch(fen, _cone(0.055, 0.46, 0.0), B.mat(Color("#718352")), grass)
-	_batch(fen, _cone(1.28, 2.5, 0.0), B.mat(Color("#355952")), boughs)
-	_batch(fen, _cone(0.2, 2.0, 0.13), B.mat(Color("#4f3c37")), trunks)
+	# Needles read as a dense, soft-lit weave (the cloth set gives them fine normal detail); trunks are bark.
+	_batch(fen, _cone(1.28, 2.5, 0.0), B.pbr("cloth", Color(0.42, 0.62, 0.55), 1.4, 1.0, 0.0, 2.0), boughs)
+	_batch(fen, _cone(0.2, 2.0, 0.13), B.pbr("timber", Color(0.5, 0.4, 0.36), 1.2, 1.0, 0.0, 1.5), trunks)
 	var rock := SphereMesh.new()
-	rock.radial_segments = 6
-	rock.rings = 2
+	rock.radial_segments = 14
+	rock.rings = 7
 	rock.radius = 0.85
 	rock.height = 1.4
-	_batch(fen, rock, B.mat(Color("#716d79")), stones)
+	_batch(fen, rock, B.pbr("stone_wall", Color(0.62, 0.6, 0.68), 0.5, 1.0, 0.0, 1.8), stones)
 
 
 static func _land_color(v: Vector2i, rows: Array, noise: FastNoiseLite) -> Color:
@@ -120,7 +122,7 @@ static func _land_color(v: Vector2i, rows: Array, noise: FastNoiseLite) -> Color
 				"~", "=": tint += Color("#506760")
 				":", "P": tint += Color("#9a815e")
 				_: tint += Color("#586f47")
-	tint *= 0.25 + noise.get_noise_2d(v.x * 2, v.y * 2) * 0.05
+	tint *= 0.62 + noise.get_noise_2d(v.x * 2, v.y * 2) * 0.12
 	tint.a = 1.0
 	return tint
 
@@ -146,8 +148,8 @@ static func _cone(radius: float, height: float, tip: float) -> CylinderMesh:
 	mesh.top_radius = tip
 	mesh.bottom_radius = radius
 	mesh.height = height
-	mesh.radial_segments = 6
-	mesh.rings = 0
+	mesh.radial_segments = 11
+	mesh.rings = 1
 	return mesh
 
 

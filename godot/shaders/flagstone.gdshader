@@ -16,6 +16,8 @@ uniform float earth_size = 6.0;
 // How much the per-cell colour shows through (0 = texture only).
 uniform float cell_tint = 0.45;
 uniform float brightness = 1.0;
+// Puddled, wet patches (0 = dry). They are glossy, so the screen-space reflections catch torchlight in them.
+uniform float wetness : hint_range(0.0, 1.0) = 0.6;
 // Kept for older callers; the texture sets have their own courses.
 uniform vec2 course_size = vec2(1.30, 0.82);
 
@@ -35,8 +37,14 @@ void fragment() {
 	float rough = mix(texture(earth_roughness, uv_e).r, texture(paved_roughness, uv_p).r, paved);
 	// The level's cell colours are dark (made for untextured tiles); normalise them to around 1.
 	vec3 tint = mix(vec3(1.0), clamp(COLOR.rgb / max(dot(COLOR.rgb, vec3(0.333)), 0.01), 0.6, 1.4), cell_tint);
-	ALBEDO = alb * tint * brightness;
+	// Break the tiling: two big, unrelated cloud layers of light and dark that never repeat in view.
+	float macro = (texture(earth_albedo, ground / 23.0).r + texture(paved_albedo, ground / 37.0 + 0.37).g) * 0.5;
+	float wear = mix(0.78, 1.22, smoothstep(0.2, 0.8, macro));
+	// Wet patches sit in the low-lying, darker parts of that same field.
+	float damp = smoothstep(0.55, 0.7, texture(earth_albedo, ground / 11.0 + vec2(0.3, 0.1)).g * 0.6 + macro * 0.4) * wetness;
+	ALBEDO = alb * tint * brightness * wear * (1.0 - 0.4 * damp);
 	NORMAL_MAP = nrm;
-	NORMAL_MAP_DEPTH = 1.2;
-	ROUGHNESS = rough;
+	NORMAL_MAP_DEPTH = mix(1.2, 0.5, damp);
+	ROUGHNESS = mix(rough, 0.1, damp);
+	SPECULAR = mix(0.5, 0.8, damp);
 }

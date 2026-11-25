@@ -57,7 +57,12 @@ def _plate(size, seed, base=IRON, mottle=0.35):
     """A flat, mottled plate that stretches without visible features."""
     n = ddk.fbm(size, cells=3, octaves=3, seed=seed)
     n = (n - n.min()) / max(1e-6, np.ptp(n))
-    return base[None, None, :] * (1.0 - mottle * 0.5 + mottle * n[..., None])
+    # Fine forged grain and a few cold flecks so the plate reads as worked metal, not flat colour.
+    fine = ddk.fbm(size, cells=max(8, size // 5), octaves=2, seed=seed + 50)
+    fine = (fine - fine.min()) / max(1e-6, np.ptp(fine))
+    rgb = base[None, None, :] * (1.0 - mottle * 0.5 + mottle * n[..., None]) * (0.88 + 0.24 * fine[..., None])
+    fleck = fine > 0.93
+    return np.where(fleck[..., None], rgb + 0.05, rgb)
 
 
 def _rim(rgb, size, width, light=IRON_HI, inlay=GOLD, inlay_at=None, inner_shadow=False):
@@ -71,6 +76,13 @@ def _rim(rgb, size, width, light=IRON_HI, inlay=GOLD, inlay_at=None, inner_shado
     if inlay_at is not None:
         line = np.abs(d - inlay_at) < 0.9
         rgb = np.where(line[..., None], inlay[None, None, :], rgb)
+        # A thin dark groove beside the gold line and a faint second line give the inlay depth.
+        groove = (np.abs(d - (inlay_at + 1.8)) < 0.7) | (np.abs(d - (inlay_at - 1.8)) < 0.7)
+        rgb = np.where(groove[..., None] & ~line[..., None], rgb * 0.45, rgb)
+    # Edge wear: scratches and chips catch the light along the rim.
+    wear = ddk.fbm(size, cells=max(10, size // 3), octaves=2, seed=size + 7)
+    chip = rim & (wear > np.percentile(wear, 93))
+    rgb = np.where(chip[..., None], rgb * 1.5 + 0.03, rgb)
     if inner_shadow:
         s = np.clip(1.0 - (d - width) / 8.0, 0, 1) * (d >= width)
         rgb = rgb * (1.0 - 0.55 * s[..., None])
@@ -79,6 +91,10 @@ def _rim(rgb, size, width, light=IRON_HI, inlay=GOLD, inlay_at=None, inner_shado
 
 def _rivets(rgb, size, at, r=2.6):
     _, x, y = _edge_distance(size)
+    # A small gold diamond ornament behind each rivet.
+    for cx, cy in [(at, at), (size - at, at), (at, size - at), (size - at, size - at)]:
+        diamond = (np.abs(x - cx) + np.abs(y - cy)) < r * 2.3
+        rgb = np.where(diamond[..., None], GOLD[None, None, :] * 0.55, rgb)
     for cx, cy in [(at, at), (size - at, at), (at, size - at), (size - at, size - at)]:
         dd = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
         dome = np.clip(1 - dd / r, 0, 1)

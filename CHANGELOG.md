@@ -17,6 +17,8 @@ How to write a section:
 - **The area map is now a live 3D view of the real level.** The minimap and the full map show the actual lit streets, roofs and walls from above, not a flat painted chart.
 - **Hollowmere's buildings have real surfaces.** Houses, the chapel and the mausoleum use textured materials with normal maps and roughness: plaster, timber, slate and stone.
 - **A cinematic finish:** soft vignette and fine film grain over the world, sharper and softer shadows, better edge smoothing.
+- **A new interface finish.** The health and resource orbs are glass spheres of moving liquid in worked bronze rings, and every panel, button, tab and tooltip frame has forged grain, edge wear and gold inlay.
+- **Wet, varied ground.** Cobbles and flagstones no longer tile visibly, and puddled patches shine back torchlight. The fen has real earth, richer trees and textured stones.
 - The Play button in the launcher breathes like an ember, panels are frosted glass, and a fine film grain covers the window.
 
 ### Changes
@@ -24,6 +26,8 @@ How to write a section:
 - The plaza under lamp posts and townsfolk is cobbled all the way, with no dark squares.
 - The town is a little brighter so the streets and walls read at a glance.
 - The chapel's stained glass is deeper and less harsh.
+- Cloth and bone on heroes and monsters are softer: no more knitted-rope look on the skeleton and robes.
+- The crypt is a little brighter.
 
 ## 0.5.0-beta.7 — Embers and Mist (2026-11-25)
 

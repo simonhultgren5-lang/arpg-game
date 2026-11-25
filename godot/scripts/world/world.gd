@@ -124,7 +124,7 @@ func _build_environment() -> void:
 	env.background_color = Color(0.03, 0.025, 0.045)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.49, 0.55, 0.65) if town else Color(0.36, 0.43, 0.47)
-	env.ambient_light_energy = 0.52 if town else 0.34
+	env.ambient_light_energy = 0.52 if town else 0.46
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.1
 	env.glow_enabled = true

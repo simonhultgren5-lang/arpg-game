@@ -212,7 +212,7 @@ def cloth():
     """Coarse wool weave with frayed patches (light grey, tinted per material)."""
     s = DETAIL
     ys, xs = np.mgrid[0:s, 0:s] / s
-    n = 96
+    n = 40  # a broad, soft wool weave: finer reads as moire (knitted rope) at game distance
     warp = np.sin(xs * n * 2 * np.pi) * 0.5 + 0.5
     weft = np.sin(ys * n * 2 * np.pi) * 0.5 + 0.5
     over = ((np.floor(xs * n) + np.floor(ys * n)) % 2)[..., None][..., 0]
@@ -220,9 +220,9 @@ def cloth():
     fuzz = ddk.fbm(s, 64, 3, 5)
     worn = np.clip((ddk.fbm(s, 5, 4, 9) - 0.6) * 3, 0, 1)
     height = weave * 0.6 + fuzz * 0.4 - worn * 0.3
-    albedo = np.full((s, s, 3), 0.62) * (0.7 + 0.3 * weave[..., None]) * (1 - worn[..., None] * 0.3)
+    albedo = np.full((s, s, 3), 0.62) * (0.84 + 0.16 * weave[..., None]) * (0.9 + 0.2 * fuzz[..., None]) * (1 - worn[..., None] * 0.3)
     rough = 0.92 - weave * 0.05
-    return albedo, height, rough, 2.0
+    return albedo, height, rough, 1.1
 
 
 def skin():
@@ -240,13 +240,13 @@ def bone():
     """Old bone: porous, yellowed, with dark cracks."""
     s = DETAIL
     m = ddk.fbm(s, 6, 6, 61)
-    d1, d2, _ = ddk.cells(s, 50, 3)
-    crack = np.clip(1 - (d2 - d1) / 0.006, 0, 1) * (ddk.fbm(s, 4, 3, 2) > 0.55)
+    d1, d2, _ = ddk.cells(s, 14, 3)
+    crack = np.clip(1 - (d2 - d1) / 0.004, 0, 1) * (ddk.fbm(s, 4, 3, 2) > 0.62)
     pores = np.clip((ddk.value_noise(s, 128, 5) - 0.7) * 5, 0, 1)
     height = m * 0.5 - crack * 0.4 - pores * 0.2
     albedo = ddk.colorize(m, [(0, (0.55, 0.5, 0.4)), (1, (0.8, 0.76, 0.66))]) * (1 - crack[..., None] * 0.7) * (1 - pores[..., None] * 0.3)
-    rough = 0.7 + pores * 0.2
-    return albedo, height, rough, 3.0
+    rough = 0.55 + pores * 0.25 + m * 0.1
+    return albedo, height, rough, 1.4
 
 
 RECIPES = {

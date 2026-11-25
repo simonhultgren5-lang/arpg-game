@@ -40,6 +40,7 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 	_set_textures(floor_mat, "paved", "cobble" if town else "flagstone")
 	_set_textures(floor_mat, "earth", "earth")
 	floor_mat.set_shader_parameter("paved_size", 3.0 if town else 4.0)
+	floor_mat.set_shader_parameter("wetness", 0.55 if town else 0.9)
 	fmi.material_override = floor_mat
 	fmi.name = "Floor"
 	parent.add_child(fmi)
