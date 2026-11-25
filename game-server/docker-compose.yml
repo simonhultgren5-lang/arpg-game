@@ -27,7 +27,7 @@ services:
       MOTD: "Welcome to the Depths. Dev server, progress may be reset."
       DATABASE_URL: "postgres://depths:${POSTGRES_PASSWORD:-depths}@db:5432/depths"
     volumes:
-      # Backups (data/backups) and, from servers before 0.5.0-beta.9, the old SQLite database that is
+      # Backups (data/backups) and, from servers before 1.0.0, the old SQLite database that is
       # imported into PostgreSQL on the first start and then kept as depths.db.imported-<date>.
       - depths-data:/data
 

@@ -1,6 +1,6 @@
 // Depths of Darkness — PostgreSQL access shared by server.mjs and admin.mjs:
 // the connection pool, the schema migrations (migration-NNN-*.sql), transactions, the one-time import
-// of an old SQLite database (data/depths.db, servers before 0.5.0-beta.9) and the built-in backup format.
+// of an old SQLite database (data/depths.db, servers before 1.0.0) and the built-in backup format.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

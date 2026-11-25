@@ -99,7 +99,7 @@ Either way it rebuilds and restarts the containers (or runs `npm ci` and restart
 
 Nightly updates run as your user, so that user must be allowed to use Docker (`sudo usermod -aG docker $USER`, then log in again). See what they did with `journalctl -u depths-server-update`.
 
-**Updating from a server before 0.5.0-beta.9 (the SQLite versions):** on its first start the server moves everything from its old database file into PostgreSQL by itself, and keeps the file as `depths.db.imported-<date>` in the data volume. The new `docker-compose.yml` adds the database container, but `update.sh` from those older releases keeps your old `docker-compose.yml`, so the server finds no database and doesn't come back. Then run the new `update.sh` once:
+**Updating from a server before 1.0.0 (the SQLite versions):** on its first start the server moves everything from its old database file into PostgreSQL by itself, and keeps the file as `depths.db.imported-<date>` in the data volume. The new `docker-compose.yml` adds the database container, but `update.sh` from those older releases keeps your old `docker-compose.yml`, so the server finds no database and doesn't come back. Then run the new `update.sh` once:
 
 ```bash
 bash update.sh --force     # switches to the new docker-compose.yml, keeps your SERVER_NAME and MOTD

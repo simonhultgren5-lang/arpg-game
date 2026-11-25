@@ -12,7 +12,7 @@
 #   4. Installs the server's npm package (pg)
 #   5. Installs a systemd service so the server starts on boot and restarts if it crashes
 #   6. Starts the server and prints the address to add in the game launcher
-# Upgrading from a server before 0.5.0-beta.9: its SQLite file (data/depths.db) is imported into
+# Upgrading from a server before 1.0.0: its SQLite file (data/depths.db) is imported into
 # PostgreSQL on the first start and kept as data/depths.db.imported-<date>.
 set -euo pipefail
 

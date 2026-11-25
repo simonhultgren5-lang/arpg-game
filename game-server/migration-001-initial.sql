@@ -1,4 +1,4 @@
--- Depths of Darkness game server: first PostgreSQL schema (0.5.0-beta.9).
+-- Depths of Darkness game server: first PostgreSQL schema (1.0.0).
 -- Same tables as the SQLite database before it; times are milliseconds since 1970 (BIGINT).
 -- Applied once by db.mjs (migrate), inside a transaction. Never edit an applied migration: add
 -- migration-002-<name>.sql instead.

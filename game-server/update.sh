@@ -8,7 +8,7 @@
 #   bash update.sh --force    reinstall the newest release even if it isn't newer
 #
 # Accounts and saves are never touched: they live in PostgreSQL (its Docker volume, or the PostgreSQL
-# installed by install.sh). A first update from a server before 0.5.0-beta.9 moves them from the old
+# installed by install.sh). A first update from a server before 1.0.0 moves them from the old
 # SQLite file into PostgreSQL (the file is kept as a backup).
 # Your settings are kept: docker-compose.yml (SERVER_NAME, MOTD, ports) and config.json.
 #
@@ -156,8 +156,8 @@ else
   ok "Files updated to $latest"
 fi
 
-# ---------------------------------------------------------------- 0.5.0-beta.9: PostgreSQL
-# Servers before 0.5.0-beta.9 kept everything in one SQLite file. The new docker-compose.yml adds a
+# ---------------------------------------------------------------- 1.0.0: PostgreSQL
+# Servers before 1.0.0 kept everything in one SQLite file. The new docker-compose.yml adds a
 # PostgreSQL container; an old one (kept above because it has your settings) doesn't have it, so
 # switch to the new file once and carry SERVER_NAME and MOTD over. The server imports the old
 # SQLite file into PostgreSQL by itself on its first start and keeps the file as a backup.

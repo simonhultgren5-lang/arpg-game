@@ -16,7 +16,7 @@
 //   UPDATE_URL   where to look for new server versions (default: the GitHub release's
 //                server-update.json); set to "off" to turn the check off
 //
-// On its first start it imports data/depths.db (the SQLite database of servers before 0.5.0-beta.9)
+// On its first start it imports data/depths.db (the SQLite database of servers before 1.0.0)
 // into PostgreSQL and renames the file to depths.db.imported-<date>. See db.mjs.
 
 import crypto from 'node:crypto';
@@ -29,7 +29,7 @@ const PORT = Number(setting('PORT', 4100));
 const HOST = setting('HOST', '0.0.0.0');
 const SERVER_NAME = String(setting('SERVER_NAME', 'Depths Server')).slice(0, 40);
 const MOTD = String(setting('MOTD', '')).slice(0, 200);
-const SERVER_VERSION = '0.5.0-beta.8'; // kept equal to package.json by scripts/sync-version.mjs
+const SERVER_VERSION = '1.0.0'; // kept equal to package.json by scripts/sync-version.mjs
 const UPDATE_URL = String(
   setting('UPDATE_URL', 'https://github.com/simonhultgren5-lang/arpg-game/releases/latest/download/server-update.json'),
 );
@@ -58,7 +58,7 @@ try {
     console.error(`[db] Could not use PostgreSQL at ${redactUrl(DATABASE_URL)}. Set DATABASE_URL (environment or config.json);`);
     console.error('[db] see game-server/README.md. With Docker: docker compose up -d starts the database too.');
     if (fs.existsSync('/.dockerenv') && !process.env.DATABASE_URL) {
-      // Updated by update.sh from a release before 0.5.0-beta.9, which kept the old docker-compose.yml.
+      // Updated by update.sh from a release before 1.0.0, which kept the old docker-compose.yml.
       console.error('[db] This docker-compose.yml has no database. On the Pi run once:  bash update.sh --force');
     }
   }

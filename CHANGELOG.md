@@ -10,7 +10,7 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
-## Unreleased
+## 1.0.0 (2026-11-25)
 
 ### Server
 - **The game server now keeps accounts and saves in a PostgreSQL database.** Logins, heroes, cloud saves, news and settings move over by themselves the first time the new server starts, and the old database file is kept as a backup. Nothing changes in the launcher or the game.
