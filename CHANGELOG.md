@@ -9,6 +9,11 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.3.1 (2026-11-25)
+
+### Fixes
+- The launcher now notices new updates while it's open. Before, a new version only showed up after you closed and reopened the launcher.
+
 ## 0.3.0 (2026-11-25)
 
 ### New
