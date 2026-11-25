@@ -81,7 +81,19 @@ bold "Depths of Darkness server — update"
 info "Installed: $current"
 
 command -v curl >/dev/null 2>&1 || fail "curl is needed (sudo apt-get install -y curl)."
-manifest="$(curl -fsSL --max-time 30 "$UPDATE_URL")" || fail "Could not reach $UPDATE_URL"
+tmp_manifest="$(mktemp)"
+code="$(curl -sSL --max-time 30 -o "$tmp_manifest" -w '%{http_code}' "$UPDATE_URL" 2>/dev/null || true)"
+manifest="$(cat "$tmp_manifest" 2>/dev/null || true)"
+rm -f "$tmp_manifest"
+case "$code" in
+  200) ;;
+  404)
+    # The newest GitHub release has no server package (releases before 0.3.3 didn't publish one).
+    ok "No newer server release has been published yet. You're on $current."
+    exit 0 ;;
+  000|'') fail "Could not reach GitHub ($UPDATE_URL). Is the Pi online?" ;;
+  *) fail "GitHub answered $code for $UPDATE_URL. Try again later." ;;
+esac
 field() { printf '%s\n' "$manifest" | sed -n "s/^[[:space:]]*\"$1\":[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -n1; }
 latest="$(field version)"
 url="$(field url)"
