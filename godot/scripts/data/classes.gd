@@ -1,7 +1,10 @@
 extends RefCounted
-## Hero classes: base stats, basic attack and two skills each.
+## Hero classes: base stats, a basic attack and four skills each.
 ## kind: "arc" (melee sweep), "bolt" (projectile), "nova" (ring around the hero),
-##       "pyre" (delayed blast at the cursor), "rush" (dash), "fan" (spread of projectiles), "blink" (teleport).
+##       "pyre" (delayed blast at the cursor), "rush" (dash), "fan" (spread of projectiles), "blink" (teleport),
+##       "buff" (damage up, damage taken down), "whirl" (spin, hitting all around), "ward" (absorbs damage),
+##       "rain" (fire falling over an area), "trap" (slowing, bleeding ground), "flurry" (leap between foes).
+## Skills 3 and 4 (index 2 and 3) unlock at the hero level in "unlock".
 
 const CLASSES := {
 	"warrior": {
@@ -20,6 +23,12 @@ const CLASSES := {
 			{"id": "iron_rush", "name": "Iron Rush", "kind": "rush", "range": 8.0, "mult": 1.4,
 				"cooldown": 6.0, "mana": 14, "color": Color(0.93, 0.83, 0.62),
 				"desc": "Charge toward the cursor, battering everything in your path."},
+			{"id": "grave_roar", "name": "Grave Roar", "kind": "buff", "duration": 6.0, "damage": 0.35,
+				"guard": 0.25, "cooldown": 12.0, "mana": 20, "unlock": 3, "color": Color(0.95, 0.55, 0.25),
+				"desc": "A roar that would wake the buried: for 6 seconds you deal 35% more damage and take 25% less."},
+			{"id": "sextons_whirl", "name": "Sexton's Whirl", "kind": "whirl", "duration": 1.5, "radius": 2.8,
+				"mult": 0.55, "tick": 0.25, "cooldown": 8.0, "mana": 26, "unlock": 5, "color": Color(0.93, 0.83, 0.62),
+				"desc": "Spin with your blade out for 1.5 seconds, striking every foe around you again and again. You can move while you spin."},
 		],
 	},
 	"pyromancer": {
@@ -39,6 +48,13 @@ const CLASSES := {
 				"burn_time": 3.0, "delay": 0.55, "range": 16.0, "cooldown": 3.0, "mana": 28,
 				"color": Color(1.0, 0.3, 0.08),
 				"desc": "Call a pillar of flame at the cursor. The ground burns after."},
+			{"id": "ashen_ward", "name": "Ashen Ward", "kind": "ward", "duration": 8.0, "absorb": 0.35,
+				"cooldown": 14.0, "mana": 30, "unlock": 3, "color": Color(0.85, 0.6, 0.4),
+				"desc": "Wrap yourself in hot ash that absorbs damage equal to 35% of your life for 8 seconds."},
+			{"id": "cinder_rain", "name": "Cinder Rain", "kind": "rain", "radius": 4.5, "count": 8, "impact": 1.6,
+				"mult": 1.0, "duration": 1.6, "range": 16.0, "cooldown": 10.0, "mana": 40, "unlock": 5,
+				"color": Color(1.0, 0.4, 0.12),
+				"desc": "Burning cinders rain down around the cursor, each one bursting on the foes below."},
 		],
 	},
 	"rogue": {
@@ -59,6 +75,13 @@ const CLASSES := {
 				"mult": 1.2, "crit_window": 3.0, "cooldown": 5.0, "mana": 14,
 				"color": Color(0.55, 0.35, 0.8),
 				"desc": "Step through shadow to the cursor, cutting foes where you land. Your next hit is a critical strike."},
+			{"id": "bone_caltrops", "name": "Bone Caltrops", "kind": "trap", "radius": 3.2, "duration": 5.0,
+				"slow": 0.5, "mult": 0.3, "range": 12.0, "cooldown": 9.0, "mana": 18, "unlock": 3,
+				"color": Color(0.85, 0.8, 0.7),
+				"desc": "Scatter sharpened knuckle-bones at the cursor: for 5 seconds, foes in them are slowed by half and bleed."},
+			{"id": "death_flurry", "name": "Death Flurry", "kind": "flurry", "targets": 5, "range": 8.0, "mult": 1.3,
+				"cooldown": 10.0, "mana": 28, "unlock": 5, "color": Color(0.6, 0.4, 0.85),
+				"desc": "Vanish and strike up to five foes near you, one after another, before you are seen."},
 		],
 	},
 }

@@ -39,6 +39,9 @@ var aggro := false
 var _cd := 0.0
 var _windup := 0.0
 var _stun := 0.0
+## Slowed (Bone Caltrops): time left and the speed multiplier while it lasts.
+var _slow_t := 0.0
+var _slow_f := 1.0
 var _path := PackedVector3Array()
 var _path_i := 0
 var _repath := 0.0
@@ -167,7 +170,8 @@ func _physics_process(delta: float) -> void:
 			_cd = data["cd"] * (0.75 if _enraged else 1.0)
 	else:
 		move = _chase(delta, p, can_see)
-	var spd: float = data["speed"] * (1.3 if _enraged else 1.0)
+	_slow_t -= delta
+	var spd: float = data["speed"] * (1.3 if _enraged else 1.0) * (_slow_f if _slow_t > 0.0 else 1.0)
 	velocity = move * spd + _knock
 	move_and_slide()
 	global_position.y = 0.0
@@ -303,6 +307,13 @@ func take_damage(amount: float, crit := false, push := Vector3.ZERO) -> void:
 		_knock += Vector3(push.x, 0, push.z).normalized() * (5.0 if crit else 2.5)
 	if hp <= 0.0:
 		_die()
+
+
+func slow(seconds: float, factor: float) -> void:
+	if is_boss:
+		factor = lerpf(factor, 1.0, 0.5)  # Hask shrugs off half of it
+	_slow_t = maxf(_slow_t, seconds)
+	_slow_f = clampf(factor, 0.1, 1.0)
 
 
 func stun(seconds: float) -> void:

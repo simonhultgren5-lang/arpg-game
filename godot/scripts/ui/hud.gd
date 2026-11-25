@@ -136,8 +136,8 @@ func _build_bottom() -> void:
 	_add_slot(row, "LMB", cls["basic"], "basic", 0)
 	_add_slot(row, "RMB/1", cls["skills"][0], "skill", 0)
 	_add_slot(row, "2", cls["skills"][1], "skill", 1)
-	_add_slot(row, "3", {}, "locked", 2)
-	_add_slot(row, "4", {}, "locked", 3)
+	_add_slot(row, "3", cls["skills"][2], "skill", 2)
+	_add_slot(row, "4", cls["skills"][3], "skill", 3)
 	var sep := Control.new()
 	sep.custom_minimum_size = Vector2(10, 10)
 	row.add_child(sep)
@@ -173,7 +173,10 @@ func _add_slot(row: HBoxContainer, key: String, sk: Dictionary, kind: String, in
 		var cd := ""
 		if sk.has("cooldown") and kind == "skill":
 			cd = "  ·  Cooldown: %.1fs" % float(sk["cooldown"])
-		s.tooltip_text = "%s\n%s%s%s" % [s.title, sk.get("desc", ""), cost, cd]
+		var unlock := ""
+		if int(sk.get("unlock", 1)) > 1:
+			unlock = "\nUnlocks at level %d." % int(sk["unlock"])
+		s.tooltip_text = "%s\n%s%s%s%s" % [s.title, sk.get("desc", ""), cost, cd, unlock]
 	row.add_child(s)
 	_slots.append([s, kind, index])
 
@@ -428,7 +431,10 @@ func _process(_delta: float) -> void:
 		return
 	var mhp: float = Game.max_hp()
 	var mmana: float = Game.max_mana()
-	_hp_orb.set_values(p.hp / mhp, "%d / %d" % [int(ceil(p.hp)), int(mhp)])
+	var life_text := "%d / %d" % [int(ceil(p.hp)), int(mhp)]
+	if p.ward > 0.0:
+		life_text += "  +%d" % int(ceil(p.ward))
+	_hp_orb.set_values(p.hp / mhp, life_text)
 	_mana_orb.set_values(p.mana / mmana, "%d / %d" % [int(p.mana), int(mmana)])
 	var cls: Dictionary = Game.class_data
 	for entry in _slots:
@@ -438,6 +444,10 @@ func _process(_delta: float) -> void:
 				s.update_state(clampf(p.attack_cd / float(cls["basic"]["cooldown"]), 0.0, 1.0), true)
 			"skill":
 				var sk: Dictionary = cls["skills"][entry[2]]
+				var locked: bool = not p.skill_unlocked(entry[2])
+				if s.locked != locked:
+					s.locked = locked
+					s.queue_redraw()
 				s.update_state(clampf(p.skill_cd[entry[2]] / float(sk["cooldown"]), 0.0, 1.0), p.mana >= float(sk["mana"]))
 			"potion":
 				var n := int(Game.progress.get("potions", 0))

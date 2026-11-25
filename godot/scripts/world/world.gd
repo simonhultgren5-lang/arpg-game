@@ -248,6 +248,46 @@ func cast_pyre(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 	burn_light.queue_free()
 
 
+## Pyromancer's Cinder Rain: burning cinders fall at random spots around `at` over a short time.
+func cast_rain(at: Vector3, sk: Dictionary, source: Node3D) -> void:
+	var color: Color = sk["color"]
+	Fx.telegraph(self, at, sk["radius"], color, float(sk["duration"]))
+	var n := int(sk["count"])
+	for i in n:
+		await get_tree().create_timer(float(sk["duration"]) / n).timeout
+		if not is_instance_valid(source):
+			return
+		var a := rng.randf() * TAU
+		var p := at + Vector3(cos(a), 0, sin(a)) * rng.randf_range(0.0, float(sk["radius"]) - 0.6)
+		Fx.pillar(self, p, float(sk["impact"]) * 0.5, color, 0.4)
+		Fx.ring(self, p, sk["impact"], color, 0.3)
+		hit_radius(p, sk["impact"], sk["mult"], source, {})
+	shake(0.2)
+
+
+## Rogue's Bone Caltrops: ground at `at` that slows foes and makes them bleed while it lasts.
+func cast_trap(at: Vector3, sk: Dictionary, source: Node3D) -> void:
+	var color: Color = sk["color"]
+	var ground := B.cylinder(sk["radius"], sk["radius"], 0.04, Fx.glow_mat(color, 0.18), at + Vector3(0, 0.05, 0), self, 24)
+	for i in 14:
+		var a := rng.randf() * TAU
+		var bone := B.box(Vector3(0.05, 0.05, 0.3), B.mat(Color(0.85, 0.8, 0.7)), at + Vector3(cos(a), 0.06, sin(a)) * rng.randf_range(0.2, float(sk["radius"]) - 0.2), self)
+		bone.rotation.y = rng.randf() * TAU
+		bone.reparent(ground)
+	Fx.ring(self, at, sk["radius"], color, 0.4)
+	var ticks := int(float(sk["duration"]) / 0.5)
+	for t in ticks:
+		for e in enemies():
+			if is_instance_valid(e) and not e.dead and Vector2(e.global_position.x - at.x, e.global_position.z - at.z).length() < float(sk["radius"]) + e.radius:
+				e.slow(0.6, 1.0 - float(sk["slow"]))
+		if is_instance_valid(source):
+			hit_radius(at, sk["radius"], float(sk["mult"]), source, {})
+		await get_tree().create_timer(0.5).timeout
+		if not is_inside_tree():
+			return
+	ground.queue_free()
+
+
 func damage_number(pos: Vector3, amount: float, crit: bool) -> void:
 	var text := str(int(ceil(amount)))
 	if crit:

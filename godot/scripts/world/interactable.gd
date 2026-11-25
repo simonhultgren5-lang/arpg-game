@@ -18,6 +18,8 @@ var _t := 0.0
 
 func _ready() -> void:
 	add_to_group("interactables")
+	if shown_when.is_valid():
+		visible = bool(shown_when.call())
 
 
 ## Whether the hero can see and use it right now.
