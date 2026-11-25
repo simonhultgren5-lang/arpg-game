@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Depths of Darkness"
 config/description="A grim gothic action RPG. Act I: The Tolling of Hollowmere."
-config/version="0.5.0-beta.4"
+config/version="0.5.0-beta.5"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 boot_splash/bg_color=Color(0.047, 0.039, 0.071, 1)

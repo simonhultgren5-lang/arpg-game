@@ -235,12 +235,16 @@ Developer commit → Build server (GitHub Actions)
 | --- | --- |
 | Left click | Move, attack, or talk to / use what you clicked (hold to keep going) |
 | Shift + left click | Attack toward the cursor without moving |
-| Right click or `1` | First skill · `2` second skill |
+| Right click, `1`–`4` | The skills on your bar (hold to repeat) |
 | `Q` | Grave-moss draught (heals) |
 | `W A S D` / arrows | Move directly |
 | `E` | Talk to or use the nearest NPC, gate or stairs |
-| `I` or `C` | Hero and pack |
+| `C` or `I` | Character and bag: drag gear onto your hero, compare in the tooltip |
+| `K` | Skills: choose your bar, each skill's variant and your passives |
+| `M` | Area map |
 | Mouse wheel | Zoom |
-| `Esc` | Close a panel, or pause |
+| `Esc` | Close a panel, or the menu (with Settings: graphics, audio, gameplay, keys) |
+
+Every key can be changed in Settings → Controls.
 
 The full list is in [godot/README.md](godot/README.md#controls).
