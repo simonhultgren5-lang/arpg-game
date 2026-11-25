@@ -63,7 +63,7 @@ func _ready() -> void:
 
 
 func _select(id: String, title: String) -> void:
-	_art.texture = load("res://assets/textures/field_guide/%s.jpg" % id)
+	_art.texture = load("res://art/field_guide/%s.jpg" % id)
 	_caption.text = title
 	ActAudio.voice(self, id, true)
 
