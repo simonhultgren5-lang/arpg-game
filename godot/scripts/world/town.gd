@@ -9,6 +9,7 @@ const LevelGrid = preload("res://scripts/world/level_grid.gd")
 const LevelMesh = preload("res://scripts/world/level_mesh.gd")
 const B = preload("res://scripts/world/build.gd")
 const Interactable = preload("res://scripts/world/interactable.gd")
+const TownsfolkModel = preload("res://scripts/models/townsfolk_model.gd")
 
 const MAP := [
 	"####################################",
@@ -270,25 +271,23 @@ func _npc(world: Node3D, level: Node3D, npc_id: String, p: Vector3) -> void:
 	node.radius = 2.4
 	node.position = p
 	level.add_child(node)
-	var robe := B.mat(NPC_COLORS.get(npc_id, Color(0.2, 0.2, 0.2)))
-	B.cylinder(0.25, 0.5, 1.5, robe, Vector3(0, 0.75, 0), node, 10)
-	B.sphere(0.24, B.mat(Color(0.55, 0.45, 0.4)), Vector3(0, 1.72, 0), node, 10)
+	TownsfolkModel.build(node, npc_id)
 	match npc_id:
 		"maud":
-			B.cylinder(0.18, 0.32, 0.7, robe, Vector3(0, 1.85, -0.05), node, 10)  # veil
-			B.box(Vector3(0.06, 0.4, 0.06), B.mat(B.GOLD, 0.4, B.GOLD, 0.6, 0.8), Vector3(0, 1.2, 0.36), node)
-			B.box(Vector3(0.24, 0.06, 0.06), B.mat(B.GOLD, 0.4, B.GOLD, 0.6, 0.8), Vector3(0, 1.28, 0.36), node)
-			B.omni(Color(0.9, 0.7, 0.45), 0.8, 4.0, Vector3(0.4, 1.5, 0.6), node)
+			B.omni(Color(0.9, 0.7, 0.45), 0.5, 4.0, Vector3(0.4, 1.8, 0.8), node)
 		"edda":
-			B.box(Vector3(0.8, 0.5, 0.4), B.mat(Color(0.1, 0.1, 0.11), 0.4, Color.BLACK, 1.0, 0.8), Vector3(0.9, 0.45, 0.2), node)  # anvil
+			# Her cold forge: anvil, a barrel of quench water and banked embers.
+			var anvil := Node3D.new()
+			anvil.position = Vector3(0.95, 0, 0.25)
+			node.add_child(anvil)
+			var iron := B.stylized_mat(Color(0.14, 0.14, 0.16), Color(1.0, 0.55, 0.3))
+			B.box(Vector3(0.36, 0.42, 0.3), iron, Vector3(0, 0.21, 0), anvil)
+			B.box(Vector3(0.75, 0.16, 0.32), iron, Vector3(0, 0.5, 0), anvil)
+			var horn := B.cylinder(0.0, 0.1, 0.32, iron, Vector3(0.48, 0.5, 0), anvil, 6)
+			horn.rotation.z = PI * 0.5
 			preload("res://scripts/models/props_model.gd").barrel(node, Vector3(1.25, 0, -0.6))
-			B.box(Vector3(0.6, 0.06, 0.5), B.mat(Color(0.3, 0.18, 0.1)), Vector3(0, 1.0, 0.27), node)  # apron
 			B.omni(B.EMBER, 1.4, 5.0, Vector3(-0.8, 0.6, 0.5), node)
 			B.sphere(0.25, B.mat(B.EMBER, 1.0, B.EMBER, 3.0), Vector3(-0.9, 0.3, 0.3), node, 6)
-		"corwin":
-			B.cylinder(0.03, 0.03, 1.8, B.mat(Color(0.2, 0.14, 0.08)), Vector3(0.45, 0.9, 0.1), node, 5)  # spade
-			B.box(Vector3(0.3, 0.4, 0.05), B.mat(Color(0.3, 0.3, 0.32), 0.5, Color.BLACK, 1.0, 0.6), Vector3(0.45, 0.1, 0.1), node)
-			B.torch(node, Vector3(-0.45, 1.2, 0.2), Vector3.ZERO, 5.0, 1.0)
 	node.marker = B.label("!", B.GOLD, Vector3(0, 2.7, 0), node, 96)
 	B.label(info.get("name", npc_id), Color(0.85, 0.82, 0.78), Vector3(0, 2.25, 0), node, 32)
 	world.call("register_interactable", node)

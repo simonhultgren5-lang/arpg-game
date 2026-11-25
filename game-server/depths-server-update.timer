@@ -1,0 +1,11 @@
+# Installed by `bash update.sh --auto`: looks for a new server release every night.
+[Unit]
+Description=Nightly Depths of Darkness game server update
+
+[Timer]
+OnCalendar=*-*-* 04:30
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

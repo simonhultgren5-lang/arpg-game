@@ -28,7 +28,7 @@ func load_progress() -> Dictionary:
 	var local := _read_local()
 	if not Boot.is_online():
 		return local
-	var url := "%s/api/characters/%s/save" % [Boot.server_url, str(Boot.character["id"]).uri_encode()]
+	var url := "%s/api/characters/%s/save" % [_base_url(), str(Boot.character["id"]).uri_encode()]
 	var res: Array = await _request(url, HTTPClient.METHOD_GET, "")
 	if res[0] != OK:
 		_status("Server unreachable: playing from the local copy.")
@@ -58,7 +58,7 @@ func save_progress(progress: Dictionary) -> void:
 	_write_local(text)
 	if not Boot.is_online():
 		return
-	var url := "%s/api/characters/%s/save" % [Boot.server_url, str(Boot.character["id"]).uri_encode()]
+	var url := "%s/api/characters/%s/save" % [_base_url(), str(Boot.character["id"]).uri_encode()]
 	var payload := {
 		"data": {SAVE_KEY: text},
 		"meta": {"heroLevel": int(progress.get("level", 1)), "depth": int(progress.get("depth", 1))},
@@ -99,6 +99,40 @@ func _write_local(text: String) -> void:
 	f.store_string(text)
 	f.close()
 	DirAccess.rename_absolute(tmp, path)
+
+
+var _resolved_base := ""
+
+
+## The server URL with its host name swapped for an IPv4 address. Names like raspberrypi.local often
+## resolve to an IPv6 link-local address first (fe80::...), which Godot can't connect to without a
+## scope id, so every request timed out. The server doesn't use the Host header, so an IP is fine.
+func _base_url() -> String:
+	if _resolved_base != "":
+		return _resolved_base
+	var base := Boot.server_url
+	var scheme_end := base.find("://")
+	if scheme_end < 0:
+		return base
+	var rest := base.substr(scheme_end + 3)
+	var host_end := rest.find("/")
+	var authority := rest if host_end < 0 else rest.substr(0, host_end)
+	var path := "" if host_end < 0 else rest.substr(host_end)
+	var host := authority
+	var port := ""
+	var colon := authority.rfind(":")
+	if colon > 0 and not authority.begins_with("["):
+		host = authority.substr(0, colon)
+		port = authority.substr(colon)
+	if base.begins_with("https://") or host.is_valid_ip_address() or host.begins_with("["):
+		# Keep names for HTTPS: the certificate is issued for the name, not the address.
+		_resolved_base = base
+		return base
+	var ip := IP.resolve_hostname(host, IP.TYPE_IPV4)
+	if ip == "" or not ip.is_valid_ip_address():
+		return base  # try again next time; maybe the network wasn't ready
+	_resolved_base = base.substr(0, scheme_end + 3) + ip + port + path
+	return _resolved_base
 
 
 ## Returns [error, http code, body text].

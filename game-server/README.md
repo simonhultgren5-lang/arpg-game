@@ -72,15 +72,35 @@ docker compose up -d
 
 ### Update to a new version
 
-Build and copy the new package, then on the Pi:
+Every release on GitHub includes the server. The server checks for new releases every 6 hours: the launcher then shows **Server update x.y.z available** under the server, and the server log prints a line about it. The server never updates itself. You install the update on the Pi with `update.sh`:
 
 ```bash
-tar xzf depths-server-0.2.0.tar.gz   # unpacks over the old files
-cd depths-server
-docker compose up -d --build
+cd ~/depths-server            # or game-server/ inside your git clone
+bash update.sh                # installs the newest release if there is one
 ```
 
-Accounts and saves are kept: they live in the `depths-data` Docker volume, not in the folder. If you changed `SERVER_NAME` or `MOTD`, the new `docker-compose.yml` overwrites them, so set them again.
+It works whether you installed from the package or from a git clone:
+
+- **Package folder:** it downloads `depths-server-<version>.tar.gz`, checks its SHA-256 and copies the new files over the folder.
+- **Git clone:** it fast-forwards the clone to the release tag (`v<version>`).
+
+Either way it rebuilds and restarts the container (or restarts the systemd service from `install.sh`), then waits until the new version answers. Accounts and saves stay in the Docker volume. Your `docker-compose.yml` (`SERVER_NAME`, `MOTD`, ports) is kept: if a release changes that file, the new one is saved next to yours as `docker-compose.yml.new`.
+
+| Command | What it does |
+| --- | --- |
+| `bash update.sh --check` | Only says whether an update is available |
+| `bash update.sh --auto` | Turns on nightly updates (a systemd timer, around 04:30) |
+| `bash update.sh --no-auto` | Turns them off again |
+| `bash update.sh --force` | Reinstalls the newest release |
+
+Nightly updates run as your user, so that user must be allowed to use Docker (`sudo usermod -aG docker $USER`, then log in again). See what they did with `journalctl -u depths-server-update`.
+
+**First time on a Pi that runs from a git clone:** older checkouts don't have `update.sh` yet. Pull once by hand, then use it from then on:
+
+```bash
+cd ~/arpg-game && git pull
+bash game-server/update.sh --auto
+```
 
 ### Back up the data
 
@@ -129,7 +149,7 @@ journalctl -u depths-server -f
 sudo systemctl restart depths-server   # after changing config.json
 ```
 
-Running `bash install.sh` again (for example after unpacking a new version) is safe: it keeps `config.json` and `data/`.
+Running `bash install.sh` again (for example after unpacking a new version) is safe: it keeps `config.json` and `data/`. `bash update.sh` works here too: it restarts the systemd service instead of Docker.
 
 ## Connect the launcher
 
