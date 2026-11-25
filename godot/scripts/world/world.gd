@@ -138,6 +138,11 @@ func ui_blocking() -> bool:
 	return hud != null and hud.is_blocking()
 
 
+## True when keys shouldn't reach the hero (menus, dialogue, the map; not the Character or Skills panels).
+func keys_blocked() -> bool:
+	return hud != null and hud.keys_blocked()
+
+
 func enemies() -> Array:
 	return get_tree().get_nodes_in_group("enemies")
 

@@ -145,7 +145,12 @@ func _build_model() -> void:
 # ------------------------------------------------------------------ input
 
 func _unhandled_input(event: InputEvent) -> void:
-	if dead or world.ui_blocking():
+	if dead:
+		return
+	# With a panel open the mouse belongs to the panel, but keys (skills, draughts) still work.
+	if event is InputEventMouseButton and world.ui_blocking():
+		return
+	if not (event is InputEventMouseButton) and world.keys_blocked():
 		return
 	if event.is_action_pressed("bar_1"):
 		_lmb_held = true
@@ -177,7 +182,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _primary_press() -> void:
-	if Input.is_key_pressed(KEY_SHIFT):
+	if Input.is_action_pressed("force_attack"):
 		_hold_mode = "force"
 		_clear_targets()
 		return
@@ -198,6 +203,13 @@ func _primary_press() -> void:
 	_hold_mode = "move"
 	_clear_targets()
 	_path_to(world.mouse_ground())
+
+
+## Stops walking, attacking and holding (a panel just opened over the world).
+func stop() -> void:
+	_clear_targets()
+	_lmb_held = false
+	_hold_mode = ""
 
 
 func _clear_targets() -> void:
@@ -224,7 +236,7 @@ func _physics_process(delta: float) -> void:
 	crit_buff -= delta
 	for id in _cds:
 		_cds[id] = maxf(0.0, _cds[id] - delta)
-	if not world.ui_blocking():
+	if not world.keys_blocked():
 		for k in range(1, Game.BAR_SIZE):
 			if _held[k]:
 				cast_slot(k, false)
@@ -251,7 +263,7 @@ func _physics_process(delta: float) -> void:
 
 	var move := Vector3.ZERO
 	var iv := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	if iv.length() > 0.1 and not world.ui_blocking():
+	if iv.length() > 0.1 and not world.keys_blocked():
 		_clear_targets()
 		_hold_mode = ""
 		move = Vector3(iv.x, 0, iv.y).normalized()

@@ -81,7 +81,7 @@ func load_hero() -> void:
 	class_data = Classes.get_class_data(hero_class)
 	var saved: Dictionary = await SaveSystem.load_progress()
 	progress = new_progress()
-	if not saved.is_empty():
+	if not saved.is_empty() and int(saved.get("version", 1)) < SAVE_VERSION:
 		saved = migrate(saved, hero_class)
 	for key in saved:
 		progress[key] = saved[key]
@@ -168,7 +168,10 @@ static func migrate(saved: Dictionary, hero_class := "warrior") -> Dictionary:
 			continue
 		_migrate_item(item, hero_class)
 		var kind: String = item["slot"]
-		var to := "ring_1" if kind == "ring" else kind
+		# An item already in a slot that takes it stays there (a version-2 save is left as it is).
+		var to: String = slot if eq.has(slot) and Items.slot_kind(slot) == kind else ("ring_1" if kind == "ring" else kind)
+		if kind == "ring" and eq.get(to) != null and eq.get("ring_2") == null:
+			to = "ring_2"
 		if eq.has(to) and eq[to] == null:
 			eq[to] = item
 		else:

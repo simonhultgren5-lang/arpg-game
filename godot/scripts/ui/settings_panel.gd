@@ -171,7 +171,7 @@ func _controls() -> Control:
 	var p := _page("list")
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(p)
-	p.add_child(UiTheme.label("Click a key, then press the new key or mouse button. Esc cancels.", 14, UiTheme.MUTED))
+	p.add_child(UiTheme.label("Click a key, then press the new key or mouse button (not the left button). Esc cancels.", 14, UiTheme.MUTED))
 	for a in Settings.ACTIONS:
 		var b := Button.new()
 		b.text = Settings.key_text(a[0])
@@ -197,7 +197,8 @@ func _input(event: InputEvent) -> void:
 		_key_buttons[_waiting].text = Settings.key_text(_waiting)
 		_waiting = ""
 		return
-	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+	# The wheel scrolls, and a left click is just a click (it would otherwise take move/attack away).
+	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 		return
 	var action := _waiting
 	_waiting = ""

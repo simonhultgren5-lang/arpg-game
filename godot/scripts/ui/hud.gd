@@ -408,6 +408,8 @@ func open_panel(name: String) -> void:
 		toggle_map()
 	close_panels()
 	_panels[name].visible = true
+	if world and world.player:
+		world.player.stop()
 
 
 func close_panels() -> void:
@@ -629,6 +631,11 @@ func _input(event: InputEvent) -> void:
 			if idx < _dlg_buttons.size():
 				_dlg_buttons[idx].emit_signal("pressed")
 			get_viewport().set_input_as_handled()
+
+
+## Like is_blocking(), except that the Character and Skills panels let keys through to the hero.
+func keys_blocked() -> bool:
+	return _map.expanded or _dialogue.visible or _pause.visible or _death.visible or _act_complete.visible or panel_open() == "settings"
 
 
 func is_blocking() -> bool:

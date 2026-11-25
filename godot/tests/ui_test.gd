@@ -102,6 +102,14 @@ func _gear() -> void:
 	_check(knuckle.size() == 1 and knuckle[0]["slot"] == "ring", "Knuckle of the Thirteenth becomes a ring")
 	_check((m["inventory"] as Array).all(func(i): return str(i.get("icon", "")) != ""), "migrated items get icons")
 
+	# A version-2 save loads unchanged: both rings stay worn, nothing moves to the bag.
+	var v2 := m.duplicate(true)
+	v2["equipped"]["ring_1"] = Items.roll_item(3, "warrior", 0.0, "ring")
+	v2["equipped"]["ring_2"] = Items.roll_item(3, "warrior", 0.0, "ring")
+	var again: Dictionary = Game.migrate(v2)
+	_check(again["equipped"]["ring_2"] == v2["equipped"]["ring_2"] and again["equipped"]["ring_1"] == v2["equipped"]["ring_1"], "reloading a v2 save keeps both rings worn")
+	_check((again["inventory"] as Array).size() == (v2["inventory"] as Array).size(), "reloading a v2 save adds nothing to the bag")
+
 	# Every kind rolls with an icon.
 	for kind in Items.KINDS:
 		var it: Dictionary = Items.roll_item(5, "warrior", 0.5, kind)
@@ -349,5 +357,49 @@ func _panels() -> void:
 		await _frames(2)
 	hud.close_panels()
 	_check(hud.hotbar_slots() == Game.BAR_SIZE, "the hotbar shows six skill slots")
+
+	# With a panel open, keys still work (a draught mid-fight) and the hero stops walking.
+	var p = w.player
+	p._path = PackedVector3Array([p.global_position + Vector3(8, 0, 0)])
+	p._path_i = 0
+	p._lmb_held = true
+	hud.open_panel("character")
+	await _frames(2)
+	_check(p._path.is_empty() and not p._lmb_held, "opening a panel stops the hero")
+	Game.progress["potions"] = 3
+	p.hp = 10.0
+	p.potion_cd = 0.0
+	var ev := InputEventAction.new()
+	ev.action = "potion"
+	ev.pressed = true
+	p._unhandled_input(ev)
+	_check(int(Game.progress["potions"]) == 2, "a draught works with a panel open")
+	hud.close_panels()
+
+	# Attack in place follows its binding, not a hard-wired Shift.
+	var f := InputEventKey.new()
+	f.physical_keycode = KEY_F
+	Settings.path = "user://settings_test.cfg"
+	Settings.rebind("force_attack", f)
+	Input.action_press("force_attack")
+	p._hold_mode = ""
+	p._primary_press()
+	_check(p._hold_mode == "force", "the rebound attack-in-place key works")
+	Input.action_release("force_attack")
+
+	# A stray left click while the Controls tab waits for a key doesn't steal the left mouse button.
+	hud.open_panel("settings")
+	var sp2 = hud.panel("settings")
+	sp2._waiting = "potion"
+	sp2._key_buttons["potion"] = Button.new()
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	sp2._input(click)
+	_check(Settings.key_text("bar_1") == "LMB" and Settings.key_text("potion") != "LMB", "left click can't be taken by a rebind")
+	sp2._waiting = ""
+	hud.close_panels()
+	Settings.reset()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://settings_test.cfg"))
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	await _frames(5)
