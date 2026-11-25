@@ -21,7 +21,7 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 	fm.use_colors = true
 	fm.use_custom_data = true
 	var tile := BoxMesh.new()
-	tile.size = Vector3(cell * 0.97, 0.2, cell * 0.97)
+	tile.size = Vector3(cell * 1.01, 0.2, cell * 1.01)  # tiles overlap a hair so no dark seams show between them
 	fm.mesh = tile
 	fm.instance_count = floor_cells.size()
 	for i in floor_cells.size():
@@ -30,7 +30,15 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 		fm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rng.randi_range(0, 3) * PI * 0.5), p))
 		fm.set_instance_color(i, floor_color.call(c))
 		var paved: bool = not is_paved.is_valid() or is_paved.call(c)
-		fm.set_instance_custom_data(i, Color(float(paved), 0, 0, 1))
+		var mask := 0
+		var bits := {Vector2i(0, -1): 1, Vector2i(1, 0): 2, Vector2i(0, 1): 4, Vector2i(-1, 0): 8}
+		for d in bits:
+			var nc: Vector2i = c + d
+			if grid.inside(nc) and grid.get_cell(nc) != LevelGrid.SOLID:
+				var n_paved: bool = not is_paved.is_valid() or is_paved.call(nc)
+				if n_paved != paved:
+					mask |= int(bits[d])
+		fm.set_instance_custom_data(i, Color(float(paved), float(mask) / 15.0, 0, 1))
 	var fmi := MultiMeshInstance3D.new()
 	fmi.multimesh = fm
 	var floor_mat := ShaderMaterial.new()
@@ -41,6 +49,7 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 	_set_textures(floor_mat, "earth", "earth")
 	floor_mat.set_shader_parameter("paved_size", 3.0 if town else 4.0)
 	floor_mat.set_shader_parameter("wetness", 0.55 if town else 0.9)
+	floor_mat.set_shader_parameter("brightness", 1.3 if town else 1.0)
 	fmi.material_override = floor_mat
 	fmi.name = "Floor"
 	parent.add_child(fmi)

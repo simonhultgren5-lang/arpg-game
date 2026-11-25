@@ -13,6 +13,7 @@ const Interactable = preload("res://scripts/world/interactable.gd")
 const TownsfolkModel = preload("res://scripts/models/townsfolk_model.gd")
 
 const Fen = preload("res://scripts/world/fen.gd")
+const BK = preload("res://scripts/world/building_kit.gd")
 
 const MAP := [
 	"####################################",
@@ -111,7 +112,7 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 			return Color(0.13, 0.12, 0.14).lerp(Color(0.17, 0.15, 0.15), n)
 		if c.x > 21 and c.y < 8:  # graveyard earth
 			return Color(0.065, 0.075, 0.055).lerp(Color(0.09, 0.09, 0.07), n)
-		return Color(0.08, 0.075, 0.065).lerp(Color(0.11, 0.095, 0.08), n)
+		return Color(0.085, 0.092, 0.058).lerp(Color(0.12, 0.118, 0.075), n)
 	var level := Node3D.new()
 	level.name = "Town"
 	world.add_child(level)
@@ -143,6 +144,7 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 	_lamp_trail(level)
 	_undercroft(world, level)
 	_dress(level)
+	_ground_cover(level)
 	# The road south vanishes into fog.
 	var fog_light := B.omni(Color(0.4, 0.38, 0.55), 0.45, 10.0, grid.center(Vector2i(17, 24)) + Vector3(0, 3, 4), level)
 	fog_light.name = "RoadGlow"
@@ -180,6 +182,52 @@ func _dress(level: Node3D) -> void:
 			Props.bone_pile(level, grid.center(c) + Vector3(r.randf_range(-1, 1), 0, r.randf_range(-1, 1)), r)
 
 
+## Living ground: grass tufts that thicken in patches, wildflowers and scattered pebbles on the bare earth of the
+## town (visual only, own RNG so the layout never shifts). Paving, buildings and graves are left clear.
+func _ground_cover(level: Node3D) -> void:
+	var TreeKit = preload("res://scripts/models/tree_kit.gd")
+	var r := RandomNumberGenerator.new()
+	r.seed = 9001
+	var patches := FastNoiseLite.new()
+	patches.seed = 5
+	patches.frequency = 0.16
+	var blades: Array[Transform3D] = []
+	var stones: Array[Transform3D] = []
+	var flowers: Array[Transform3D] = []
+	for y in range(1, Fen.START_ROW - 1):
+		for x in range(1, chars[y].size() - 1):
+			if chars[y][x] != ".":
+				continue
+			var clear := true
+			for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+				var n: String = chars[y + d.y][x + d.x]
+				if n in ["H", "C", "B", "G", "W", "S", "U", "Y"]:
+					clear = false
+			var density := patches.get_noise_2d(x * 3.0, y * 3.0) * 0.5 + 0.55
+			var count := int(density * (6.0 if clear else 2.0) * 2.0)
+			var base := grid.center(Vector2i(x, y))
+			for i in count:
+				var at := base + Vector3(r.randf_range(-1.0, 1.0), 0.0, r.randf_range(-1.0, 1.0))
+				var yaw := r.randf() * TAU
+				var tall := r.randf_range(0.5, 1.1) * (0.7 + density * 0.6)
+				for b in 3:
+					blades.append(Transform3D(Basis(Vector3.UP, yaw + b * 1.05).scaled(Vector3(r.randf_range(0.8, 1.2), tall, 1.0)), at))
+				if r.randf() < 0.06:
+					flowers.append(Transform3D(Basis.IDENTITY, at + Vector3.UP * 0.22))
+			if r.randf() < 0.55:
+				var sz := r.randf_range(0.08, 0.26)
+				stones.append(Transform3D(Basis(Vector3.UP, r.randf() * TAU).scaled(Vector3(sz, sz * 0.7, sz)), base + Vector3(r.randf_range(-0.9, 0.9), -0.05, r.randf_range(-0.9, 0.9))))
+	var grass_mat := ShaderMaterial.new()
+	grass_mat.shader = preload("res://shaders/grass.gdshader")
+	Fen._batch(level, TreeKit.blade(0.45, 0.07, 0.25), grass_mat, blades)
+	var pebble := B.pbr("stone_wall", Color(0.5, 0.48, 0.52), 1.2, 1.0, 0.0, 1.8)
+	Fen._batch(level, Fen._boulder(900), pebble, stones)
+	var bloom := SphereMesh.new()
+	bloom.radius = 0.05
+	bloom.height = 0.07
+	Fen._batch(level, bloom, B.mat(Color("#d4b3b0"), 0.8), flowers)
+
+
 func _region(start: Vector2i, ch: String, done: Dictionary) -> Rect2i:
 	var stack: Array[Vector2i] = [start]
 	var minc := start
@@ -214,17 +262,24 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 	match ch:
 		"H":
 			var wall_h := 3.0 + rng.randf() * 0.8
-			var plaster := B.pbr("plaster", Color(0.62, 0.56, 0.52).lerp(Color(0.5, 0.42, 0.42), rng.randf()), 0.45, 1.0, 0.0, 1.4)
-			var timber := B.pbr("timber", Color(0.32, 0.26, 0.24), 0.8, 1.0, 0.0, 1.2)
+			var plaster := BK.weathered("plaster", Color(1.0, 0.92, 0.84).lerp(Color(0.86, 0.72, 0.72), rng.randf()), 0.45, 0.45, 1.0, 0.0, 1.0, 1.3)
+			var timber := BK.weathered("timber", Color(0.6, 0.48, 0.42), 0.8, 0.25, 0.6, 0.0, 1.0, 1.2)
+			var base_stone := BK.weathered("stone_wall", Color(0.95, 0.92, 0.98), 0.35, 0.7, 1.0, 0.0, 1.0, 1.5)
+			var slate := BK.weathered("roof_slate", Color(1.0, 0.95, 1.05), 0.55, 0.4, 0.0, 0.1, 0.9, 1.6)
+			var seed_h := int(c.x * 7.0 + c.z * 13.0)
 			B.box(Vector3(s.x - 0.4, wall_h, s.z - 0.4), plaster, Vector3(0, wall_h * 0.5, 0), node)
+			BK.plinth(node, Vector2(s.x - 0.35, s.z - 0.35), 0.6, base_stone, seed_h)
+			# Half-timbering on the back and both sides (the front keeps its door and window).
+			BK.timber_frame(node, Vector3(0, wall_h * 0.5 + 0.3, -(s.z * 0.5 - 0.2)), Vector3(0, 0, -1), s.x - 0.9, wall_h - 0.7, timber, seed_h)
+			for side in [-1, 1]:
+				BK.timber_frame(node, Vector3(side * (s.x * 0.5 - 0.2), wall_h * 0.5 + 0.3, 0), Vector3(side, 0, 0), s.z - 0.9, wall_h - 0.7, timber, seed_h + side)
 			for corner in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1)]:
 				B.box(Vector3(0.3, wall_h + 0.1, 0.3), timber, Vector3(corner.x * (s.x * 0.5 - 0.25), wall_h * 0.5, corner.z * (s.z * 0.5 - 0.25)), node)
 			B.box(Vector3(s.x - 0.3, 0.25, 0.3), timber, Vector3(0, wall_h * 0.55, s.z * 0.5 - 0.2), node)
-			var roof := B.prism(Vector3(s.z + 0.8, 2.2, s.x + 0.6), B.pbr("roof_slate", Color(0.42, 0.38, 0.44), 0.6, 1.0, 0.05, 1.5), Vector3(0, wall_h + 1.1, 0), node)
-			roof.rotation.y = PI * 0.5
-			if s.z > s.x:
-				roof.rotation.y = 0.0
-				(roof.mesh as PrismMesh).size = Vector3(s.x + 0.8, 2.2, s.z + 0.6)
+			var ridge_x := not (s.z > s.x)
+			var roof := BK.gable_roof(node, Vector3(0, wall_h, 0), (s.x if ridge_x else s.z) + 0.7, (s.z if ridge_x else s.x) - 0.4, 1.8, 0.5, slate, plaster, timber, seed_h)
+			if not ridge_x:
+				roof.rotation.y = PI * 0.5
 			# door and windows on the south face
 			var front := s.z * 0.5 - 0.2  # the plaster's south face
 			if not _kit(node, "house_door", Vector3(-s.x * 0.2, 0, front)):
@@ -245,11 +300,13 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			if lit:
 				B.omni(Color(1.0, 0.55, 0.25), 0.7, 4.5, Vector3(s.x * 0.22, 2.0, s.z * 0.5 + 0.6), node)
 		"C":
-			var stone := B.pbr("stone_wall", Color(0.62, 0.58, 0.64), 0.28, 1.0, 0.0, 1.6)
-			var dark := B.pbr("roof_slate", Color(0.3, 0.27, 0.33), 0.5, 1.0, 0.05, 1.5)
+			var stone := BK.weathered("stone_wall", Color(1.05, 1.0, 1.08), 0.3, 0.7, 1.7, 0.1, 1.0, 1.6)
+			var dark := BK.weathered("roof_slate", Color(0.8, 0.76, 0.85), 0.5, 0.45, 0.0, 0.12, 0.9, 1.7)
 			B.box(Vector3(s.x - 0.6, 6.0, s.z - 0.6), stone, Vector3(0, 3.0, 0), node)
-			var roof := B.prism(Vector3(s.x + 0.2, 3.4, s.z + 0.2), dark, Vector3(0, 7.7, 0), node)
-			roof.rotation.y = 0.0
+			BK.plinth(node, Vector2(s.x - 0.5, s.z - 0.5), 0.95, stone, 77, 0.2)
+			BK.cornice(node, Vector3(0, 5.9, s.z * 0.5 - 0.3), s.x - 0.4, 0.45, stone)
+			BK.cornice(node, Vector3(0, 5.9, -(s.z * 0.5 - 0.3)), s.x - 0.4, 0.45, stone)
+			BK.gable_roof(node, Vector3(0, 6.0, 0), s.x + 0.2, s.z - 0.6, 3.3, 0.75, dark, stone, stone, 91)
 			# buttresses
 			for i in 4:
 				var x := -s.x * 0.5 + 1.0 + i * (s.x - 2.0) / 3.0
@@ -257,12 +314,18 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			# bell tower over the door
 			B.box(Vector3(3.2, 11.0, 3.2), stone, Vector3(0, 5.5, s.z * 0.5 - 1.6), node)
 			B.box(Vector3(2.0, 2.2, 3.4), B.mat(Color(0.02, 0.01, 0.03)), Vector3(0, 9.4, s.z * 0.5 - 1.6), node)
-			var spire := B.cylinder(0.0, 2.4, 5.0, dark, Vector3(0, 13.5, s.z * 0.5 - 1.6), node, 4)
-			spire.rotation.y = PI * 0.25
+			var spire := B.cylinder(0.0, 2.4, 5.0, dark, Vector3(0, 13.5, s.z * 0.5 - 1.6), node, 8)
+			spire.rotation.y = PI * 0.125
+			# Belfry louvres and corner pinnacles break the tower's slab sides.
+			for k in 5:
+				B.box(Vector3(1.7, 0.1, 0.12), B.mat(Color(0.015, 0.01, 0.02)), Vector3(0, 8.7 + k * 0.32, s.z * 0.5 + 0.05), node)
+			for sx in [-1, 1]:
+				for sz in [-1, 1]:
+					B.cylinder(0.0, 0.26, 1.1, dark, Vector3(sx * 1.55, 11.55, s.z * 0.5 - 1.6 + sz * 1.55), node, 6)
 			# stained glass and door
-			var glass := B.mat(Color(0.28, 0.12, 0.3), 0.3, Color(0.55, 0.2, 0.4), 0.7)
+			var glass := B.mat(Color(0.2, 0.1, 0.34), 0.25, Color(0.5, 0.18, 0.42), 0.8)
 			for wx in [-s.x * 0.32, s.x * 0.32]:
-				B.box(Vector3(0.9, 2.4, 0.1), glass, Vector3(wx, 3.6, s.z * 0.5 - 0.25), node)
+				BK.arched_window(node, Vector3(wx, 3.7, s.z * 0.5 - 0.3), 1.0, 3.0, glass, stone)
 			B.box(Vector3(1.6, 2.6, 0.15), B.mat(Color(0.12, 0.06, 0.05), 1.0, Color(0.5, 0.2, 0.08), 0.4), Vector3(0, 1.3, s.z * 0.5 - 0.05), node)
 			var rose := _kit(node, "rose_window", Vector3(0, 6.0, s.z * 0.5 + 0.03))
 			if rose:
@@ -271,10 +334,11 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			B.torch(node, Vector3(-1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
 			B.torch(node, Vector3(1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
 		"B":
-			var stone := B.pbr("stone_wall", Color(0.5, 0.49, 0.52), 0.3, 1.0, 0.0, 1.6)
+			var stone := BK.weathered("stone_wall", Color(0.88, 0.86, 0.92), 0.3, 0.7, 1.4, 0.1, 1.0, 1.6)
 			B.box(Vector3(s.x - 0.6, 3.4, s.z - 0.4), stone, Vector3(0, 1.7, 0), node)
-			var mroof := B.prism(Vector3(s.z + 0.2, 1.4, s.x), B.pbr("roof_slate", Color(0.34, 0.32, 0.36), 0.5, 1.0, 0.05, 1.5), Vector3(0, 4.1, 0), node)
-			mroof.rotation.y = PI * 0.5
+			BK.plinth(node, Vector2(s.x - 0.5, s.z - 0.3), 0.7, stone, 33, 0.16)
+			BK.cornice(node, Vector3(0, 3.35, s.z * 0.5 - 0.2), s.x - 0.3, 0.4, stone)
+			BK.gable_roof(node, Vector3(0, 3.5, 0), s.x - 0.1, s.z - 0.2, 1.5, 0.35, BK.weathered("roof_slate", Color(0.85, 0.82, 0.88), 0.5, 0.5, 0.0, 0.1, 0.9, 1.6), stone, stone, 55)
 			for i in 4:
 				B.cylinder(0.22, 0.25, 3.4, stone, Vector3(-s.x * 0.5 + 0.6 + i * (s.x - 1.2) / 3.0, 1.7, s.z * 0.5), node, 8)
 			B.label("Mausoleum of the Wardens", B.GOLD, Vector3(0, 5.4, 0), node, 36)
@@ -403,7 +467,8 @@ func _npc(world: Node3D, level: Node3D, npc_id: String, p: Vector3) -> void:
 			horn.rotation.z = PI * 0.5
 			preload("res://scripts/models/props_model.gd").barrel(node, Vector3(1.25, 0, -0.6))
 			B.omni(B.EMBER, 1.4, 5.0, Vector3(-0.8, 0.6, 0.5), node)
-			B.sphere(0.25, B.mat(B.EMBER, 1.0, B.EMBER, 3.0), Vector3(-0.9, 0.3, 0.3), node, 6)
+			B.sphere(0.25, B.mat(Color(0.12, 0.05, 0.03), 1.0, B.EMBER, 1.2), Vector3(-0.9, 0.2, 0.3), node, 8)  # the forge coals
+			preload("res://scripts/world/spell_fx.gd").ambient_fire(node, Vector3(-0.9, 0.38, 0.3), 0.3, true, true)
 	var tall := npc_id != "lamplighter"
 	node.marker_height = 2.7 if tall else 2.2
 	node.marker = B.label("!", B.GOLD, Vector3(0, node.marker_height, 0), node, 96)

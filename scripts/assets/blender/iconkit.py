@@ -14,22 +14,38 @@ from mathutils import Vector
 import ddk
 
 ICONS = os.path.join(ddk.ROOT, "godot", "assets", "textures", "icons")
-SIZE = 128
+SIZE = 256  # Diablo IV style: rendered at 256 px so icons stay crisp on 4K interfaces
 
 
 def _scene():
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    try:
+        scene.render.engine = "BLENDER_EEVEE_NEXT"
+    except TypeError:  # Blender 5 renamed the engine
+        scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = scene.render.resolution_y = SIZE * 2
     scene.render.resolution_percentage = 50
     scene.render.film_transparent = True
-    scene.render.filter_size = 1.2
+    scene.render.filter_size = 1.0
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"
-    scene.view_settings.view_transform = "Standard"
-    scene.view_settings.exposure = 0.3
+    # A filmic curve with punchy contrast gives the dark, rich, high-end look of a Diablo IV inventory icon.
+    for transform in ("AgX", "Filmic", "Standard"):
+        try:
+            scene.view_settings.view_transform = transform
+            break
+        except TypeError:
+            continue
     try:
-        scene.eevee.taa_render_samples = 48
+        scene.view_settings.look = "AgX - Medium High Contrast" if scene.view_settings.view_transform == "AgX" else "Medium High Contrast"
+    except TypeError:
+        pass
+    scene.view_settings.exposure = 0.45
+    try:
+        scene.eevee.taa_render_samples = 96
+        scene.eevee.use_gtao = True
+        scene.eevee.gtao_distance = 0.5
+        scene.eevee.use_raytracing = True
     except AttributeError:
         pass
     world = bpy.data.worlds.get("icon_world") or bpy.data.worlds.new("icon_world")

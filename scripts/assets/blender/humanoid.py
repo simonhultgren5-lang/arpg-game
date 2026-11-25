@@ -84,7 +84,7 @@ def finish(obj, arm, bone, bevel=0.0, uv_scale=2.0):
     if bevel:
         m = obj.modifiers.new("bevel", "BEVEL")
         m.width = bevel
-        m.segments = 2
+        m.segments = 3
         m.limit_method = "ANGLE"
     ddk.select_only(obj)
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)

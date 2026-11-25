@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../godot/assets/audio/hollowmere/', import.meta.url));
-const rate = 32000;
+const rate = 48000; // 48 kHz: full-bandwidth masters for 4K-era hardware
 const tau = 2 * Math.PI;
 const midi = n => 440 * 2 ** ((n - 69) / 12);
 
@@ -119,19 +119,67 @@ const cues = {
   thunder: [air(0,.22,2100,.46), skin(.055,1.6,49,.52), air(.16,3.8,260,1), skin(.77,2.1,63,.27)],
   potion: [skin(0,.09,405,.33), pluck(.08,.13,630,.24), skin(.17,.19,180,.3)],
   hurt: [skin(0,.21,106,.58), air(.01,.19,1150,.55)],
+  // Premium interface and world cues: layered, with a transient, a body and a shimmering tail.
+  ui_hover: [air(0,.05,5200,.22), pluck(.004,.09,midi(86),.12)],
+  ui_open: [air(0,.2,2300,.4), skin(.03,.14,170,.3), pluck(.07,.35,midi(74),.17), pluck(.11,.4,midi(81),.1)],
+  ui_close: [air(0,.14,1500,.34), skin(.02,.1,140,.28), pluck(.045,.22,midi(66),.14)],
+  ui_tab: [air(0,.06,3000,.3), strike(.01,.11,1750,.16)],
+  ui_error: [skin(0,.15,120,.5), bow(.02,.2,midi(52),.2), air(.01,.1,800,.3)],
+  ui_confirm: [pluck(0,.4,midi(67),.3), pluck(.07,.5,midi(74),.24), air(0,.1,3800,.2)],
+  shockwave: [skin(0,.55,52,.7), air(.01,.6,900,.7), strike(.05,.9,170,.3), air(.08,.7,3200,.35)],
+  embers_burst: [air(0,.35,5200,.5), pluck(.02,.2,midi(88),.1), pluck(.09,.18,midi(93),.08), air(.12,.4,6800,.3)],
+  spell_charge: [bow(0,.9,midi(55),.22), bow(.1,.8,midi(62),.16), air(.05,.85,2400,.3)],
+  ward_shimmer: [pluck(0,1.1,midi(91),.1), pluck(.12,1.0,midi(98),.08), bow(.02,1.1,midi(79),.12), air(0,.9,7200,.14)],
+  door_creak: [bow(0,1.1,midi(48),.18), air(.02,1.0,620,.38), skin(.9,.2,90,.35)],
+  chest_open: [skin(0,.18,150,.45), strike(.06,.3,420,.2), air(.1,.5,2400,.3), pluck(.2,.6,midi(76),.12)],
+  torch_ignite: [air(0,.5,1700,.7), air(.05,.7,520,.4), skin(0,.1,95,.3)],
+  bell_toll_low: [strike(0,4.2,98,.6), bow(.1,3.8,147,.22), strike(.02,3.5,247,.14)],
 };
-for (const [name,freq,grit] of [['stone',265,3400],['dirt',125,1050],['wood',390,1500],['grass',105,4200],['snow',180,2350]]) {
+for (const [name,freq,grit] of [['stone',265,3400],['dirt',125,1050],['wood',390,1500],['grass',105,4200],['snow',180,2350],['water',90,2100]]) {
   for (let take=1; take<=3; take++) {
     const id = 'step_'+name+'_'+take;
     cues[id] = [skin(0,.12,freq*(1+.025*take),.32), air(.008,.10+.012*take,grit,.76), air(.06,.09,grit*.55,.35)];
     if (name === 'wood') cues[id].push(pluck(.015,.16,480,.26));
     if (name === 'snow') cues[id].push(air(.054,.19,3100,.65));
+    if (name === 'water') cues[id].push(air(.03,.22,3600,.55), pluck(.07,.14,midi(84),.1));
   }
+}
+
+// A small Schroeder room (four combs into two all-passes, different delays per ear) gives every effect a
+// tail and width, and a soft saturator adds punch before the master peak normalisation.
+function room(mono, wet, tail) {
+  const combs = [[.0297,.0371],[.0411,.0437],[.0533,.0511],[.0617,.0593]];
+  const out = [0,1].map(ear => {
+    const result = new Float32Array(mono.length + Math.round(rate * tail));
+    const padded = new Float32Array(result.length); padded.set(mono);
+    for (const pair of combs) {
+      const d = Math.round(rate * pair[ear]), fb = .72;
+      const buf = new Float32Array(d); let pos = 0;
+      for (let i = 0; i < padded.length; i++) {
+        const v = padded[i] + buf[pos] * fb; buf[pos] = v; pos = (pos + 1) % d;
+        result[i] += v * .25;
+      }
+    }
+    const ap = Math.round(rate * (ear ? .0071 : .0059)), apb = new Float32Array(ap); let ai = 0;
+    for (let i = 0; i < result.length; i++) {
+      const x = result[i], y = apb[ai] - .5 * x; apb[ai] = x + .5 * y; ai = (ai + 1) % ap; result[i] = y;
+    }
+    for (let i = 0; i < result.length; i++) {
+      const dry = i < mono.length ? mono[i] : 0;
+      result[i] = Math.tanh((dry * .92 + result[i] * wet) * 1.6) / 1.6;
+    }
+    // Cue lengths are gameplay timing (telegraphs), so the room tail is folded inside the original length.
+    const keep = result.slice(0, mono.length), fade = Math.round(rate * .04);
+    for (let i = 0; i < fade; i++) keep[keep.length - 1 - i] *= i / fade;
+    return keep;
+  });
+  return out;
 }
 
 function shot(id, layers) {
   const length = Math.max(...layers.map(l => l.start+l.duration));
-  write(id, [render(layers,length,randomFor(id))]);
+  const big = /boss|death|nova|wave|roar|split|toll|bell|thunder/.test(id);
+  write(id, room(render(layers,length,randomFor(id)), big ? .42 : .26, big ? .9 : .45));
 }
 for (const [id,layers] of Object.entries(cues)) shot('sfx/'+id,layers);
 

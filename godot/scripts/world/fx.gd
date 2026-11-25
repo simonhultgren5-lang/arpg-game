@@ -13,6 +13,99 @@ static func glow_mat(color: Color, alpha := 0.8, additive := true) -> StandardMa
 	return m
 
 
+static var _soft_tex: GradientTexture2D
+
+
+## A soft round sprite (radial falloff) for embers, smoke and glows, billboarded and additive.
+static func soft_mat(color: Color, additive := true) -> StandardMaterial3D:
+	if _soft_tex == null:
+		_soft_tex = GradientTexture2D.new()
+		_soft_tex.fill = GradientTexture2D.FILL_RADIAL
+		_soft_tex.fill_from = Vector2(0.5, 0.5)
+		_soft_tex.fill_to = Vector2(1.0, 0.5)
+		_soft_tex.width = 64
+		_soft_tex.height = 64
+		var g := Gradient.new()
+		g.set_color(0, Color(1, 1, 1, 1))
+		g.set_color(1, Color(1, 1, 1, 0))
+		g.add_point(0.35, Color(1, 1, 1, 0.55))
+		_soft_tex.gradient = g
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD if additive else BaseMaterial3D.BLEND_MODE_MIX
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	m.albedo_texture = _soft_tex
+	m.albedo_color = color
+	m.disable_receive_shadows = true
+	return m
+
+
+## Rising embers (sparks that drift up, flicker and fade). Used by pillars, impacts and death bursts.
+static func embers(parent: Node, pos: Vector3, color: Color, count := 18, spread := 1.0, rise := 2.2, lifetime := 1.1) -> void:
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.11, 0.11)
+	quad.material = soft_mat(color)
+	var p := CPUParticles3D.new()
+	p.emitting = false
+	p.mesh = quad
+	p.amount = count
+	p.one_shot = true
+	p.explosiveness = 0.85
+	p.lifetime = lifetime
+	p.local_coords = false
+	p.direction = Vector3.UP
+	p.spread = 38.0
+	p.gravity = Vector3(0.0, rise * 0.6, 0.0)
+	p.initial_velocity_min = 0.4
+	p.initial_velocity_max = 1.6 * spread
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.5
+	p.damping_min = 0.6
+	p.damping_max = 1.4
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 1))
+	fade.set_color(1, Color(1, 0.5, 0.2, 0))
+	p.color_ramp = fade
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(p)
+	p.global_position = pos
+	p.finished.connect(p.queue_free)
+	p.emitting = true
+
+
+## A drifting puff of dust or smoke that swells and fades.
+static func smoke(parent: Node, pos: Vector3, color := Color(0.5, 0.48, 0.5, 0.35), size := 1.2) -> void:
+	var quad := QuadMesh.new()
+	quad.size = Vector2(size, size)
+	quad.material = soft_mat(color, false)
+	var p := CPUParticles3D.new()
+	p.emitting = false
+	p.mesh = quad
+	p.amount = 5
+	p.one_shot = true
+	p.explosiveness = 0.9
+	p.lifetime = 1.0
+	p.local_coords = false
+	p.direction = Vector3.UP
+	p.spread = 60.0
+	p.gravity = Vector3(0, 0.35, 0)
+	p.initial_velocity_min = 0.2
+	p.initial_velocity_max = 0.8
+	p.scale_amount_min = 0.7
+	p.scale_amount_max = 1.8
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0.7))
+	fade.set_color(1, Color(1, 1, 1, 0))
+	p.color_ramp = fade
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(p)
+	p.global_position = pos
+	p.finished.connect(p.queue_free)
+	p.emitting = true
+
+
 static func _fade_free(node: Node3D, mat: StandardMaterial3D, duration: float) -> void:
 	var tw := node.create_tween()
 	tw.tween_property(mat, "albedo_color:a", 0.0, duration)
@@ -39,6 +132,28 @@ static func ring(parent: Node, pos: Vector3, radius: float, color: Color, durati
 	tw.tween_property(mi, "scale", Vector3(radius, 0.15, radius), duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(m, "albedo_color:a", 0.0, duration)
 	tw.chain().tween_callback(mi.queue_free)
+	# A thinner trailing echo ring, a flash of ground light and a puff of dust make the shockwave feel physical.
+	var echo := MeshInstance3D.new()
+	var thin := TorusMesh.new()
+	thin.inner_radius = 0.94
+	thin.outer_radius = 1.0
+	thin.rings = 32
+	thin.ring_segments = 3
+	echo.mesh = thin
+	var em := glow_mat(color.lightened(0.35), 0.7)
+	echo.material_override = em
+	echo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(echo)
+	echo.global_position = pos + Vector3(0, 0.2, 0)
+	echo.scale = Vector3(radius * 0.1, 0.1, radius * 0.1)
+	var tw2 := echo.create_tween()
+	tw2.set_parallel(true)
+	tw2.tween_property(echo, "scale", Vector3(radius * 0.92, 0.1, radius * 0.92), duration * 1.25).set_delay(0.04).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw2.tween_property(em, "albedo_color:a", 0.0, duration * 1.25).set_delay(0.04)
+	tw2.chain().tween_callback(echo.queue_free)
+	flash(parent, pos, color, 2.5, radius * 1.6, duration)
+	if radius > 1.2:
+		smoke(parent, pos + Vector3(0, 0.2, 0), Color(0.55, 0.5, 0.48, 0.3), radius * 0.5)
 
 
 ## A flat disc warning of an attack that lands after `duration` seconds. Freed automatically.
@@ -128,10 +243,20 @@ static func impact(parent: Node, pos: Vector3, dir: Vector3, crit: bool) -> void
 	sparks.global_position = pos
 	sparks.finished.connect(sparks.queue_free)
 	sparks.emitting = true
+	embers(parent, pos, Color(1.0, 0.6, 0.25), 8 if crit else 4, 0.7, 1.4, 0.7)
+	flash(parent, pos, Color(1.0, 0.7, 0.4), 3.5 if crit else 1.6, 3.5, 0.14)
 
 
 ## A column of fire or light.
 static func pillar(parent: Node, pos: Vector3, radius: float, color: Color, duration := 0.6) -> void:
+	# Warm colours are fire: a column of real flame, stacked and fading, instead of a glowing tube.
+	if color.r > color.b + 0.15 and color.r > 0.7:
+		var Spell = preload("res://scripts/world/spell_fx.gd")
+		for i in 4:
+			Spell.flame_puff(parent, pos + Vector3(0, i * radius * 1.6, 0), radius * (2.6 - i * 0.35), color, duration + 0.2)
+		Spell.fire_light(parent, pos + Vector3(0, 1.5, 0), color, 6.0, radius * 4.0, duration)
+		embers(parent, pos, color.lightened(0.2), 24, radius, 3.2, duration + 0.8)
+		return
 	var node := Node3D.new()
 	parent.add_child(node)
 	node.global_position = pos
@@ -158,6 +283,7 @@ static func pillar(parent: Node, pos: Vector3, radius: float, color: Color, dura
 	tw.tween_property(light, "light_energy", 0.0, duration)
 	tw.tween_property(mi, "scale", Vector3(0.4, 1.2, 0.4), duration)
 	tw.chain().tween_callback(node.queue_free)
+	embers(parent, pos + Vector3(0, 0.3, 0), color.lightened(0.2), 28, radius, 3.4, duration + 0.8)
 
 
 ## A brief flash of light (casts, hits, level ups).

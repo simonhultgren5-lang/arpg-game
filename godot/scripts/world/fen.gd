@@ -1,10 +1,17 @@
 extends RefCounted
 ## The approach to Hollowmere. The same authored cells drive the land, bridges and navigation.
 ## ^ shale and spruce, ~ river, = timber deck, : pilgrim road, F abandoned watchfire.
+##
+## The land is a smoothed height field (round hills, banked river, flat paths) meshed at SUB x SUB quads per
+## cell and shaded by terrain.gdshader (earth, grass, mud, shale cliffs, frost). Mountains rise beyond the
+## level edge, the river is a flowing water shader, and the trees, boulders and grass are MultiMeshes.
 const START_ROW := 25
+const SUB := 3  # ground sub-quads per cell edge
 const Grid = preload("res://scripts/world/level_grid.gd")
 const B = preload("res://scripts/world/build.gd")
 const Interactable = preload("res://scripts/world/interactable.gd")
+const TreeKit = preload("res://scripts/models/tree_kit.gd")
+const WALKABLE := [".", ":", "P", "F", "="]
 
 
 static func build(world: Node3D, parent: Node3D, grid: Grid, rows: Array) -> void:
@@ -13,36 +20,44 @@ static func build(world: Node3D, parent: Node3D, grid: Grid, rows: Array) -> voi
 	parent.add_child(fen)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 62487
-	var ground := SurfaceTool.new()
-	ground.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var grass: Array[Transform3D] = []
-	var boughs: Array[Transform3D] = []
-	var trunks: Array[Transform3D] = []
-	var stones: Array[Transform3D] = []
-	var rushes: Array[Transform3D] = []
-	var flowers: Array[Transform3D] = []
-	var decks: Array[Transform3D] = []
 	var noise := FastNoiseLite.new()
 	noise.seed = 427
 	noise.frequency = 0.12
+	var relief := FastNoiseLite.new()
+	relief.seed = 91
+	relief.fractal_octaves = 4
+	relief.frequency = 0.09
+	var field := _height_field(grid, rows, noise)
+	var grass: Array[Transform3D] = []
+	var spruces: Array = [[], [], []]
+	var oaks: Array = [[], []]
+	var birches: Array = [[], []]
+	var stones: Array = [[], [], []]
+	var rushes: Array[Transform3D] = []
+	var flowers: Array[Transform3D] = []
+	var decks: Array[Transform3D] = []
+	var ground := SurfaceTool.new()
+	ground.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var corner := [Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1)]
+	# The ground is meshed SUB x SUB per cell from the smoothed height field, so slopes and banks are round.
 	for y in range(START_ROW, grid.h):
 		for x in grid.w:
 			var c := Vector2i(x, y)
 			var kind: String = rows[y][x]
 			var p := grid.center(c)
-			var corners: Array[Vector3] = []
-			for offset in [Vector2i.ZERO, Vector2i.RIGHT, Vector2i.ONE, Vector2i.DOWN]:
-				var v: Vector2i = c + offset
-				var jitter := Vector2(noise.get_noise_2d(v.x * 5, v.y * 5), noise.get_noise_2d(v.x * 5 + 90, v.y * 5)) * 0.95
-				if v.y == START_ROW:
-					jitter = Vector2.ZERO
-				corners.append(Vector3(v.x * Grid.CELL + jitter.x, _height(v, rows, noise), v.y * Grid.CELL + jitter.y))
-			var shades: Array[Color] = []
-			for offset in [Vector2i.ZERO, Vector2i.RIGHT, Vector2i.ONE, Vector2i.DOWN]:
-				shades.append(_land_color(c + offset, rows, noise))
-			for index in [0, 1, 2, 0, 2, 3]:
-				ground.set_color(shades[index])
-				ground.add_vertex(corners[index])
+			for sy in SUB:
+				for sx in SUB:
+					var q: Array[Vector3] = []
+					var col: Array[Color] = []
+					for o in corner:
+						var g := Vector2(x + float(sx + o.x) / SUB, y + float(sy + o.y) / SUB)
+						q.append(_surface(field, relief, g))
+						col.append(_land_color(Vector2i(roundi(g.x), roundi(g.y)), rows, noise))
+					for index in [0, 1, 2, 0, 2, 3]:
+						ground.set_color(col[index])
+						ground.add_vertex(q[index])
+			var centre := Vector2(c) + Vector2(0.5, 0.5)
+			var base := _surface(field, relief, centre)
 			match kind:
 				"=":
 					if rows[y - 1][x] != "=":
@@ -50,49 +65,59 @@ static func build(world: Node3D, parent: Node3D, grid: Grid, rows: Array) -> voi
 					for plank in 5:
 						decks.append(Transform3D(Basis.IDENTITY, p + Vector3(0, -0.045, -0.8 + plank * 0.4)))
 				"^":
-					var h := (corners[0].y + corners[2].y) * 0.5
-					var base := p + Vector3.UP * h
-					if rng.randf() < 0.28:
-						var scale_y := rng.randf_range(0.65, 1.25)
-						trunks.append(Transform3D(Basis.IDENTITY.scaled(Vector3(1, scale_y, 1)), base + Vector3.UP * scale_y))
-						for tier in 4:
-							var radius := 1.0 - tier * 0.19
-							var shape := Vector3(radius, scale_y, radius)
-							boughs.append(Transform3D(Basis(Vector3.UP, tier * 1.7).scaled(shape), base + Vector3.UP * (1.6 + tier * 0.9) * scale_y))
-					else:
-						var size := Vector3(rng.randf_range(0.7, 1.5), rng.randf_range(0.5, 1.1), 0.92)
-						stones.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(size), base))
+					var roll := rng.randf()
+					var jitter := Vector2(rng.randf_range(-0.35, 0.35), rng.randf_range(-0.35, 0.35))
+					var at := _surface(field, relief, centre + jitter)
+					var steep := absf(_surface(field, relief, centre + Vector2(0.4, 0)).y - _surface(field, relief, centre - Vector2(0.4, 0)).y)
+					if at.y < 4.8 and steep < 1.9 and roll < 0.62:
+						var s := rng.randf_range(0.8, 1.35)
+						var pose := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s), at)
+						if roll < 0.40:
+							spruces[rng.randi() % 3].append(pose)
+						elif roll < 0.52:
+							oaks[rng.randi() % 2].append(pose)
+						else:
+							birches[rng.randi() % 2].append(pose)
+					elif rng.randf() < 0.55:
+						var size := Vector3(rng.randf_range(0.8, 1.9), rng.randf_range(0.6, 1.5), rng.randf_range(0.8, 1.7))
+						stones[rng.randi() % 3].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(size), at - Vector3.UP * 0.25))
 				".":
-					var patch := p + Vector3(rng.randf_range(-0.7, 0.7), 0.0, rng.randf_range(-0.7, 0.7))
 					var bank := false
 					for offset in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 						var n: Vector2i = c + offset
 						if grid.inside(n) and rows[n.y][n.x] == "~":
 							bank = true
-					for tuft in rng.randi_range(5, 11):
-						var at := patch + Vector3(rng.randf_range(-0.38, 0.38), 0.12, rng.randf_range(-0.38, 0.38))
-						var length := rng.randf_range(0.64, 1.35)
-						var lean := Basis(Vector3.FORWARD, rng.randf_range(-0.48, 0.48)).rotated(Vector3.UP, rng.randf() * TAU)
-						grass.append(Transform3D(lean.scaled(Vector3(1, length, 1)), at))
+					var meadow := noise.get_noise_2d(x * 3.1, y * 3.1)
+					var tufts := 5 + int(clampf(meadow + 0.6, 0.0, 1.2) * 7.0) + (4 if bank else 0)
+					for tuft in tufts:
+						var at := base + Vector3(rng.randf_range(-1.0, 1.0), 0.02, rng.randf_range(-1.0, 1.0))
+						var length := rng.randf_range(0.55, 1.5) * (1.25 if bank else 1.0)
+						var yaw := rng.randf() * TAU
+						for b in 3:
+							var basis := Basis(Vector3.UP, yaw + b * 1.05).scaled(Vector3(rng.randf_range(0.8, 1.3), length * rng.randf_range(0.7, 1.15), 1.0))
+							grass.append(Transform3D(basis, at + Vector3(rng.randf_range(-0.07, 0.07), 0, rng.randf_range(-0.07, 0.07))))
 						if bank and tuft % 2 == 0:
-							rushes.append(Transform3D(lean, at + Vector3.UP * 0.25))
-						elif tuft % 3 == 0 and noise.get_noise_2d(x, y) > 0.1:
-							flowers.append(Transform3D(Basis.IDENTITY, at + Vector3.UP * 0.14))
-					if bank and rng.randf() < 0.65:
-						var size := Vector3(0.55, 0.42, 0.68) * rng.randf_range(0.45, 1.1)
-						stones.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(size), patch))
+							rushes.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(1, rng.randf_range(0.9, 1.6), 1)), at + Vector3.UP * 0.3))
+						elif tuft % 4 == 0 and meadow > 0.0:
+							flowers.append(Transform3D(Basis.IDENTITY, at + Vector3.UP * 0.2))
+					if bank and rng.randf() < 0.7:
+						var size := Vector3(0.55, 0.42, 0.68) * rng.randf_range(0.5, 1.2)
+						stones[rng.randi() % 3].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(size), base + Vector3(rng.randf_range(-0.6, 0.6), 0, rng.randf_range(-0.6, 0.6))))
 				"F": _watchfire(world, fen, p)
 	ground.generate_normals()
-	# The fen's ground: the shared earth set in PBR, tinted by the painted vertex colours (grass, mud, scree).
-	var earth: StandardMaterial3D = B.pbr("earth", Color.WHITE, 0.22, 1.0, 0.0, 1.3).duplicate()
-	earth.vertex_color_use_as_albedo = true
-	earth.albedo_color = Color(2.4, 2.4, 2.4)  # the painted vertex colours are dark; lift them to moonlit grass and mud
-	B.mesh_node(ground.commit(), earth, Vector3.ZERO, fen)
+	var land := ShaderMaterial.new()
+	land.shader = preload("res://shaders/terrain.gdshader")
+	for part in ["albedo", "normal"]:
+		land.set_shader_parameter("earth_%s" % part, load("res://assets/textures/materials/earth_%s.png" % part))
+		land.set_shader_parameter("rock_%s" % part, load("res://assets/textures/materials/stone_wall_%s.png" % part))
+	B.mesh_node(ground.commit(), land, Vector3.ZERO, fen).name = "Terrain"
+	_backdrop(fen, grid, land)
 	var water := ShaderMaterial.new()
-	water.shader = preload("res://shaders/fen_river.gdshader")
+	water.shader = preload("res://shaders/water.gdshader")
 	var river := PlaneMesh.new()
-	river.size = Vector2(grid.w * Grid.CELL, 18.0)
-	B.mesh_node(river, water, Vector3(river.size.x / 2, -0.15, (START_ROW + 10.5) * Grid.CELL), fen)
+	river.size = Vector2(grid.w * Grid.CELL + 60.0, 30.0)
+	_bake_riverbed(water, field, relief, grid)
+	B.mesh_node(river, water, Vector3(grid.w * Grid.CELL / 2, -0.15, (START_ROW + 10.5) * Grid.CELL), fen).name = "River"
 	var plank_mesh := BoxMesh.new()
 	plank_mesh.size = Vector3(Grid.CELL, 0.09, 0.38)
 	var wood := B.unique_mat(Color("#78654a"))
@@ -100,16 +125,171 @@ static func build(world: Node3D, parent: Node3D, grid: Grid, rows: Array) -> voi
 	_batch(fen, plank_mesh, wood, decks)
 	_batch(fen, _cone(0.032, 0.94, 0.018), B.mat(Color("#ba995c")), rushes)
 	_batch(fen, _cone(0.055, 0.09, 0.09), B.mat(Color("#d4b3b0")), flowers)
-	_batch(fen, _cone(0.055, 0.46, 0.0), B.mat(Color("#718352")), grass)
-	# Needles read as a dense, soft-lit weave (the cloth set gives them fine normal detail); trunks are bark.
-	_batch(fen, _cone(1.28, 2.5, 0.0), B.pbr("cloth", Color(0.42, 0.62, 0.55), 1.4, 1.0, 0.0, 2.0), boughs)
-	_batch(fen, _cone(0.2, 2.0, 0.13), B.pbr("timber", Color(0.5, 0.4, 0.36), 1.2, 1.0, 0.0, 1.5), trunks)
-	var rock := SphereMesh.new()
-	rock.radial_segments = 14
-	rock.rings = 7
-	rock.radius = 0.85
-	rock.height = 1.4
-	_batch(fen, rock, B.pbr("stone_wall", Color(0.62, 0.6, 0.68), 0.5, 1.0, 0.0, 1.8), stones)
+	# Grass: curved blades with wind sway; the hero's position (a shader global) bends them aside.
+	var blade_material := ShaderMaterial.new()
+	blade_material.shader = preload("res://shaders/grass.gdshader")
+	_batch(fen, TreeKit.blade(0.5, 0.07, 0.25), blade_material, grass)
+	var spruce_tints := [Color(0.2, 0.34, 0.24), Color(0.17, 0.3, 0.22), Color(0.24, 0.36, 0.2)]
+	for i in spruces.size():
+		_batch(fen, TreeKit.spruce(100 + i, 5 + i, spruce_tints[i]), null, spruces[i])
+	for i in oaks.size():
+		_batch(fen, TreeKit.oak(200 + i, Color(0.24, 0.33, 0.12).lerp(Color(0.4, 0.3, 0.1), i * 0.4)), null, oaks[i])
+	for i in birches.size():
+		_batch(fen, TreeKit.birch(300 + i, Color(0.4, 0.48, 0.18)), null, birches[i])
+	var rock_material := B.pbr("stone_wall", Color(0.62, 0.6, 0.68), 0.5, 1.0, 0.0, 1.8)
+	for i in stones.size():
+		_batch(fen, _boulder(500 + i), rock_material, stones[i])
+
+
+## The water shader reads depth from this baked height map of the ground (R32F, 8 px per cell).
+static func _bake_riverbed(water: ShaderMaterial, field: Dictionary, relief: FastNoiseLite, grid: Grid) -> void:
+	var px := 8
+	var w := grid.w * px
+	var h := (grid.h - START_ROW) * px
+	var image := Image.create(w, h, false, Image.FORMAT_RF)
+	for y in h:
+		for x in w:
+			var g := Vector2(float(x) / px, START_ROW + float(y) / px)
+			image.set_pixel(x, y, Color(_surface(field, relief, g).y, 0, 0, 1))
+	water.set_shader_parameter("bed", ImageTexture.create_from_image(image))
+	water.set_shader_parameter("bed_rect", Vector4(0.0, START_ROW * Grid.CELL, grid.w * Grid.CELL, (grid.h - START_ROW) * Grid.CELL))
+
+
+## One shared boulder: a faceted, noise-displaced sphere that is flat-shaded.
+static func _boulder(seed_value: int) -> ArrayMesh:
+	var n := FastNoiseLite.new()
+	n.seed = seed_value
+	n.frequency = 1.6
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lat := 6
+	var lon := 9
+	var pts: Array = []
+	for i in lat + 1:
+		var row: Array = []
+		for j in lon:
+			var v := PI * i / lat
+			var u := TAU * j / lon
+			var d := Vector3(sin(v) * cos(u), cos(v), sin(v) * sin(u))
+			var r := 0.8 * (1.0 + n.get_noise_3dv(d * 2.0) * 0.55)
+			row.append(d * r * Vector3(1.0, 0.7, 1.0) + Vector3.UP * 0.35)
+		pts.append(row)
+	for i in lat:
+		for j in lon:
+			var k := (j + 1) % lon
+			for v in [pts[i][j], pts[i][k], pts[i + 1][k], pts[i][j], pts[i + 1][k], pts[i + 1][j]]:
+				st.add_vertex(v)
+	st.generate_normals()
+	return st.commit()
+
+
+## Smoothed height field at the cell corners of the fen (rows START_ROW..h), kept flat beside walkable cells.
+static func _height_field(grid: Grid, rows: Array, noise: FastNoiseLite) -> Dictionary:
+	var w := grid.w + 1
+	var h := grid.h + 1
+	var raw := PackedFloat32Array()
+	raw.resize(w * h)
+	var keep := PackedByteArray()
+	keep.resize(w * h)
+	for y in range(START_ROW, h):
+		for x in w:
+			raw[y * w + x] = _height(Vector2i(x, y), rows, noise)
+			for dy in [-1, 0]:
+				for dx in [-1, 0]:
+					var row: String = rows[clampi(y + dy, START_ROW, rows.size() - 1)]
+					if row[clampi(x + dx, 0, row.length() - 1)] in WALKABLE:
+						keep[y * w + x] = 1
+	var soft := raw.duplicate()
+	for pass_index in 3:
+		var next := soft.duplicate()
+		for y in range(START_ROW + 1, h - 1):
+			for x in range(1, w - 1):
+				var sum := 0.0
+				for dy in range(-1, 2):
+					for dx in range(-1, 2):
+						sum += soft[(y + dy) * w + x + dx]
+				next[y * w + x] = sum / 9.0
+		soft = next
+	for i in soft.size():
+		if keep[i] == 1:
+			soft[i] = minf(soft[i], raw[i]) if raw[i] > 0.0 else lerpf(raw[i], soft[i], 0.5)
+	return {"w": w, "data": soft}
+
+
+static func _sample(field: Dictionary, g: Vector2) -> float:
+	var w: int = field["w"]
+	var data: PackedFloat32Array = field["data"]
+	var total := data.size() / w
+	var gx := clampf(g.x, 0.0, w - 1.001)
+	var gy := clampf(g.y, float(START_ROW), total - 1.001)
+	var ix := int(gx)
+	var iy := int(gy)
+	var fx := gx - ix
+	var fy := gy - iy
+	var a := lerpf(data[iy * w + ix], data[iy * w + ix + 1], fx)
+	var b := lerpf(data[(iy + 1) * w + ix], data[(iy + 1) * w + ix + 1], fx)
+	return lerpf(a, b, fy)
+
+
+## A point on the land at fractional grid position g: world XZ with fine relief added on the slopes.
+static func _surface(field: Dictionary, relief: FastNoiseLite, g: Vector2) -> Vector3:
+	var y := _sample(field, g)
+	var wx := g.x * Grid.CELL
+	var wz := g.y * Grid.CELL
+	if y > 0.2:
+		y += relief.get_noise_2d(wx * 3.0, wz * 3.0) * (0.35 + clampf(y * 0.5, 0.0, 1.0) * 1.6)
+	return Vector3(wx, y, wz)
+
+
+## Mountains beyond the walkable fen: noise ridges rising out of the level edge on the south, east and west
+## sides, so the valley sits inside real hills and the horizon is never an empty void.
+static func _backdrop(fen: Node3D, grid: Grid, material: Material) -> void:
+	var ridge := FastNoiseLite.new()
+	ridge.seed = 733
+	ridge.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	ridge.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	ridge.fractal_octaves = 5
+	ridge.frequency = 0.018
+	var width := grid.w * Grid.CELL
+	var depth_start := START_ROW * Grid.CELL
+	var depth_end := grid.h * Grid.CELL
+	var margin := 70.0
+	var step := 3.5
+	var xs := int((width + margin * 2) / step)
+	var zs := int((depth_end - depth_start + margin) / step)
+	var heights := PackedFloat32Array()
+	heights.resize((xs + 1) * (zs + 1))
+	for zi in zs + 1:
+		for xi in xs + 1:
+			var wx := -margin + xi * step
+			var wz := depth_start + zi * step
+			var out := maxf(maxf(-wx, wx - width), wz - depth_end)
+			var h := -4.0
+			if out > 0.0:
+				var rise := smoothstep(0.0, 26.0, out)
+				var rise2 := smoothstep(0.0, 60.0, out)
+				h = -0.8 + rise * (7.0 + (ridge.get_noise_2d(wx, wz) * 0.5 + 0.5) * 12.0) + rise2 * 16.0
+			heights[zi * (xs + 1) + xi] = h
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var corner := [Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1)]
+	for zi in zs:
+		for xi in xs:
+			var cs: Array[Vector3] = []
+			var any := false
+			for o in corner:
+				var ix: int = xi + o.x
+				var iz: int = zi + o.y
+				var hh: float = heights[iz * (xs + 1) + ix]
+				any = any or hh > -3.0
+				cs.append(Vector3(-margin + ix * step, hh, depth_start + iz * step))
+			if not any:
+				continue
+			for index in [0, 1, 2, 0, 2, 3]:
+				st.set_color(Color(0.22, 0.24, 0.21))
+				st.add_vertex(cs[index])
+	st.generate_normals()
+	B.mesh_node(st.commit(), material, Vector3.ZERO, fen).name = "Mountains"
 
 
 static func _land_color(v: Vector2i, rows: Array, noise: FastNoiseLite) -> Color:
@@ -137,9 +317,11 @@ static func _height(v: Vector2i, rows: Array, noise: FastNoiseLite) -> float:
 			if kind == "^": ridge += 1
 			if kind in ["~", "="]: wet += 1
 	if wet > 0:
-		return -0.80 if wet >= 3 else -0.09
+		return (-0.95 + noise.get_noise_2d(v.x * 2, v.y * 2) * 0.2) if wet >= 3 else -0.09
 	if ridge >= 3:
-		return (1.8 + noise.get_noise_2d(v.x, v.y) * 2.6) * (ridge - 2)
+		return (2.2 + noise.get_noise_2d(v.x, v.y) * 2.8 + (ridge - 3) * 1.6) * (ridge - 2.0)
+	if ridge >= 1:
+		return 0.15 * ridge
 	return -0.025
 
 
@@ -153,7 +335,9 @@ static func _cone(radius: float, height: float, tip: float) -> CylinderMesh:
 	return mesh
 
 
-static func _batch(parent: Node3D, mesh: Mesh, material: Material, poses: Array[Transform3D]) -> void:
+static func _batch(parent: Node3D, mesh: Mesh, material: Material, poses: Array) -> void:
+	if poses.is_empty():
+		return
 	var batch := MultiMesh.new()
 	batch.transform_format = MultiMesh.TRANSFORM_3D
 	batch.mesh = mesh
@@ -162,7 +346,8 @@ static func _batch(parent: Node3D, mesh: Mesh, material: Material, poses: Array[
 		batch.set_instance_transform(i, poses[i])
 	var instances := MultiMeshInstance3D.new()
 	instances.multimesh = batch
-	instances.material_override = material
+	if material != null:
+		instances.material_override = material
 	parent.add_child(instances)
 
 

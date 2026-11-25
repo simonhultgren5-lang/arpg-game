@@ -13,6 +13,8 @@ const CameraRig = preload("res://scripts/world/camera_rig.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 const Interactable = preload("res://scripts/world/interactable.gd")
 const Items = preload("res://scripts/data/items.gd")
+const Decor = preload("res://scripts/world/decor.gd")
+const SpellFx = preload("res://scripts/world/spell_fx.gd")
 
 var grid  # LevelGrid
 var player: CharacterBody3D
@@ -51,6 +53,7 @@ func _ready() -> void:
 		var town := Town.new()
 		town.build(self, rng)
 		grid = town.grid
+		Decor.load_layout(self, "town")
 		spawn = town.gate_spawn if Game.came_from == "catacomb" else town.spawn
 	rng.randomize()
 
@@ -188,6 +191,8 @@ func _build_environment() -> void:
 func _process(delta: float) -> void:
 	if wall_material and player:
 		wall_material.set_shader_parameter("player_pos", player.global_position)
+	if player and DisplayServer.get_name() != "headless":
+		RenderingServer.global_shader_parameter_set("hero_pos", player.global_position)
 	if player:
 		_zone_check -= delta
 		if _zone_check <= 0:
@@ -386,22 +391,20 @@ func cast_pyre(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 	await get_tree().create_timer(sk["delay"]).timeout
 	if not is_instance_valid(source):
 		return
-	Fx.pillar(self, at, sk["radius"] * 0.6, color, 0.7)
-	Fx.ring(self, at, sk["radius"], color, 0.4)
+	SpellFx.explosion(self, at, sk["radius"], color, 6)
 	shake(0.25)
 	var fx := effects_of(sk)
 	fx.erase("burn")  # the pyre's burn is its burning ground
 	hit_radius(at, sk["radius"], sk["mult"], source, fx)
-	var ground := B.cylinder(sk["radius"], sk["radius"], 0.04, Fx.glow_mat(Color(1.0, 0.3, 0.05), 0.35), at + Vector3(0, 0.05, 0), self, 24)
-	var burn_light := B.omni(Color(1.0, 0.4, 0.1), 1.5, sk["radius"] * 2.5, at + Vector3(0, 0.8, 0), self)
+	var ground := SpellFx.burning_ground(self, at, sk["radius"], float(sk["burn_time"]), Color(1.0, 0.42, 0.08))
 	var ticks := int(float(sk["burn_time"]) / 0.5)
 	for t in ticks:
 		await get_tree().create_timer(0.5).timeout
 		if not is_instance_valid(source):
 			break
 		hit_radius(at, sk["radius"], float(sk["burn"]) * 0.5, source, {})
-	ground.queue_free()
-	burn_light.queue_free()
+	if is_instance_valid(ground):
+		ground.queue_free()
 
 
 ## Pyromancer's Cinder Rain: burning cinders fall at random spots around `at` over a short time.
@@ -415,9 +418,10 @@ func cast_rain(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 			return
 		var a := rng.randf() * TAU
 		var p := at + Vector3(cos(a), 0, sin(a)) * rng.randf_range(0.0, float(sk["radius"]) - 0.6)
-		Fx.pillar(self, p, float(sk["impact"]) * 0.5, color, 0.4)
-		Fx.ring(self, p, sk["impact"], color, 0.3)
-		hit_radius(p, sk["impact"], sk["mult"], source, effects_of(sk))
+		SpellFx.meteor(self, p, color, float(sk["impact"]), 0.35)
+		get_tree().create_timer(0.35).timeout.connect(func():
+			if is_instance_valid(source):
+				hit_radius(p, sk["impact"], sk["mult"], source, effects_of(sk)))
 	shake(0.2)
 
 
@@ -431,6 +435,7 @@ func cast_trap(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 		bone.rotation.y = rng.randf() * TAU
 		bone.reparent(ground)
 	Fx.ring(self, at, sk["radius"], color, 0.4)
+	SpellFx.smoke_cloud(self, at, float(sk["radius"]), float(sk["duration"]), color if sk["id"] == "rot_cloud" else Color(0.5, 0.46, 0.4))
 	var ticks := int(float(sk["duration"]) / 0.5)
 	for t in ticks:
 		for e in enemies():

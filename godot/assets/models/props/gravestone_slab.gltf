@@ -1,6 +1,6 @@
 {
 	"asset":{
-		"generator":"Khronos glTF Blender I/O v4.5.51",
+		"generator":"Khronos glTF Blender I/O v5.3.43",
 		"version":"2.0"
 	},
 	"extensionsUsed":[
@@ -22,27 +22,27 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"slab",
-			"translation":[
-				0,
-				0.4699999988079071,
-				0
-			]
-		},
-		{
-			"mesh":1,
 			"name":"mound",
 			"translation":[
 				0,
 				0.05000000074505806,
 				-0.8500000238418579
 			]
+		},
+		{
+			"mesh":1,
+			"name":"slab",
+			"translation":[
+				0,
+				0.4699999988079071,
+				0
+			]
 		}
 	],
 	"materials":[
 		{
 			"doubleSided":true,
-			"name":"slab",
+			"name":"earth",
 			"normalTexture":{
 				"extensions":{
 					"KHR_texture_transform":{
@@ -59,12 +59,6 @@
 				"index":0
 			},
 			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.75,
-					0.7200000286102295,
-					0.699999988079071,
-					1
-				],
 				"baseColorTexture":{
 					"extensions":{
 						"KHR_texture_transform":{
@@ -100,7 +94,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"earth",
+			"name":"slab",
 			"normalTexture":{
 				"extensions":{
 					"KHR_texture_transform":{
@@ -117,6 +111,12 @@
 				"index":3
 			},
 			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.75,
+					0.7200000286102295,
+					0.699999988079071,
+					1
+				],
 				"baseColorTexture":{
 					"extensions":{
 						"KHR_texture_transform":{
@@ -153,7 +153,7 @@
 	],
 	"meshes":[
 		{
-			"name":"slab",
+			"name":"mound",
 			"primitives":[
 				{
 					"attributes":{
@@ -167,7 +167,7 @@
 			]
 		},
 		{
-			"name":"mound",
+			"name":"slab",
 			"primitives":[
 				{
 					"attributes":{
@@ -210,21 +210,6 @@
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"flagstone_normal.png",
-			"uri":"../../textures/materials/flagstone_normal.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"flagstone_albedo.png",
-			"uri":"../../textures/materials/flagstone_albedo.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"flagstone_roughness.png",
-			"uri":"../../textures/materials/flagstone_roughness.png"
-		},
-		{
-			"mimeType":"image/png",
 			"name":"earth_normal.png",
 			"uri":"../../textures/materials/earth_normal.png"
 		},
@@ -237,125 +222,140 @@
 			"mimeType":"image/png",
 			"name":"earth_roughness.png",
 			"uri":"../../textures/materials/earth_roughness.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_normal.png",
+			"uri":"../../textures/materials/flagstone_normal.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_albedo.png",
+			"uri":"../../textures/materials/flagstone_albedo.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_roughness.png",
+			"uri":"../../textures/materials/flagstone_roughness.png"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":216,
+			"count":6144,
 			"max":[
-				0.365963339805603,
-				0.4903618097305298,
-				0.13832256197929382
+				0.39911001920700073,
+				0.10910990089178085,
+				0.7991100549697876
 			],
 			"min":[
-				-0.3648156225681305,
-				-0.4906887114048004,
-				-0.1372152864933014
+				-0.39911001920700073,
+				-0.10910990089178085,
+				-0.7991100549697876
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":216,
+			"count":6144,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":216,
+			"count":6144,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
 			"componentType":5123,
-			"count":324,
+			"count":9216,
 			"type":"SCALAR"
 		},
 		{
 			"bufferView":4,
 			"componentType":5126,
-			"count":3456,
+			"count":384,
 			"max":[
-				0.3980700969696045,
-				0.10807005316019058,
-				0.7980700731277466
+				0.365970641374588,
+				0.4903690218925476,
+				0.13834714889526367
 			],
 			"min":[
-				-0.3980700969696045,
-				-0.10807005316019058,
-				-0.7980700731277466
+				-0.3648127317428589,
+				-0.49069884419441223,
+				-0.13722802698612213
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":5,
 			"componentType":5126,
-			"count":3456,
+			"count":384,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":6,
 			"componentType":5126,
-			"count":3456,
+			"count":384,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":7,
 			"componentType":5123,
-			"count":5184,
+			"count":564,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":2592,
+			"byteLength":73728,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":2592,
+			"byteLength":73728,
+			"byteOffset":73728,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1728,
-			"byteOffset":5184,
+			"byteLength":49152,
+			"byteOffset":147456,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":648,
-			"byteOffset":6912,
+			"byteLength":18432,
+			"byteOffset":196608,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteLength":41472,
-			"byteOffset":7560,
+			"byteLength":4608,
+			"byteOffset":215040,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":41472,
-			"byteOffset":49032,
+			"byteLength":4608,
+			"byteOffset":219648,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":27648,
-			"byteOffset":90504,
+			"byteLength":3072,
+			"byteOffset":224256,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":10368,
-			"byteOffset":118152,
+			"byteLength":1128,
+			"byteOffset":227328,
 			"target":34963
 		}
 	],
@@ -367,7 +367,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":128520,
+			"byteLength":228456,
 			"uri":"gravestone_slab.bin"
 		}
 	]

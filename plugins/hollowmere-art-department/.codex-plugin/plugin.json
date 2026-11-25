@@ -1,0 +1,24 @@
+{
+  "interface": {
+    "category": "Productivity",
+    "defaultPrompt": [
+      "Design Edda's blue cup for the opening cinematic and its in-game appearance.",
+      "Design a modular crypt entrance that stays readable behind a group of enemies.",
+      "Review my creature against the art bible and give me a Blender-to-Godot correction pass."
+    ],
+    "developerName": "hannes Hultgren",
+    "displayName": "Hollowmere Art Department",
+    "shortDescription": "Dark fantasy asset production",
+    "longDescription": "Direct, build and review original dark fantasy assets for a PC isometric action RPG in Godot 4.",
+    "capabilities": []
+  },
+  "name": "hollowmere-art-department",
+  "version": "1.3.0",
+  "description": "Direct, build and review original dark fantasy assets for a PC isometric action RPG in Godot 4.",
+  "author": {
+    "name": "hannes Hultgren",
+    "email": "hanneshultgren78@gmail.com"
+  },
+  "keywords": [],
+  "skills": "./skills"
+}

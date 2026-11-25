@@ -260,7 +260,7 @@ def _new_obj(name, mesh):
     return link(bpy.data.objects.new(name, mesh))
 
 
-def prim(kind, name, size=(1, 1, 1), loc=(0, 0, 0), rot=(0, 0, 0), segments=16, bevel=0.0, subsurf=0, mat=None):
+def prim(kind, name, size=(1, 1, 1), loc=(0, 0, 0), rot=(0, 0, 0), segments=24, bevel=0.0, subsurf=0, mat=None):
     """A primitive part: 'box', 'cyl', 'cone', 'sphere', 'torus'. size is the full extent (x, y, z)."""
     bm = bmesh.new()
     if kind == "box":
@@ -296,7 +296,7 @@ def prim(kind, name, size=(1, 1, 1), loc=(0, 0, 0), rot=(0, 0, 0), segments=16, 
     if bevel > 0:
         m = obj.modifiers.new("bevel", "BEVEL")
         m.width = bevel
-        m.segments = 2
+        m.segments = 3
         m.limit_method = "ANGLE"
     if subsurf:
         m = obj.modifiers.new("subsurf", "SUBSURF")
@@ -431,7 +431,7 @@ def armature(name, bones, scale=1.0):
     return arm
 
 
-def skin_body(name, joints, edges, mat=None, subsurf=2):
+def skin_body(name, joints, edges, mat=None, subsurf=3):
     """A smooth body from a stick figure: joints {name: ((x, y, z), radius_x, radius_y)}, edges [(a, b)].
 
     The skin modifier wraps the sticks in a skin with the radius of each joint; subdivision smooths it.

@@ -3,6 +3,12 @@ extends Control
 const INK := Color("#102025")
 const BRASS := Color("#d4b482")
 const JADE := Color("#95e5ce")
+## Named places on Hollowmere's map (cell positions), shown on the full map so the land reads as one region.
+const TOWN_PLACES := [
+	["St. Aldric's Chapel", Vector2(16.5, 3.5)], ["The Graveyard", Vector2(27, 2.2)], ["Market Square", Vector2(17, 9)],
+	["Hollowmere", Vector2(6, 13)], ["Pilgrim Road", Vector2(19.5, 27.5)], ["The Mere", Vector2(5, 35.5)],
+	["Southwatch Fen", Vector2(26, 40)], ["Southwatch Beacon", Vector2(6.5, 41)], ["Shale Hills", Vector2(31, 30)],
+]
 var world: Node3D
 signal toggle_requested
 var expanded := false
@@ -120,7 +126,9 @@ func _draw() -> void:
 	var origin := chart.get_center() - center * scale_factor
 	if _live and _view:
 		# Frame exactly `chart` of the level: scale_factor is pixels per cell, a cell is CELL metres.
-		var want := Vector2i((chart.size * (1.0 if expanded else 2.0)).round())
+		# Render at the screen's real pixel density (2x on a 4K display) so the map stays sharp.
+		var density := clampf(float(get_window().size.y) / 1080.0, 1.0, 2.0)
+		var want := Vector2i((chart.size * (1.0 if expanded else 2.0) * density).round())
 		if _view.size != want and want.x > 8 and want.y > 8:
 			_view.size = want  # same aspect as the chart, so the picture is never stretched
 		var metres_high := chart.size.y / scale_factor * cell_size
@@ -142,6 +150,8 @@ func _draw() -> void:
 				draw_circle(point, 4, Color("#bfa1da"))
 			else:
 				draw_rect(Rect2(point - Vector2.ONE * 4, Vector2.ONE * 8), JADE, false, 2)
+	if expanded:
+		_draw_places(font, origin, scale_factor, chart)
 	var at := origin + hero * scale_factor
 	var direction: Vector3 = world.player.facing()
 	var tip := Vector2(direction.x, direction.z).normalized()
@@ -151,3 +161,30 @@ func _draw() -> void:
 	draw_string(font, Vector2(size.x - 30, 23), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, JADE)
 	var caption := "You  ▲     Townsfolk  ●     Passage  □     Oath stone  ●             M / Esc   Close" if expanded else "M   Area map     ·     H   Controls"
 	draw_string(font, Vector2(12, size.y - 9), caption, HORIZONTAL_ALIGNMENT_LEFT, size.x - 20, 12, Color.WHITE)
+
+
+## Region names over the full map (outlined so they read on light stone and dark water), a compass rose
+## and a scale bar, like an engraved survey chart.
+func _draw_places(font: Font, origin: Vector2, scale_factor: float, chart: Rect2) -> void:
+	if Game.area == "town":
+		for place in TOWN_PLACES:
+			var pt: Vector2 = origin + place[1] * scale_factor
+			if not chart.grow(-24).has_point(pt):
+				continue
+			var label: String = place[0]
+			var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+			draw_string_outline(font, pt - Vector2(w * 0.5, 0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 5, Color(0.04, 0.06, 0.08, 0.9))
+			draw_string(font, pt - Vector2(w * 0.5, 0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, BRASS.lightened(0.15))
+	var rose := chart.position + Vector2(chart.size.x - 44, chart.size.y - 44)
+	draw_circle(rose, 26, Color(0.04, 0.06, 0.08, 0.55))
+	draw_arc(rose, 26, 0, TAU, 40, BRASS.darkened(0.2), 1.5)
+	draw_colored_polygon(PackedVector2Array([rose + Vector2(0, -24), rose + Vector2(5, 0), rose + Vector2(-5, 0)]), JADE)
+	draw_colored_polygon(PackedVector2Array([rose + Vector2(0, 24), rose + Vector2(5, 0), rose + Vector2(-5, 0)]), BRASS.darkened(0.3))
+	draw_string(font, rose + Vector2(-4, -29), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, JADE)
+	var bar: float = 20.0 / float(world.grid.CELL) * scale_factor
+	var start := chart.position + Vector2(18, chart.size.y - 18)
+	draw_line(start, start + Vector2(bar, 0), Color.WHITE, 2.0)
+	draw_line(start + Vector2(0, -4), start + Vector2(0, 4), Color.WHITE, 2.0)
+	draw_line(start + Vector2(bar, -4), start + Vector2(bar, 4), Color.WHITE, 2.0)
+	draw_string_outline(font, start + Vector2(bar + 8, 5), "20 m", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, 4, Color(0.04, 0.06, 0.08))
+	draw_string(font, start + Vector2(bar + 8, 5), "20 m", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)

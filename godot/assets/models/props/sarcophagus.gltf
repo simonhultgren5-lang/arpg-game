@@ -1,6 +1,6 @@
 {
 	"asset":{
-		"generator":"Khronos glTF Blender I/O v4.5.51",
+		"generator":"Khronos glTF Blender I/O v5.3.43",
 		"version":"2.0"
 	},
 	"extensionsUsed":[
@@ -28,33 +28,6 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"tomb_base",
-			"translation":[
-				0,
-				0.05999999865889549,
-				0
-			]
-		},
-		{
-			"mesh":1,
-			"name":"tomb_body",
-			"translation":[
-				0,
-				0.4300000071525574,
-				0
-			]
-		},
-		{
-			"mesh":2,
-			"name":"tomb_lid",
-			"translation":[
-				0.019999999552965164,
-				0.8100000023841858,
-				-0.029999999329447746
-			]
-		},
-		{
-			"mesh":3,
 			"name":"effigy",
 			"translation":[
 				0,
@@ -63,7 +36,7 @@
 			]
 		},
 		{
-			"mesh":4,
+			"mesh":1,
 			"name":"effigy_head",
 			"translation":[
 				0,
@@ -72,7 +45,7 @@
 			]
 		},
 		{
-			"mesh":5,
+			"mesh":2,
 			"name":"panel",
 			"translation":[
 				-0.4050000011920929,
@@ -81,7 +54,7 @@
 			]
 		},
 		{
-			"mesh":6,
+			"mesh":3,
 			"name":"panel.001",
 			"translation":[
 				0.4050000011920929,
@@ -90,74 +63,43 @@
 			]
 		},
 		{
-			"mesh":7,
+			"mesh":4,
 			"name":"skull",
 			"translation":[
 				0.30000001192092896,
 				0.9399999976158142,
 				0.75
 			]
+		},
+		{
+			"mesh":5,
+			"name":"tomb_base",
+			"translation":[
+				0,
+				0.05999999865889549,
+				0
+			]
+		},
+		{
+			"mesh":6,
+			"name":"tomb_body",
+			"translation":[
+				0,
+				0.4300000071525574,
+				0
+			]
+		},
+		{
+			"mesh":7,
+			"name":"tomb_lid",
+			"translation":[
+				0.019999999552965164,
+				0.8100000023841858,
+				-0.029999999329447746
+			]
 		}
 	],
 	"materials":[
-		{
-			"doubleSided":true,
-			"name":"slab",
-			"normalTexture":{
-				"extensions":{
-					"KHR_texture_transform":{
-						"offset":[
-							0,
-							0.5
-						],
-						"scale":[
-							0.5,
-							0.5
-						]
-					}
-				},
-				"index":0
-			},
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.75,
-					0.7200000286102295,
-					0.699999988079071,
-					1
-				],
-				"baseColorTexture":{
-					"extensions":{
-						"KHR_texture_transform":{
-							"offset":[
-								0,
-								0.5
-							],
-							"scale":[
-								0.5,
-								0.5
-							]
-						}
-					},
-					"index":1
-				},
-				"metallicFactor":0,
-				"metallicRoughnessTexture":{
-					"extensions":{
-						"KHR_texture_transform":{
-							"offset":[
-								0,
-								0.5
-							],
-							"scale":[
-								0.5,
-								0.5
-							]
-						}
-					},
-					"index":2
-				}
-			}
-		},
 		{
 			"doubleSided":true,
 			"name":"stone",
@@ -174,7 +116,7 @@
 						]
 					}
 				},
-				"index":3
+				"index":0
 			},
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
@@ -196,7 +138,7 @@
 							]
 						}
 					},
-					"index":4
+					"index":1
 				},
 				"metallicFactor":0,
 				"metallicRoughnessTexture":{
@@ -209,6 +151,64 @@
 							"scale":[
 								0.6000000238418579,
 								0.6000000238418579
+							]
+						}
+					},
+					"index":2
+				}
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"slab",
+			"normalTexture":{
+				"extensions":{
+					"KHR_texture_transform":{
+						"offset":[
+							0,
+							0.5
+						],
+						"scale":[
+							0.5,
+							0.5
+						]
+					}
+				},
+				"index":3
+			},
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.75,
+					0.7200000286102295,
+					0.699999988079071,
+					1
+				],
+				"baseColorTexture":{
+					"extensions":{
+						"KHR_texture_transform":{
+							"offset":[
+								0,
+								0.5
+							],
+							"scale":[
+								0.5,
+								0.5
+							]
+						}
+					},
+					"index":4
+				},
+				"metallicFactor":0,
+				"metallicRoughnessTexture":{
+					"extensions":{
+						"KHR_texture_transform":{
+							"offset":[
+								0,
+								0.5
+							],
+							"scale":[
+								0.5,
+								0.5
 							]
 						}
 					},
@@ -277,7 +277,7 @@
 	],
 	"meshes":[
 		{
-			"name":"tomb_base",
+			"name":"effigy",
 			"primitives":[
 				{
 					"attributes":{
@@ -291,7 +291,7 @@
 			]
 		},
 		{
-			"name":"tomb_body",
+			"name":"effigy_head",
 			"primitives":[
 				{
 					"attributes":{
@@ -299,50 +299,8 @@
 						"NORMAL":5,
 						"TEXCOORD_0":6
 					},
-					"indices":3,
-					"material":1
-				}
-			]
-		},
-		{
-			"name":"tomb_lid",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":7,
-						"NORMAL":8,
-						"TEXCOORD_0":9
-					},
-					"indices":10,
+					"indices":7,
 					"material":0
-				}
-			]
-		},
-		{
-			"name":"effigy",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":11,
-						"NORMAL":12,
-						"TEXCOORD_0":13
-					},
-					"indices":14,
-					"material":1
-				}
-			]
-		},
-		{
-			"name":"effigy_head",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":15,
-						"NORMAL":16,
-						"TEXCOORD_0":17
-					},
-					"indices":18,
-					"material":1
 				}
 			]
 		},
@@ -351,12 +309,12 @@
 			"primitives":[
 				{
 					"attributes":{
-						"POSITION":19,
-						"NORMAL":20,
-						"TEXCOORD_0":21
+						"POSITION":8,
+						"NORMAL":9,
+						"TEXCOORD_0":10
 					},
-					"indices":3,
-					"material":0
+					"indices":11,
+					"material":1
 				}
 			]
 		},
@@ -365,12 +323,12 @@
 			"primitives":[
 				{
 					"attributes":{
-						"POSITION":22,
-						"NORMAL":23,
-						"TEXCOORD_0":24
+						"POSITION":12,
+						"NORMAL":13,
+						"TEXCOORD_0":14
 					},
-					"indices":3,
-					"material":0
+					"indices":11,
+					"material":1
 				}
 			]
 		},
@@ -379,12 +337,54 @@
 			"primitives":[
 				{
 					"attributes":{
+						"POSITION":15,
+						"NORMAL":16,
+						"TEXCOORD_0":17
+					},
+					"indices":18,
+					"material":2
+				}
+			]
+		},
+		{
+			"name":"tomb_base",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":19,
+						"NORMAL":20,
+						"TEXCOORD_0":21
+					},
+					"indices":11,
+					"material":1
+				}
+			]
+		},
+		{
+			"name":"tomb_body",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":22,
+						"NORMAL":23,
+						"TEXCOORD_0":24
+					},
+					"indices":11,
+					"material":0
+				}
+			]
+		},
+		{
+			"name":"tomb_lid",
+			"primitives":[
+				{
+					"attributes":{
 						"POSITION":25,
 						"NORMAL":26,
 						"TEXCOORD_0":27
 					},
 					"indices":28,
-					"material":2
+					"material":1
 				}
 			]
 		}
@@ -430,21 +430,6 @@
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"flagstone_normal.png",
-			"uri":"../../textures/materials/flagstone_normal.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"flagstone_albedo.png",
-			"uri":"../../textures/materials/flagstone_albedo.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"flagstone_roughness.png",
-			"uri":"../../textures/materials/flagstone_roughness.png"
-		},
-		{
-			"mimeType":"image/png",
 			"name":"stone_wall_normal.png",
 			"uri":"../../textures/materials/stone_wall_normal.png"
 		},
@@ -457,6 +442,21 @@
 			"mimeType":"image/png",
 			"name":"stone_wall_roughness.png",
 			"uri":"../../textures/materials/stone_wall_roughness.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_normal.png",
+			"uri":"../../textures/materials/flagstone_normal.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_albedo.png",
+			"uri":"../../textures/materials/flagstone_albedo.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_roughness.png",
+			"uri":"../../textures/materials/flagstone_roughness.png"
 		},
 		{
 			"mimeType":"image/png",
@@ -478,102 +478,6 @@
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":216,
-			"max":[
-				0.44999998807907104,
-				0.05999999865889549,
-				0.949999988079071
-			],
-			"min":[
-				-0.44999998807907104,
-				-0.05999999865889549,
-				-0.949999988079071
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":1,
-			"componentType":5126,
-			"count":216,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":2,
-			"componentType":5126,
-			"count":216,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":3,
-			"componentType":5123,
-			"count":324,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":4,
-			"componentType":5126,
-			"count":216,
-			"max":[
-				0.4000000059604645,
-				0.3100000023841858,
-				0.8999999761581421
-			],
-			"min":[
-				-0.4000000059604645,
-				-0.3100000023841858,
-				-0.8999999761581421
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":5,
-			"componentType":5126,
-			"count":216,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":6,
-			"componentType":5126,
-			"count":216,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":7,
-			"componentType":5126,
-			"count":216,
-			"max":[
-				0.49884071946144104,
-				0.07000000029802322,
-				0.9956449270248413
-			],
-			"min":[
-				-0.49884071946144104,
-				-0.07000000029802322,
-				-0.9956449270248413
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":8,
-			"componentType":5126,
-			"count":216,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":9,
-			"componentType":5126,
-			"count":216,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":10,
-			"componentType":5123,
-			"count":324,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":11,
-			"componentType":5126,
 			"count":90,
 			"max":[
 				0.18000000715255737,
@@ -588,25 +492,25 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":12,
+			"bufferView":1,
 			"componentType":5126,
 			"count":90,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":13,
+			"bufferView":2,
 			"componentType":5126,
 			"count":90,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":14,
+			"bufferView":3,
 			"componentType":5123,
 			"count":288,
 			"type":"SCALAR"
 		},
 		{
-			"bufferView":15,
+			"bufferView":4,
 			"componentType":5126,
 			"count":480,
 			"max":[
@@ -622,27 +526,27 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":16,
+			"bufferView":5,
 			"componentType":5126,
 			"count":480,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":17,
+			"bufferView":6,
 			"componentType":5126,
 			"count":480,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":18,
+			"bufferView":7,
 			"componentType":5123,
 			"count":672,
 			"type":"SCALAR"
 		},
 		{
-			"bufferView":19,
+			"bufferView":8,
 			"componentType":5126,
-			"count":216,
+			"count":384,
 			"max":[
 				0.009999999776482582,
 				0.18000000715255737,
@@ -656,21 +560,27 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":20,
+			"bufferView":9,
 			"componentType":5126,
-			"count":216,
+			"count":384,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":21,
+			"bufferView":10,
 			"componentType":5126,
-			"count":216,
+			"count":384,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":22,
+			"bufferView":11,
+			"componentType":5123,
+			"count":564,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":12,
 			"componentType":5126,
-			"count":216,
+			"count":384,
 			"max":[
 				0.009999999776482582,
 				0.18000000715255737,
@@ -684,19 +594,19 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":23,
+			"bufferView":13,
 			"componentType":5126,
-			"count":216,
+			"count":384,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":24,
+			"bufferView":14,
 			"componentType":5126,
-			"count":216,
+			"count":384,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":25,
+			"bufferView":15,
 			"componentType":5126,
 			"count":264,
 			"max":[
@@ -712,197 +622,287 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":26,
+			"bufferView":16,
 			"componentType":5126,
 			"count":264,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":27,
+			"bufferView":17,
 			"componentType":5126,
 			"count":264,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":28,
+			"bufferView":18,
 			"componentType":5123,
 			"count":360,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":19,
+			"componentType":5126,
+			"count":384,
+			"max":[
+				0.44999998807907104,
+				0.05999999865889549,
+				0.949999988079071
+			],
+			"min":[
+				-0.44999998807907104,
+				-0.05999999865889549,
+				-0.949999988079071
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":20,
+			"componentType":5126,
+			"count":384,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":21,
+			"componentType":5126,
+			"count":384,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":22,
+			"componentType":5126,
+			"count":384,
+			"max":[
+				0.4000000059604645,
+				0.3100000023841858,
+				0.8999999761581421
+			],
+			"min":[
+				-0.4000000059604645,
+				-0.3100000023841858,
+				-0.8999999761581421
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":23,
+			"componentType":5126,
+			"count":384,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":24,
+			"componentType":5126,
+			"count":384,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":25,
+			"componentType":5126,
+			"count":384,
+			"max":[
+				0.49884071946144104,
+				0.07000000029802322,
+				0.9956449270248413
+			],
+			"min":[
+				-0.49884071946144104,
+				-0.07000000029802322,
+				-0.9956449270248413
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":26,
+			"componentType":5126,
+			"count":384,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":27,
+			"componentType":5126,
+			"count":384,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":28,
+			"componentType":5123,
+			"count":564,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":2592,
+			"byteLength":1080,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":2592,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":1728,
-			"byteOffset":5184,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":648,
-			"byteOffset":6912,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":7560,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":10152,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":1728,
-			"byteOffset":12744,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":14472,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":17064,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":1728,
-			"byteOffset":19656,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":648,
-			"byteOffset":21384,
-			"target":34963
-		},
-		{
-			"buffer":0,
 			"byteLength":1080,
-			"byteOffset":22032,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":1080,
-			"byteOffset":23112,
+			"byteOffset":1080,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":720,
-			"byteOffset":24192,
+			"byteOffset":2160,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":576,
-			"byteOffset":24912,
+			"byteOffset":2880,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":5760,
-			"byteOffset":25488,
+			"byteOffset":3456,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":5760,
-			"byteOffset":31248,
+			"byteOffset":9216,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":3840,
-			"byteOffset":37008,
+			"byteOffset":14976,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1344,
-			"byteOffset":40848,
+			"byteOffset":18816,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":42192,
+			"byteLength":4608,
+			"byteOffset":20160,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":44784,
+			"byteLength":4608,
+			"byteOffset":24768,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1728,
-			"byteOffset":47376,
+			"byteLength":3072,
+			"byteOffset":29376,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":49104,
+			"byteLength":1128,
+			"byteOffset":32448,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":33576,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":51696,
+			"byteLength":4608,
+			"byteOffset":38184,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1728,
-			"byteOffset":54288,
+			"byteLength":3072,
+			"byteOffset":42792,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":3168,
-			"byteOffset":56016,
+			"byteOffset":45864,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":3168,
-			"byteOffset":59184,
+			"byteOffset":49032,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":2112,
-			"byteOffset":62352,
+			"byteOffset":52200,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":720,
-			"byteOffset":64464,
+			"byteOffset":54312,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":55032,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":59640,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":3072,
+			"byteOffset":64248,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":67320,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":71928,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":3072,
+			"byteOffset":76536,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":79608,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":84216,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":3072,
+			"byteOffset":88824,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1128,
+			"byteOffset":91896,
 			"target":34963
 		}
 	],
@@ -914,7 +914,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":65184,
+			"byteLength":93024,
 			"uri":"sarcophagus.bin"
 		}
 	]

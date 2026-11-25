@@ -81,3 +81,5 @@ static func build(parent: Node3D, body_mat: StandardMaterial3D, weapon: Node3D) 
 	K.add(weapon, B.sphere(0.13, ember, Vector3.ZERO, null, 10).mesh, ember, Vector3(0, 1.38, 0))
 	K.add(weapon, K.spike(0.05, 0.1, 5), trim, Vector3(0, -0.65, 0), Vector3(PI, 0, 0))  # butt cap
 	B.omni(B.EMBER, 1.2, 4.0, Vector3(0, 1.45, 0), weapon)
+	# A living flame crowns the staff.
+	preload("res://scripts/world/spell_fx.gd").ambient_fire(weapon, Vector3(0, 1.4, 0), 0.11, true, false)

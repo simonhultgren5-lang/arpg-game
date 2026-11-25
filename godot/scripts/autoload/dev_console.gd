@@ -40,6 +40,8 @@ const HELP := [
 	["speed <0.1-5>", "game speed"],
 	["fps", "toggle the FPS counter"],
 	["stats", "print the hero's stats"],
+	["decor list|add <id> [yaw] [scale]|scatter <id> <n> <radius>|undo|save", "place models in the level like a set decorator"],
+	["cinematic list|<id>", "play a camera cinematic from data/cinematics"],
 	["save", "save now"],
 	["clear", "clear this log"],
 ]
@@ -361,7 +363,53 @@ func run(text: String) -> String:
 				int(Game.crit_chance() * 100.0), Game.move_speed(),
 				int(Game.progress["gold"]), int(Game.progress["potions"]), int(Game.progress.get("kills", 0)), Game.area, Game.quest_state(),
 			]
+		"decor":
+			return _decor(args, w, p)
+		"cinematic":
+			var CinematicPlayer = preload("res://scripts/cinematics/shot_player.gd")
+			var which := _arg(args, 1, "list")
+			if which == "list":
+				return "Cinematics: " + ", ".join(CinematicPlayer.list())
+			if CinematicPlayer.play(w, which) == null:
+				return _err("No cinematic called %s." % which)
+			toggle()
+			return _ok("Playing %s (Space skips)." % which)
 		"save":
 			Game.save()
 			return _ok("Saved%s." % (" to the server" if Boot.is_online() else ""))
 	return _err("Unknown command: %s (try help)" % cmd)
+
+
+## decor list | add <id> [yaw] [scale] | scatter <id> <n> <radius> | undo | save
+func _decor(args: PackedStringArray, w, p) -> String:
+	var Decor = preload("res://scripts/world/decor.gd")
+	var sub := _arg(args, 1, "list")
+	var area := "catacomb" if Game.area == "catacomb" else "town"
+	var root: Node = w.get_node_or_null("Decor")
+	if root == null:
+		root = Node3D.new()
+		root.name = "Decor"
+		w.add_child(root)
+	var ahead: Vector3 = p.global_position + p.facing() * 2.5
+	ahead.y = 0.0
+	match sub:
+		"list":
+			return "Placeable: " + ", ".join(Decor.ids()) + "
+Placed here: %d" % root.get_child_count()
+		"add":
+			var id := _arg(args, 2, "")
+			if Decor.place(root, id, ahead, float(_arg(args, 3, "0")), float(_arg(args, 4, "1"))) == null:
+				return _err("Unknown model %s (decor list)." % id)
+			return _ok("Placed %s at %.1f, %.1f." % [id, ahead.x, ahead.z])
+		"scatter":
+			var id := _arg(args, 2, "")
+			var n: int = Decor.scatter(root, id, Vector2(ahead.x, ahead.z), float(_arg(args, 4, "5")), int(_arg(args, 3, "8")), randi()).size()
+			return _ok("Scattered %d x %s." % [n, id]) if n > 0 else _err("Unknown model %s." % id)
+		"undo":
+			if root.get_child_count() == 0:
+				return _err("Nothing to undo.")
+			root.get_child(root.get_child_count() - 1).queue_free()
+			return _ok("Removed the last piece.")
+		"save":
+			return _ok(Decor.save_layout(w, area))
+	return _err("decor list | add | scatter | undo | save")

@@ -12,7 +12,7 @@ static func _root(parent: Node, pos: Vector3) -> Node3D:
 	return root
 
 
-static var _flame_mat: ShaderMaterial
+const SpellFx = preload("res://scripts/world/spell_fx.gd")
 
 
 ## The Blender model of a prop (assets/models/props/<id>.gltf) placed at `pos`, or null if missing.
@@ -37,14 +37,7 @@ static func sconce(parent: Node, pos: Vector3) -> Node3D:
 	for i in 4:
 		var a := i * PI / 2
 		K.add(root, K.spike(0.04, 0.19, 4), iron, Vector3(0.16 * cos(a), 0.45, 0.24 + 0.16 * sin(a)))
-	if _flame_mat == null:
-		_flame_mat = ShaderMaterial.new()
-		_flame_mat.shader = preload("res://shaders/torch_flame.gdshader")
-	K.add(root, K.lathe(PackedVector2Array([Vector2(0, 0), Vector2(0.09, 0),
-		Vector2(0.13, 0.12), Vector2(0.08, 0.26), Vector2(0, 0.42)]), 7),
-		_flame_mat, Vector3(0, 0.46, 0.24), Vector3(0, 0, -0.18))
-	K.add(root, K.spike(0.065, 0.24, 5), B.mat(B.GOLD, 1, Color("#ffbf61"), 2),
-		Vector3(0, 0.46, 0.34), Vector3(0, 0, 0.16))
+	SpellFx.ambient_fire(root, Vector3(0, 0.44, 0.24), 0.27, true, false)
 	return root
 
 
@@ -139,21 +132,9 @@ static func brazier(parent: Node, pos: Vector3, light_range := 9.0, energy := 2.
 			Vector2(0.46, 1.12), Vector2(0.4, 1.12), Vector2(0.2, 0.98), Vector2(0, 0.96)]), 12), iron)
 		K.add(root, K.lathe(PackedVector2Array([Vector2(0, 0), Vector2(0.38, 0), Vector2(0.42, 0.04), Vector2(0, 0.06)]), 12),
 			B.mat(Color("#ff7a2a"), 1.0, Color("#ff5a14"), 2.2), Vector3(0, 1.02, 0))
-		if _flame_mat == null:
-			_flame_mat = ShaderMaterial.new()
-			_flame_mat.shader = preload("res://shaders/torch_flame.gdshader")
-		K.add(root, K.lathe(PackedVector2Array([Vector2(0, 0), Vector2(0.2, 0), Vector2(0.28, 0.25),
-			Vector2(0.14, 0.6), Vector2(0, 0.9)]), 8), _flame_mat, Vector3(0, 1.08, 0))
 	if modelled != null and modelled.get_child_count() > 0 and not modelled.has_meta("flamed"):
 		modelled.set_meta("flamed", true)
-		if _flame_mat == null:
-			_flame_mat = ShaderMaterial.new()
-			_flame_mat.shader = preload("res://shaders/torch_flame.gdshader")
-		var f := Node3D.new()
-		f.position = Vector3(0, 1.08, 0)
-		K.add(f, K.lathe(PackedVector2Array([Vector2(0, 0), Vector2(0.2, 0), Vector2(0.28, 0.25),
-			Vector2(0.14, 0.6), Vector2(0, 0.9)]), 8), _flame_mat)
-		modelled.add_child(f)
+		SpellFx.ambient_fire(modelled, Vector3(0, 1.06, 0), 0.5, true, true)
 	var glow := Node3D.new()
 	glow.position = Vector3(0, 1.5, 0)
 	var light := B.omni(Color(1.0, 0.6, 0.28), energy, light_range, Vector3.ZERO, glow)

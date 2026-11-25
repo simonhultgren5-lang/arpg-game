@@ -46,6 +46,12 @@ func _process(delta: float) -> void:
 func _wire_button(node: Node) -> void:
 	if node is BaseButton:
 		node.pressed.connect(_button_sound)
+		node.mouse_entered.connect(_button_hover.bind(node))
+
+
+func _button_hover(button: BaseButton) -> void:
+	if not button.disabled:
+		cue("ui_hover", -26.0, null, 60)
 
 
 func _button_sound() -> void:

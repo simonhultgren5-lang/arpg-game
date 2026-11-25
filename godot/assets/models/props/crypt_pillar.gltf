@@ -1,6 +1,6 @@
 {
 	"asset":{
-		"generator":"Khronos glTF Blender I/O v4.5.51",
+		"generator":"Khronos glTF Blender I/O v5.3.43",
 		"version":"2.0"
 	},
 	"extensionsUsed":[
@@ -24,6 +24,14 @@
 	"nodes":[
 		{
 			"mesh":0,
+			"name":"base_mould"
+		},
+		{
+			"mesh":1,
+			"name":"capital"
+		},
+		{
+			"mesh":2,
 			"name":"plinth",
 			"translation":[
 				0,
@@ -32,77 +40,11 @@
 			]
 		},
 		{
-			"mesh":1,
-			"name":"base_mould"
-		},
-		{
-			"mesh":2,
-			"name":"shaft"
-		},
-		{
 			"mesh":3,
-			"name":"capital"
+			"name":"shaft"
 		}
 	],
 	"materials":[
-		{
-			"doubleSided":true,
-			"name":"slab",
-			"normalTexture":{
-				"extensions":{
-					"KHR_texture_transform":{
-						"offset":[
-							0,
-							0.5
-						],
-						"scale":[
-							0.5,
-							0.5
-						]
-					}
-				},
-				"index":0
-			},
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.75,
-					0.7200000286102295,
-					0.699999988079071,
-					1
-				],
-				"baseColorTexture":{
-					"extensions":{
-						"KHR_texture_transform":{
-							"offset":[
-								0,
-								0.5
-							],
-							"scale":[
-								0.5,
-								0.5
-							]
-						}
-					},
-					"index":1
-				},
-				"metallicFactor":0,
-				"metallicRoughnessTexture":{
-					"extensions":{
-						"KHR_texture_transform":{
-							"offset":[
-								0,
-								0.5
-							],
-							"scale":[
-								0.5,
-								0.5
-							]
-						}
-					},
-					"index":2
-				}
-			}
-		},
 		{
 			"doubleSided":true,
 			"name":"stone",
@@ -119,7 +61,7 @@
 						]
 					}
 				},
-				"index":3
+				"index":0
 			},
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
@@ -141,7 +83,7 @@
 							]
 						}
 					},
-					"index":4
+					"index":1
 				},
 				"metallicFactor":0,
 				"metallicRoughnessTexture":{
@@ -157,6 +99,64 @@
 							]
 						}
 					},
+					"index":2
+				}
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"slab",
+			"normalTexture":{
+				"extensions":{
+					"KHR_texture_transform":{
+						"offset":[
+							0,
+							0.5
+						],
+						"scale":[
+							0.5,
+							0.5
+						]
+					}
+				},
+				"index":3
+			},
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.75,
+					0.7200000286102295,
+					0.699999988079071,
+					1
+				],
+				"baseColorTexture":{
+					"extensions":{
+						"KHR_texture_transform":{
+							"offset":[
+								0,
+								0.5
+							],
+							"scale":[
+								0.5,
+								0.5
+							]
+						}
+					},
+					"index":4
+				},
+				"metallicFactor":0,
+				"metallicRoughnessTexture":{
+					"extensions":{
+						"KHR_texture_transform":{
+							"offset":[
+								0,
+								0.5
+							],
+							"scale":[
+								0.5,
+								0.5
+							]
+						}
+					},
 					"index":5
 				}
 			}
@@ -164,7 +164,7 @@
 	],
 	"meshes":[
 		{
-			"name":"plinth",
+			"name":"base_mould",
 			"primitives":[
 				{
 					"attributes":{
@@ -178,7 +178,7 @@
 			]
 		},
 		{
-			"name":"base_mould",
+			"name":"capital",
 			"primitives":[
 				{
 					"attributes":{
@@ -187,12 +187,12 @@
 						"TEXCOORD_0":6
 					},
 					"indices":7,
-					"material":1
+					"material":0
 				}
 			]
 		},
 		{
-			"name":"shaft",
+			"name":"plinth",
 			"primitives":[
 				{
 					"attributes":{
@@ -206,7 +206,7 @@
 			]
 		},
 		{
-			"name":"capital",
+			"name":"shaft",
 			"primitives":[
 				{
 					"attributes":{
@@ -215,7 +215,7 @@
 						"TEXCOORD_0":14
 					},
 					"indices":15,
-					"material":1
+					"material":0
 				}
 			]
 		}
@@ -249,21 +249,6 @@
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"flagstone_normal.png",
-			"uri":"../../textures/materials/flagstone_normal.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"flagstone_albedo.png",
-			"uri":"../../textures/materials/flagstone_albedo.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"flagstone_roughness.png",
-			"uri":"../../textures/materials/flagstone_roughness.png"
-		},
-		{
-			"mimeType":"image/png",
 			"name":"stone_wall_normal.png",
 			"uri":"../../textures/materials/stone_wall_normal.png"
 		},
@@ -276,45 +261,26 @@
 			"mimeType":"image/png",
 			"name":"stone_wall_roughness.png",
 			"uri":"../../textures/materials/stone_wall_roughness.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_normal.png",
+			"uri":"../../textures/materials/flagstone_normal.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_albedo.png",
+			"uri":"../../textures/materials/flagstone_albedo.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"flagstone_roughness.png",
+			"uri":"../../textures/materials/flagstone_roughness.png"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
-			"componentType":5126,
-			"count":216,
-			"max":[
-				0.375,
-				0.125,
-				0.375
-			],
-			"min":[
-				-0.375,
-				-0.125,
-				-0.375
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":1,
-			"componentType":5126,
-			"count":216,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":2,
-			"componentType":5126,
-			"count":216,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":3,
-			"componentType":5123,
-			"count":324,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":4,
 			"componentType":5126,
 			"count":185,
 			"max":[
@@ -330,59 +296,25 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":5,
+			"bufferView":1,
 			"componentType":5126,
 			"count":185,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":6,
+			"bufferView":2,
 			"componentType":5126,
 			"count":185,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":7,
+			"bufferView":3,
 			"componentType":5123,
 			"count":564,
 			"type":"SCALAR"
 		},
 		{
-			"bufferView":8,
-			"componentType":5126,
-			"count":634,
-			"max":[
-				0.2530682384967804,
-				2.298948049545288,
-				0.25327977538108826
-			],
-			"min":[
-				-0.25423988699913025,
-				0.40000009536743164,
-				-0.25352293252944946
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":9,
-			"componentType":5126,
-			"count":634,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":10,
-			"componentType":5126,
-			"count":634,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":11,
-			"componentType":5123,
-			"count":2016,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":12,
+			"bufferView":4,
 			"componentType":5126,
 			"count":165,
 			"max":[
@@ -398,119 +330,187 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":13,
+			"bufferView":5,
 			"componentType":5126,
 			"count":165,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":14,
+			"bufferView":6,
 			"componentType":5126,
 			"count":165,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":15,
+			"bufferView":7,
 			"componentType":5123,
 			"count":570,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":8,
+			"componentType":5126,
+			"count":384,
+			"max":[
+				0.375,
+				0.125,
+				0.375
+			],
+			"min":[
+				-0.375,
+				-0.125,
+				-0.375
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":9,
+			"componentType":5126,
+			"count":384,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":10,
+			"componentType":5126,
+			"count":384,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":11,
+			"componentType":5123,
+			"count":564,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":12,
+			"componentType":5126,
+			"count":634,
+			"max":[
+				0.2530682384967804,
+				2.298948049545288,
+				0.25327977538108826
+			],
+			"min":[
+				-0.25423988699913025,
+				0.40000009536743164,
+				-0.25352293252944946
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":13,
+			"componentType":5126,
+			"count":634,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":14,
+			"componentType":5126,
+			"count":634,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":15,
+			"componentType":5123,
+			"count":2016,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":2592,
+			"byteLength":2220,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":2592,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":1728,
-			"byteOffset":5184,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":648,
-			"byteOffset":6912,
-			"target":34963
-		},
-		{
-			"buffer":0,
 			"byteLength":2220,
-			"byteOffset":7560,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":2220,
-			"byteOffset":9780,
+			"byteOffset":2220,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1480,
-			"byteOffset":12000,
+			"byteOffset":4440,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1128,
-			"byteOffset":13480,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":7608,
-			"byteOffset":14608,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":7608,
-			"byteOffset":22216,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":5072,
-			"byteOffset":29824,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":4032,
-			"byteOffset":34896,
+			"byteOffset":5920,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":1980,
-			"byteOffset":38928,
+			"byteOffset":7048,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1980,
-			"byteOffset":40908,
+			"byteOffset":9028,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1320,
-			"byteOffset":42888,
+			"byteOffset":11008,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1140,
-			"byteOffset":44208,
+			"byteOffset":12328,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":13468,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4608,
+			"byteOffset":18076,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":3072,
+			"byteOffset":22684,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1128,
+			"byteOffset":25756,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":7608,
+			"byteOffset":26884,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":7608,
+			"byteOffset":34492,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":5072,
+			"byteOffset":42100,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4032,
+			"byteOffset":47172,
 			"target":34963
 		}
 	],
@@ -522,7 +522,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":45348,
+			"byteLength":51204,
 			"uri":"crypt_pillar.bin"
 		}
 	]

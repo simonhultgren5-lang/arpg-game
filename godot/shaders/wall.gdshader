@@ -52,6 +52,15 @@ void fragment() {
 			col = albedo_top.rgb;
 		}
 	}
+	// Aged by water and time: damp and moss climb the base, soot darkens the top, vertical rain streaks run down.
+	float along = wpos.x + wpos.z;
+	float wob = hash(floor(vec2(along * 2.3, 0.0))) * 0.4 + hash(floor(vec2(along * 5.1, 1.0))) * 0.2;
+	float damp = 1.0 - smoothstep(0.1, 1.5, wpos.y + wob - 0.3);
+	float streak = smoothstep(0.55, 0.9, hash(floor(vec2(along * 9.0, 3.0))) * (0.6 + 0.4 * hash(floor(vec2(along * 3.0, floor(wpos.y * 0.6))))));
+	col *= mix(1.0, 0.72, streak * 0.6);
+	col *= mix(1.0, 0.8, smoothstep(2.4, 3.2, wpos.y));
+	col = mix(col, vec3(0.06, 0.1, 0.04) * (0.8 + col * 2.0), damp * 0.6 * (wnormal.y < 0.7 ? 1.0 : 0.0));
+	col *= mix(0.5, 1.0, smoothstep(0.0, 0.8, wpos.y));  // contact shadow at the base
 	ALBEDO = col;
 	ROUGHNESS = use_texture > 0.5 ? texture(stone_roughness, vec2(wpos.x + wpos.z, -wpos.y) / stone_size).r : 0.92;
 }

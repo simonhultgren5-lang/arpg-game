@@ -2,6 +2,7 @@ extends CharacterBody3D
 ## Catacomb monsters and the Act I boss. One script, data-driven by KINDS.
 
 const B = preload("res://scripts/world/build.gd")
+const SpellFx = preload("res://scripts/world/spell_fx.gd")
 const Fx = preload("res://scripts/world/fx.gd")
 const Projectile = preload("res://scripts/actors/projectile.gd")
 const HollowModel = preload("res://scripts/models/hollow_model.gd")
@@ -97,6 +98,7 @@ func setup() -> void:
 	_build_model(s)
 	_build_life_bar(s)
 	_cd = randf() * 1.0
+	SpellFx.enemy_ambient(self, "boss" if is_boss else kind, 1.2 * s)
 
 
 var _bar: Node3D
@@ -422,6 +424,7 @@ func _die() -> void:
 		_warning_audio.stop()
 		_warning_audio.queue_free()
 	ActAudio.cue("boss_death" if is_boss else "death_" + kind, -6.0 if is_boss else -14.0, self, 100)
+	SpellFx.death_burst(world, global_position, kind, is_boss)
 	remove_from_group("enemies")
 	collision_layer = 0
 	collision_mask = 0

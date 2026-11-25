@@ -36,6 +36,8 @@ static func build(parent: Node3D, s: float, col: Color, mat_for: Callable) -> vo
 	K.add(root, B.sphere(0.35, ember, Vector3.ZERO, null, 12).mesh, ember, Vector3(0, 1.5, 0.95))
 	K.add(root, K.limb(0.07, 0.07, 0.5, 6), dark, Vector3(0, 1.5, 0.95), Vector3(PI * 0.5 + 0.2, 0, 0))
 	B.omni(B.EMBER, 2.0, 6.0, Vector3(0, 1.6, 1.4), root)
+	# The clapper burns for real: flame pours from the chest.
+	preload("res://scripts/world/spell_fx.gd").ambient_fire(root, Vector3(0, 1.3, 1.0), 0.5, true, true, Color(1.0, 0.38, 0.1))
 
 	# Helm: iron great-helm with a glowing slit and a pair of bell-shaped horns.
 	K.add(root, K.lathe(PackedVector2Array([

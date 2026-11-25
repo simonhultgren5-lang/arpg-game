@@ -4,6 +4,7 @@ extends CharacterBody3D
 ## directly, E talks or uses the nearest thing. The bar and variants are Game.build() (Skills panel, S).
 
 const B = preload("res://scripts/world/build.gd")
+const SpellFx = preload("res://scripts/world/spell_fx.gd")
 const WarriorModel = preload("res://scripts/models/warrior_model.gd")
 const AssetModels = preload("res://scripts/models/asset_models.gd")
 const RogueModel = preload("res://scripts/models/rogue_model.gd")
@@ -76,6 +77,7 @@ func setup() -> void:
 	# The hero's own light: the dark never quite closes in.
 	var l := B.omni(Color(1.0, 0.85, 0.7), 0.9, 10.0, Vector3(0, 3.2, 0.5), self, true)
 	l.name = "HeroLight"
+	SpellFx.class_ambient(self, Game.hero_class)
 
 
 func _build_model() -> void:
@@ -284,6 +286,7 @@ func _physics_process(delta: float) -> void:
 		if old_step % 2 == 0:
 			ActAudio.cue("gear", -24.0, self)
 		Fx.footfall(world, Vector3(foot.global_position.x, 0.035, foot.global_position.z), _model.rotation.y)
+		SpellFx.footstep(world, Vector3(foot.global_position.x, 0.0, foot.global_position.z))
 
 
 func _auto_move(delta: float) -> Vector3:
@@ -569,7 +572,18 @@ func cast_slot(slot_i: int, loud := true) -> void:
 	match sk["kind"]:
 		"nova":
 			world.hit_radius(global_position, sk["radius"], sk["mult"], self, fx)
-			Fx.ring(world, global_position, sk["radius"], color, 0.4)
+			match Game.hero_class:
+				"warrior":
+					Fx.ring(world, global_position, sk["radius"], color, 0.4)
+					SpellFx.ground_cracks(world, global_position, sk["radius"], color)
+					SpellFx.dust_burst(world, global_position, sk["radius"])
+					SpellFx.debris(world, global_position, sk["radius"], 14)
+					SpellFx.shockwave(world, global_position, sk["radius"])
+				"pyromancer":
+					SpellFx.explosion(world, global_position, sk["radius"] * 0.8, color)
+				_:
+					SpellFx.smoke_burst(world, global_position, sk["radius"] * 0.5, Color(0.2, 0.2, 0.26), 8, 1.4, 0.5)
+					Fx.ring(world, global_position, sk["radius"], color, 0.4)
 			Fx.flash(world, global_position, color, 5.0, sk["radius"] * 2.0)
 			world.shake(0.3)
 		"rush":
@@ -593,8 +607,10 @@ func cast_slot(slot_i: int, loud := true) -> void:
 				return
 			var land: Vector3 = to if world.grid.walkable_at(to) else world.grid.center(c)
 			Fx.ring(world, global_position, 1.5, color, 0.3)
+			_blink_fx(global_position, color)
 			global_position = Vector3(land.x, 0, land.z)
 			_clear_targets()
+			_blink_fx(global_position, color)
 			Fx.ring(world, global_position, sk["radius"], color, 0.35)
 			Fx.flash(world, global_position, color, 4.0, 6.0)
 			world.hit_radius(global_position, sk["radius"], sk["mult"], self, fx)
@@ -607,6 +623,7 @@ func cast_slot(slot_i: int, loud := true) -> void:
 				Fx.ring(world, global_position, sk["radius"], color, 0.4)
 			Fx.ring(world, global_position, 3.0, color, 0.5)
 			Fx.flash(world, global_position, color, 5.0, 6.0, 0.5)
+			SpellFx.aura(self, color, float(sk["duration"]))
 			world.shake(0.2)
 		"whirl":
 			_whirl = {"left": sk["duration"], "tick": 0.0, "every": sk["tick"], "radius": sk["radius"], "mult": sk["mult"], "color": color, "fx": fx}
@@ -618,6 +635,7 @@ func cast_slot(slot_i: int, loud := true) -> void:
 				Fx.ring(world, global_position, sk["radius"], color, 0.4)
 			Fx.ring(world, global_position, 1.6, color, 0.6)
 			Fx.flash(world, global_position, color, 3.0, 4.0, 0.4)
+			SpellFx.aura(self, color, float(sk["duration"]), 0.8)
 		"rain":
 			var at := global_position + dir * minf(dist, sk["range"])
 			world.cast_rain(at, sk, self)
@@ -646,8 +664,10 @@ func _dash_step(delta: float) -> void:
 			world.apply_effects(e, _dash["dir"], _dash.get("fx", {}), roll[0], self)
 			if is_instance_valid(e) and not e.dead:
 				e.knockback((e.global_position - global_position).normalized() + _dash["dir"] * 0.5, 1.5)
+	SpellFx.footstep(world, global_position)
 	if _dash["left"] <= 0.0 or moved < step * 0.3:
 		Fx.ring(world, global_position, 2.0, _dash["color"], 0.3)
+		SpellFx.dust_burst(world, global_position, 1.6)
 		world.shake(0.2)
 		_dash = {}
 
@@ -721,6 +741,8 @@ func _whirl_step(delta: float) -> void:
 		_whirl["tick"] = _whirl["every"]
 		world.hit_radius(global_position, _whirl["radius"], _whirl["mult"], self, _whirl.get("fx", {}))
 		Fx.ring(world, global_position, _whirl["radius"], _whirl["color"], 0.2)
+		SpellFx.sparks(world, global_position + Vector3(0, 1.0, 0), Vector3.UP, 8, 5.0, 120.0)
+		SpellFx.dust_burst(world, global_position, _whirl["radius"] * 0.6)
 	if _whirl["left"] <= 0.0:
 		_whirl = {}
 
@@ -754,6 +776,19 @@ func _flurry(sk: Dictionary) -> void:
 		await get_tree().create_timer(0.12).timeout
 		if not is_inside_tree():
 			return
+
+
+## Departure and arrival of a blink: smoke for the rogue, flame for the pyromancer, thrown earth otherwise.
+func _blink_fx(at: Vector3, color: Color) -> void:
+	match Game.hero_class:
+		"rogue":
+			SpellFx.smoke_burst(world, at, 1.1, Color(0.12, 0.12, 0.17), 7, 1.5, 0.4)
+		"pyromancer":
+			SpellFx.flame_puff(world, at, 2.2, color, 0.5)
+			SpellFx.sparks(world, at + Vector3(0, 0.5, 0), Vector3.UP, 12, 3.5, 90.0)
+		_:
+			SpellFx.dust_burst(world, at, 2.0)
+			SpellFx.debris(world, at, 1.6, 6)
 
 
 func on_level_up() -> void:

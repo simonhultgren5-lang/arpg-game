@@ -257,7 +257,7 @@ func _decorate(level: Node3D, room: Dictionary, rng: RandomNumberGenerator) -> v
 			var a := i * TAU / 10.0
 			var p := ctr + Vector3(cos(a), 0, sin(a)) * 6.5
 			B.cylinder(0.06, 0.06, 0.35, B.mat(Color(0.85, 0.8, 0.7)), p + Vector3(0, 0.18, 0), level, 6)
-			B.sphere(0.06, B.mat(B.EMBER, 1.0, B.EMBER, 5.0), p + Vector3(0, 0.4, 0), level, 5)
+			preload("res://scripts/world/spell_fx.gd").ambient_fire(level, p + Vector3(0, 0.34, 0), 0.05, false, false)
 		B.omni(Color(0.9, 0.3, 0.15), 2.5, 16.0, ctr + Vector3(0, 4, 0), level)
 		var bell := preload("res://scripts/models/props_model.gd").founders_bell(level, ctr + Vector3(5.5, 0.9, -5.0))
 		bell.rotation = Vector3(0.5, 0.0, 1.2)

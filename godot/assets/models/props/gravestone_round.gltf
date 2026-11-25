@@ -1,6 +1,6 @@
 {
 	"asset":{
-		"generator":"Khronos glTF Blender I/O v4.5.51",
+		"generator":"Khronos glTF Blender I/O v5.3.43",
 		"version":"2.0"
 	},
 	"extensionsUsed":[
@@ -23,11 +23,11 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"stone",
+			"name":"mound",
 			"translation":[
 				0,
-				0.4000000059604645,
-				0
+				0.05000000074505806,
+				-0.8500000238418579
 			]
 		},
 		{
@@ -41,15 +41,67 @@
 		},
 		{
 			"mesh":2,
-			"name":"mound",
+			"name":"stone",
 			"translation":[
 				0,
-				0.05000000074505806,
-				-0.8500000238418579
+				0.4000000059604645,
+				0
 			]
 		}
 	],
 	"materials":[
+		{
+			"doubleSided":true,
+			"name":"earth",
+			"normalTexture":{
+				"extensions":{
+					"KHR_texture_transform":{
+						"offset":[
+							0,
+							0.5
+						],
+						"scale":[
+							0.5,
+							0.5
+						]
+					}
+				},
+				"index":0
+			},
+			"pbrMetallicRoughness":{
+				"baseColorTexture":{
+					"extensions":{
+						"KHR_texture_transform":{
+							"offset":[
+								0,
+								0.5
+							],
+							"scale":[
+								0.5,
+								0.5
+							]
+						}
+					},
+					"index":1
+				},
+				"metallicFactor":0,
+				"metallicRoughnessTexture":{
+					"extensions":{
+						"KHR_texture_transform":{
+							"offset":[
+								0,
+								0.5
+							],
+							"scale":[
+								0.5,
+								0.5
+							]
+						}
+					},
+					"index":2
+				}
+			}
+		},
 		{
 			"doubleSided":true,
 			"name":"stone",
@@ -66,7 +118,7 @@
 						]
 					}
 				},
-				"index":0
+				"index":3
 			},
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
@@ -88,7 +140,7 @@
 							]
 						}
 					},
-					"index":1
+					"index":4
 				},
 				"metallicFactor":0,
 				"metallicRoughnessTexture":{
@@ -104,58 +156,6 @@
 							]
 						}
 					},
-					"index":2
-				}
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"earth",
-			"normalTexture":{
-				"extensions":{
-					"KHR_texture_transform":{
-						"offset":[
-							0,
-							0.5
-						],
-						"scale":[
-							0.5,
-							0.5
-						]
-					}
-				},
-				"index":3
-			},
-			"pbrMetallicRoughness":{
-				"baseColorTexture":{
-					"extensions":{
-						"KHR_texture_transform":{
-							"offset":[
-								0,
-								0.5
-							],
-							"scale":[
-								0.5,
-								0.5
-							]
-						}
-					},
-					"index":4
-				},
-				"metallicFactor":0,
-				"metallicRoughnessTexture":{
-					"extensions":{
-						"KHR_texture_transform":{
-							"offset":[
-								0,
-								0.5
-							],
-							"scale":[
-								0.5,
-								0.5
-							]
-						}
-					},
 					"index":5
 				}
 			}
@@ -163,7 +163,7 @@
 	],
 	"meshes":[
 		{
-			"name":"stone",
+			"name":"mound",
 			"primitives":[
 				{
 					"attributes":{
@@ -186,12 +186,12 @@
 						"TEXCOORD_0":6
 					},
 					"indices":7,
-					"material":0
+					"material":1
 				}
 			]
 		},
 		{
-			"name":"mound",
+			"name":"stone",
 			"primitives":[
 				{
 					"attributes":{
@@ -234,21 +234,6 @@
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"stone_wall_normal.png",
-			"uri":"../../textures/materials/stone_wall_normal.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"stone_wall_albedo.png",
-			"uri":"../../textures/materials/stone_wall_albedo.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"stone_wall_roughness.png",
-			"uri":"../../textures/materials/stone_wall_roughness.png"
-		},
-		{
-			"mimeType":"image/png",
 			"name":"earth_normal.png",
 			"uri":"../../textures/materials/earth_normal.png"
 		},
@@ -261,41 +246,56 @@
 			"mimeType":"image/png",
 			"name":"earth_roughness.png",
 			"uri":"../../textures/materials/earth_roughness.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"stone_wall_normal.png",
+			"uri":"../../textures/materials/stone_wall_normal.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"stone_wall_albedo.png",
+			"uri":"../../textures/materials/stone_wall_albedo.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"stone_wall_roughness.png",
+			"uri":"../../textures/materials/stone_wall_roughness.png"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":216,
+			"count":6144,
 			"max":[
-				0.313882440328598,
-				0.41194015741348267,
-				0.107274129986763
+				0.39911001920700073,
+				0.10910990089178085,
+				0.7991100549697876
 			],
 			"min":[
-				-0.3131043612957001,
-				-0.41229477524757385,
-				-0.1062202975153923
+				-0.39911001920700073,
+				-0.10910990089178085,
+				-0.7991100549697876
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":216,
+			"count":6144,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":216,
+			"count":6144,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
 			"componentType":5123,
-			"count":324,
+			"count":9216,
 			"type":"SCALAR"
 		},
 		{
@@ -335,109 +335,109 @@
 		{
 			"bufferView":8,
 			"componentType":5126,
-			"count":3456,
+			"count":384,
 			"max":[
-				0.3980700969696045,
-				0.10807005316019058,
-				0.7980700731277466
+				0.3138967454433441,
+				0.4119316339492798,
+				0.10728618502616882
 			],
 			"min":[
-				-0.3980700969696045,
-				-0.10807005316019058,
-				-0.7980700731277466
+				-0.3131030797958374,
+				-0.4122900366783142,
+				-0.10621914267539978
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":9,
 			"componentType":5126,
-			"count":3456,
+			"count":384,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":10,
 			"componentType":5126,
-			"count":3456,
+			"count":384,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":11,
 			"componentType":5123,
-			"count":5184,
+			"count":564,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":2592,
+			"byteLength":73728,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2592,
-			"byteOffset":2592,
+			"byteLength":73728,
+			"byteOffset":73728,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1728,
-			"byteOffset":5184,
+			"byteLength":49152,
+			"byteOffset":147456,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":648,
-			"byteOffset":6912,
+			"byteLength":18432,
+			"byteOffset":196608,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":1728,
-			"byteOffset":7560,
+			"byteOffset":215040,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1728,
-			"byteOffset":9288,
+			"byteOffset":216768,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1152,
-			"byteOffset":11016,
+			"byteOffset":218496,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":552,
-			"byteOffset":12168,
+			"byteOffset":219648,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteLength":41472,
-			"byteOffset":12720,
+			"byteLength":4608,
+			"byteOffset":220200,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":41472,
-			"byteOffset":54192,
+			"byteLength":4608,
+			"byteOffset":224808,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":27648,
-			"byteOffset":95664,
+			"byteLength":3072,
+			"byteOffset":229416,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":10368,
-			"byteOffset":123312,
+			"byteLength":1128,
+			"byteOffset":232488,
 			"target":34963
 		}
 	],
@@ -449,7 +449,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":133680,
+			"byteLength":233616,
 			"uri":"gravestone_round.bin"
 		}
 	]

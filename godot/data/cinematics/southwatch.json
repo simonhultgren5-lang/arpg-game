@@ -1,0 +1,11 @@
+{
+	"title": "Southwatch Approach",
+	"shots": [
+		{"duration": 6.0, "from": [34, 22, 150], "to": [34, 9, 112], "look_from": [34, 0, 100], "look_to": [34, 1, 80],
+		 "fov_from": 52, "fov_to": 40, "caption": "South of Hollowmere, the fen keeps its own counsel.", "fade_in": 1.2, "fade_out": 0.4},
+		{"duration": 6.0, "from": [14, 3, 76], "to": [46, 5, 72], "look_from": [34, 0, 70], "look_to": [34, 0, 72],
+		 "fov_from": 38, "fov_to": 44, "caption": "The river does not run to the sea. It runs to the bell.", "fade_in": 0.4, "fade_out": 0.4},
+		{"duration": 5.0, "from": [34, 14, 58], "to": [34, 6, 40], "look_from": [34, 0, 40], "look_to": [34, 3, 12],
+		 "fov_from": 46, "fov_to": 36, "caption": "Hollowmere waits.", "fade_in": 0.4, "fade_out": 1.2}
+	]
+}

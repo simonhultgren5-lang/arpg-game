@@ -4,6 +4,7 @@ extends Node3D
 
 const Fx = preload("res://scripts/world/fx.gd")
 const B = preload("res://scripts/world/build.gd")
+const SpellFx = preload("res://scripts/world/spell_fx.gd")
 
 var world: Node3D
 var team := "player"  # "player" hits enemies, "enemy" hits the hero
@@ -25,11 +26,11 @@ var _hit := {}
 func setup() -> void:
 	match style:
 		"bolt":
-			B.sphere(0.22, B.mat(color, 1.0, color, 5.0), Vector3.ZERO, self, 8)
-			B.omni(color, 2.0, 4.5, Vector3.ZERO, self)
+			SpellFx.fireball(self, color)
 		"knife":
 			var k := B.box(Vector3(0.06, 0.04, 0.5), B.mat(Color(0.8, 0.8, 0.85), 0.3, Color(0.4, 0.4, 0.5), 1.0, 0.8), Vector3.ZERO, self)
 			k.name = "Blade"
+			SpellFx.blade_trail(self)
 		"arrow":
 			B.box(Vector3(0.05, 0.05, 0.8), B.mat(Color(0.5, 0.45, 0.35), 0.8, color, 1.5), Vector3.ZERO, self)
 	look_at(global_position + dir, Vector3.UP)
@@ -70,6 +71,6 @@ func _physics_process(delta: float) -> void:
 
 func _impact() -> void:
 	if style == "bolt":
-		Fx.ring(world, global_position - Vector3(0, global_position.y, 0), 1.4, color, 0.25)
+		SpellFx.explosion(world, global_position - Vector3(0, global_position.y, 0), 1.3, color)
 	set_physics_process(false)
 	queue_free()

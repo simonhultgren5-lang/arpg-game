@@ -16,7 +16,7 @@ const DEFAULTS := {
 }
 const WINDOW_MODES := ["windowed", "borderless", "fullscreen"]
 const RESOLUTIONS := ["1280x720", "1600x900", "1920x1080", "2560x1440", "3840x2160"]
-const QUALITIES := ["low", "medium", "high"]
+const QUALITIES := ["low", "medium", "high", "ultra"]
 ## Audio buses (ActAudio routes each kind of sound to one).
 const BUSES := {"master": "Master", "music": "Music", "effects": "Effects", "voice": "Voice", "ambience": "Ambience"}
 ## The actions a player can rebind, in the order the Controls tab lists them, with their names.
@@ -63,6 +63,10 @@ func load_settings() -> void:
 		_values[section] = (DEFAULTS[section] as Dictionary).duplicate()
 	_keys = {}
 	var cfg := ConfigFile.new()
+	if cfg.load(path) != OK and DisplayServer.get_name() != "headless" and DisplayServer.screen_get_size().y >= 2160:
+		_values["graphics"]["resolution"] = "3840x2160"  # first run on a 4K display: start in 4K at Ultra
+		_values["graphics"]["quality"] = "ultra"
+		_values["graphics"]["window"] = "borderless"
 	if cfg.load(path) == OK:
 		for section in DEFAULTS:
 			for key in DEFAULTS[section]:
@@ -240,7 +244,11 @@ func _apply_graphics(key: String, v: Variant) -> void:
 			var vp := get_viewport()
 			var q := str(get_value("graphics", "quality"))
 			vp.msaa_3d = Viewport.MSAA_DISABLED if q == "low" else (Viewport.MSAA_2X if q == "medium" else Viewport.MSAA_4X)
-			vp.positional_shadow_atlas_size = 0 if not get_value("graphics", "shadows") else (1024 if q == "low" else (2048 if q == "medium" else 4096))
+			vp.positional_shadow_atlas_size = 0 if not get_value("graphics", "shadows") else (1024 if q == "low" else (2048 if q == "medium" else (4096 if q == "high" else 8192)))
+			# Ultra (for 4K): 8K sun shadows, 16x texture filtering, and temporal anti-aliasing on top of MSAA.
+			RenderingServer.directional_shadow_atlas_set_size(8192 if q == "ultra" else 4096, true)
+			vp.use_taa = q == "ultra"
+			vp.scaling_3d_scale = 1.0
 			var w = get_tree().current_scene if get_tree() else null
 			if w and w.has_method("apply_settings"):
 				w.apply_settings()
@@ -257,10 +265,10 @@ func apply_world(env: Environment, lights: Array) -> void:
 		env.set_meta("base_ssr", env.ssr_enabled)
 	env.tonemap_exposure = float(env.get_meta("base_exposure")) * float(get_value("graphics", "brightness"))
 	env.ssao_enabled = bool(env.get_meta("base_ssao")) and q != "low"
-	env.volumetric_fog_enabled = bool(env.get_meta("base_volumetric")) and q == "high"
+	env.volumetric_fog_enabled = bool(env.get_meta("base_volumetric")) and (q == "high" or q == "ultra")
 	env.glow_enabled = q != "low"
-	env.ssil_enabled = bool(env.get_meta("base_ssil", false)) and q == "high"
-	env.ssr_enabled = bool(env.get_meta("base_ssr", false)) and q == "high"
+	env.ssil_enabled = bool(env.get_meta("base_ssil", false)) and (q == "high" or q == "ultra")
+	env.ssr_enabled = bool(env.get_meta("base_ssr", false)) and (q == "high" or q == "ultra")
 	var shadows: bool = get_value("graphics", "shadows")
 	for l in lights:
 		if not is_instance_valid(l):

@@ -140,7 +140,7 @@ func _graphics() -> Control:
 	var p := _page("Graphics")
 	_row(p, "Window", _choice("graphics", "window", Settings.WINDOW_MODES, ["Windowed", "Borderless fullscreen", "Fullscreen"]))
 	_row(p, "Resolution (windowed)", _choice("graphics", "resolution", Settings.RESOLUTIONS, Settings.RESOLUTIONS))
-	_row(p, "Quality", _choice("graphics", "quality", Settings.QUALITIES, ["Low (fastest)", "Medium", "High"]),
+	_row(p, "Quality", _choice("graphics", "quality", Settings.QUALITIES, ["Low (fastest)", "Medium", "High", "Ultra (4K)"]),
 		"Low turns off ambient occlusion, glow and volumetric fog and lowers anti-aliasing.")
 	_row(p, "Shadows", _check("graphics", "shadows", "On"))
 	_row(p, "Brightness", _slider("graphics", "brightness", 0.6, 1.5, 0.05, "%.2f"))

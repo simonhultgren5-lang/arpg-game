@@ -62,7 +62,23 @@ def _plate(size, seed, base=IRON, mottle=0.35):
     fine = (fine - fine.min()) / max(1e-6, np.ptp(fine))
     rgb = base[None, None, :] * (1.0 - mottle * 0.5 + mottle * n[..., None]) * (0.88 + 0.24 * fine[..., None])
     fleck = fine > 0.93
-    return np.where(fleck[..., None], rgb + 0.05, rgb)
+    rgb = np.where(fleck[..., None], rgb + 0.05, rgb)
+    # Brushed metal: grain smeared along x, a few long hairline scratches, and a slow cold-to-warm patina.
+    brush = ddk.fbm(size, cells=max(24, size // 2), octaves=1, seed=seed + 90)
+    for shift in range(1, 7):
+        brush = brush + np.roll(brush, shift * 2, axis=1)
+    brush = (brush - brush.min()) / max(1e-6, np.ptp(brush))
+    rgb = rgb * (0.9 + 0.2 * brush[..., None])
+    rng = np.random.default_rng(seed)
+    for _ in range(max(3, size // 14)):
+        yy = rng.integers(0, size)
+        x0 = rng.integers(0, size // 2)
+        x1 = x0 + rng.integers(size // 4, size // 2)
+        rgb[yy, x0:x1] = rgb[yy, x0:x1] * 1.0 + 0.045
+    patina = ddk.fbm(size, cells=2, octaves=2, seed=seed + 130)
+    patina = (patina - patina.min()) / max(1e-6, np.ptp(patina))
+    rgb = rgb * (1.0 + 0.10 * (patina[..., None] - 0.5) * np.array([1.2, 0.2, -0.9])[None, None, :])
+    return rgb
 
 
 def _rim(rgb, size, width, light=IRON_HI, inlay=GOLD, inlay_at=None, inner_shadow=False):
@@ -73,6 +89,9 @@ def _rim(rgb, size, width, light=IRON_HI, inlay=GOLD, inlay_at=None, inner_shado
     bevel = np.clip(1.0 - d / max(width, 1), 0, 1)
     shade = np.where(lit, 0.6 + 0.6 * bevel, 0.35 - 0.2 * bevel)
     rgb = np.where(rim[..., None], light[None, None, :] * shade[..., None], rgb)
+    # A crisp specular catch-light along the lit bevel, like polished edges under a torch.
+    spec = lit & (np.abs(d - width * 0.78) < 0.65)
+    rgb = np.where(spec[..., None], np.clip(rgb + 0.22, 0, 1), rgb)
     if inlay_at is not None:
         line = np.abs(d - inlay_at) < 0.9
         rgb = np.where(line[..., None], inlay[None, None, :], rgb)

@@ -69,7 +69,14 @@ func _ready() -> void:
 	_cup(Vector3(.27,.902,-1.15), Color("#a47856"))
 	_cup(Vector3(.64,.902,-1.29), Color("#597077"))
 	B.cylinder(.042,.05,.21,B.mat(Color("#b28c65")),Vector3(-.93,1.01,-1.19),self,16)
-	flame = B.sphere(.026,B.mat(Color("#ffd6a0"),.8,Color("#ffb264"),3),Vector3(-.93,1.14,-1.19),self)
+	flame = MeshInstance3D.new()  # the candle flame: a real flame sprite, animated by the cinematic through scale.y
+	var flame_quad := QuadMesh.new()
+	flame_quad.size = Vector2(.05, .04)
+	flame_quad.material = preload("res://scripts/world/spell_fx.gd").flame_material(Color(1.0, 0.97, 0.8), Color(1.0, 0.72, 0.32), Color(0.5, 0.15, 0.04), 2.2, 2.2)
+	flame.mesh = flame_quad
+	flame.position = Vector3(-.93,1.16,-1.19)
+	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(flame)
 	flame.scale.y = 1.75
 	# A second plane of architecture breaks up the mist behind the visitor.
 	for i in 6:
