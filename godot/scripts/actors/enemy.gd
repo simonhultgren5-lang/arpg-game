@@ -56,6 +56,9 @@ var _toll_cd := 6.0
 var _toll_pending := -1.0
 var _summoned := false
 var _enraged := false
+var _crawler_legs: Array[Node3D] = []
+var _crawl_phase := 0.0
+var _crawl_weight := 0.0
 var _step_t := 0.0
 
 
@@ -106,7 +109,7 @@ func _build_model(s: float) -> void:
 		"hollow":
 			HollowModel.build(_model, s, col, _m)
 		"crawler":
-			CrawlerModel.build(_model, s, col, _m)
+			_crawler_legs = CrawlerModel.build(_model, s, col, _m)
 		"archer":
 			BoneArcherModel.build(_model, s, col, _m)
 		"boss":
@@ -120,6 +123,16 @@ func _build_model(s: float) -> void:
 func _physics_process(delta: float) -> void:
 	if dead:
 		return
+	if not _crawler_legs.is_empty():
+		# Distance travelled last physics tick also covers wandering and backing away.
+		var travel := get_position_delta().length()
+		_crawl_weight = move_toward(_crawl_weight, clampf(travel / maxf(delta * 2.0, 0.001), 0, 1), delta * 9)
+		_crawl_phase = fmod(_crawl_phase + travel * 4.2, TAU)
+		for i in _crawler_legs.size():
+			var phase := _crawl_phase + (PI if i % 2 else 0.0)
+			var side := -1.0 if i < 3 else 1.0
+			_crawler_legs[i].rotation.y = side * sin(phase) * _crawl_weight * 0.31
+			_crawler_legs[i].rotation.z = side * maxf(0, cos(phase)) * _crawl_weight * 0.22
 	_cd -= delta
 	_flash = maxf(0.0, _flash - delta * 4.0)
 	for m in _mats:

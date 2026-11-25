@@ -8,7 +8,7 @@ const WALL_SHADER = preload("res://shaders/wall.gdshader")
 
 ## floor_color(cell) -> Color is called per floor tile. Returns the wall ShaderMaterial (the world
 ## updates its player_pos every frame).
-static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_color: Color, floor_color: Callable, rng: RandomNumberGenerator) -> ShaderMaterial:
+static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_color: Color, floor_color: Callable, rng: RandomNumberGenerator, is_paved := Callable()) -> ShaderMaterial:
 	var cell := LevelGrid.CELL
 	# ---- floor tiles (every non-solid cell, props included)
 	var floor_cells: Array[Vector2i] = []
@@ -19,6 +19,7 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 	var fm := MultiMesh.new()
 	fm.transform_format = MultiMesh.TRANSFORM_3D
 	fm.use_colors = true
+	fm.use_custom_data = true
 	var tile := BoxMesh.new()
 	tile.size = Vector3(cell * 0.97, 0.2, cell * 0.97)
 	fm.mesh = tile
@@ -28,13 +29,14 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 		var p := grid.center(c) + Vector3(0, -0.1 - rng.randf() * 0.04, 0)
 		fm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rng.randi_range(0, 3) * PI * 0.5), p))
 		fm.set_instance_color(i, floor_color.call(c))
+		var paved: bool = not is_paved.is_valid() or is_paved.call(c)
+		fm.set_instance_custom_data(i, Color(float(paved), 0, 0, 1))
 	var fmi := MultiMeshInstance3D.new()
 	fmi.multimesh = fm
-	var floor_mat := StandardMaterial3D.new()
-	floor_mat.vertex_color_use_as_albedo = true
-	floor_mat.roughness = 0.95
-	preload("res://scripts/world/build.gd").surface_grain(floor_mat, Vector3.ONE * 0.55)
-	floor_mat.uv1_world_triplanar = true
+	var floor_mat := ShaderMaterial.new()
+	floor_mat.shader = preload("res://shaders/flagstone.gdshader")
+	if is_paved.is_valid():
+		floor_mat.set_shader_parameter("course_size", Vector2(0.76, 0.48))
 	fmi.material_override = floor_mat
 	fmi.name = "Floor"
 	parent.add_child(fmi)

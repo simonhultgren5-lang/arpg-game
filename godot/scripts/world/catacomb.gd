@@ -230,8 +230,10 @@ func _decorate(level: Node3D, room: Dictionary, rng: RandomNumberGenerator) -> v
 		bone.rotation = Vector3(PI * 0.5, rng.randf() * TAU, 0)
 	if room["template"] == "flooded":
 		var r := rect
+		var water_material := ShaderMaterial.new()
+		water_material.shader = preload("res://shaders/crypt_water.gdshader")
 		var water := B.box(Vector3(r.size.x * LevelGrid.CELL, 0.05, r.size.y * LevelGrid.CELL),
-			B.mat(Color(0.05, 0.08, 0.1, 1.0), 0.05, Color(0.05, 0.12, 0.15), 0.3, 0.3),
+			water_material,
 			Vector3((r.position.x + r.size.x * 0.5) * LevelGrid.CELL, 0.03, (r.position.y + r.size.y * 0.5) * LevelGrid.CELL), level)
 		water.name = "Water"
 	if room["kind"] == "boss":
@@ -243,7 +245,7 @@ func _decorate(level: Node3D, room: Dictionary, rng: RandomNumberGenerator) -> v
 			B.cylinder(0.06, 0.06, 0.35, B.mat(Color(0.85, 0.8, 0.7)), p + Vector3(0, 0.18, 0), level, 6)
 			B.sphere(0.06, B.mat(B.EMBER, 1.0, B.EMBER, 5.0), p + Vector3(0, 0.4, 0), level, 5)
 		B.omni(Color(0.9, 0.3, 0.15), 2.5, 16.0, ctr + Vector3(0, 4, 0), level)
-		var bell := B.cylinder(0.9, 1.6, 2.0, B.mat(Color(0.25, 0.2, 0.12), 0.5, Color.BLACK, 1.0, 0.7), ctr + Vector3(5.5, 0.7, -5.0), level, 12)
+		var bell := preload("res://scripts/models/props_model.gd").founders_bell(level, ctr + Vector3(5.5, 0.9, -5.0))
 		bell.rotation = Vector3(0.5, 0.0, 1.2)
 
 
