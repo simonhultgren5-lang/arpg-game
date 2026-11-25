@@ -49,6 +49,25 @@ func _run() -> void:
 	await _frames(90)
 	await _shot("1_town")
 	var w = get_tree().current_scene
+	# A fight in the fen, with quests in the tracker and a buff up.
+	Game.set_quest("silent_bell", 1)
+	Game.run_action("accept_southwatch")
+	Game.run_action("accept_kin")
+	var fen_foes: Array = w.enemies()
+	if not fen_foes.is_empty():
+		w.player.global_position = fen_foes[0].global_position + Vector3(3.5, 0, 3.5)
+		w.player.hp = 99999.0
+		fen_foes[0].set_aggro()
+		await _frames(50)
+		w.player.mana = 999.0
+		w.player.cast_slot(1)
+		w.player.buff_t = 6.0
+		w.player.buff_id = "grave_roar"
+		w.player.ward = 40.0
+		w.player.ward_t = 8.0
+		w.player.ward_id = "iron_hide"
+		await _frames(6)
+		await _shot("1a_fen_fight")
 	# The square, with the chapel and houses, and the graveyard with the mausoleum and the crypt gate.
 	for spot in [["1b_square", Vector2i(17, 12)], ["1c_graveyard", Vector2i(27, 8)]]:
 		w.player.global_position = w.grid.center(spot[1])
