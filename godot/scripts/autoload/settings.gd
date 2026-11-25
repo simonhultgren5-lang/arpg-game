@@ -25,7 +25,7 @@ const ACTIONS := [
 	["bar_4", "Skill slot 2"], ["bar_5", "Skill slot 3"], ["bar_6", "Skill slot 4"], ["potion", "Drink a draught"],
 	["interact", "Talk / use"], ["force_attack", "Attack in place (hold)"], ["move_up", "Move up"],
 	["move_down", "Move down"], ["move_left", "Move left"], ["move_right", "Move right"],
-	["inventory", "Character and bag"], ["skills", "Skills"], ["map", "Area map"],
+	["inventory", "Character and bag"], ["skills", "Skills"], ["quests", "Quest log"], ["map", "Area map"],
 ]
 
 ## Where settings are saved (tests point this elsewhere).

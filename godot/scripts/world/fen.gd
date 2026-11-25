@@ -192,5 +192,8 @@ static func _watchfire(world: Node3D, parent: Node3D, p: Vector3) -> void:
 	B.cylinder(0.69, 0.9, 0.42, shale, Vector3.UP * 0.21, fire, 8)
 	B.cylinder(0.46, 0.62, 1.6, shale, Vector3.UP * 1.22, fire, 8)
 	B.cylinder(0.72, 0.32, 0.44, B.mat(Color("#483d40")), Vector3.UP * 2.18, fire, 8)
-	B.torch(fire, Vector3.UP * 2.46, Vector3.ZERO, 12.0, 2.0)
+	# Cold while The Southwatch Fire is under way; the player relights it (world.gd, "watchfire").
+	var flame := B.torch(fire, Vector3.UP * 2.46, Vector3.ZERO, 12.0, 2.0)
+	flame.visible = Game.beacon_lit()
+	fire.set_meta("flame", flame)
 	world.call("register_interactable", fire)

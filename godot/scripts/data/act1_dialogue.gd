@@ -8,6 +8,8 @@ extends RefCounted
 ##   lamps        Lamps Without Oil: 0 not started, 1 follow the lamps, 2 charter found, 3 done
 ##   act_end      0, 1 the wells toll and the undercroft stair is open, 2 Act I complete
 ##   wardens      The Wardens' Oath (optional): 0, 1 find the name-stones, 2 all found, 3 done
+##   southwatch   The Southwatch Fire (optional, Edda): 0, 1 clear the fen, 2 relight the beacon, 3 tell Edda, 4 done
+##   kin          Restless Kin (optional, Corwin): 0, 1 take grave-tokens from elites, 2 bring them back, 3 done
 
 const NPCS := {
 	"maud": {"name": "Sister Maud", "title": "Last Sister of St. Aldric's"},
@@ -77,9 +79,40 @@ const NODES := {
 		"text": "Forge is cold. Nothing to burn but coffin wood, and that smokes wrong. If you want steel, find it on the dead; they've no more use for it.\n\nI brew grave-moss draughts now. Bitter, but they close wounds. Twenty-five gold.",
 		"options": [
 			{"text": "Buy a grave-moss draught (25 gold)", "next": "edda_buy", "action": "buy_potion", "if": "gold_25"},
+			{"text": "The beacon out in the fen has gone dark.", "next": "edda_s0", "if": "southwatch_offer"},
+			{"text": "About the Southwatch beacon...", "next": "edda_s1", "if": "southwatch_progress"},
+			{"text": "The beacon still burns.", "next": "edda_s4", "if": "southwatch_done"},
 			{"text": "What happened to this town?", "next": "edda_lore"},
 			{"text": "[Leave]", "next": ""},
 		],
+	},
+	# ------------------------------------------------------------ The Southwatch Fire (optional)
+	"edda_s0": {
+		"speaker": "edda",
+		"text": "Noticed that, did you. Old Haskett keeps that beacon. Kept it. He came for nails every second morning, and I haven't seen him in three.
+
+The fen road runs past my brother's grave. I'm not asking you to find Haskett. I'm asking you to put down what came up out of that water, and light the fire again so the road can see.",
+		"options": [
+			{"text": "I'll clear the fen and light the beacon.", "next": "", "action": "accept_southwatch"},
+			{"text": "Not now.", "next": ""},
+		],
+	},
+	"edda_s1": {
+		"speaker": "edda",
+		"text": "The fen's south of the wall, past the pilgrim road. The beacon stands on the rise by the river bend. Don't drink the water.",
+		"options": [{"text": "[Leave]", "next": ""}],
+	},
+	"edda_s3": {
+		"speaker": "edda",
+		"text": "Saw it from the wall. First light on that rise in three nights.
+
+Here. I put an edge on this with the last of the good coal. It's the best thing I've made since the bell started. Don't bring it back bent.",
+		"options": [{"text": "Thank you, Edda. [Receive the reward]", "next": "", "action": "complete_southwatch"}],
+	},
+	"edda_s4": {
+		"speaker": "edda",
+		"text": "It still burns. Someone's been feeding it, and it isn't me. I've stopped asking who.",
+		"options": [{"text": "[Leave]", "next": ""}],
 	},
 	"edda_buy": {
 		"speaker": "edda",
@@ -101,6 +134,8 @@ const NODES := {
 		"options": [
 			{"text": "Tell me about the crypt.", "next": "corwin_crypt"},
 			{"text": "What happened to the wardens' names?", "next": "corwin_w0", "if": "wardens_offer"},
+			{"text": "You look troubled, Corwin.", "next": "corwin_k0", "if": "kin_offer"},
+			{"text": "About the grave-tokens...", "next": "corwin_k1", "if": "kin_progress"},
 			{"text": "[Leave]", "next": ""},
 		],
 	},
@@ -122,6 +157,8 @@ const NODES := {
 		"text": "Bell's quiet. Graves are quiet. I don't trust it. Quiet's just the dark holding its breath.",
 		"options": [
 			{"text": "What happened to the wardens' names?", "next": "corwin_w0", "if": "wardens_offer"},
+			{"text": "You look troubled, Corwin.", "next": "corwin_k0", "if": "kin_offer"},
+			{"text": "About the grave-tokens...", "next": "corwin_k1", "if": "kin_progress"},
 			{"text": "[Leave]", "next": ""},
 		],
 	},
@@ -152,6 +189,36 @@ const NODES := {
 	"corwin_w3": {
 		"speaker": "corwin",
 		"text": "They're quiet now. Proper quiet, not the waiting kind. That vigil-plate suits you. Hask wore one like it, before. Don't wear it the way he did.",
+		"options": [{"text": "You look troubled, Corwin.", "next": "corwin_k0", "if": "kin_offer"},
+			{"text": "About the grave-tokens...", "next": "corwin_k1", "if": "kin_progress"},
+			{"text": "[Leave]", "next": ""}],
+	},
+	# ------------------------------------------------------------ Restless Kin (optional)
+	"corwin_k0": {
+		"speaker": "corwin",
+		"text": "Troubled. Hah. Every soul I put in the ground, I gave a token. Lead coin with their name on, pressed into the hand. So they'd know who they were, if they woke up confused.
+
+The bad ones, the big ones walking about, they still have them. I want them back. Can't say a name over a grave if the name's walking around in the fen.",
+		"options": [
+			{"text": "I'll bring you their tokens.", "next": "", "action": "accept_kin"},
+			{"text": "Not now.", "next": ""},
+		],
+	},
+	"corwin_k1": {
+		"speaker": "corwin",
+		"text": "Only the strong ones keep hold of them. The rest let go a long time ago. Look for the ones that stand taller than the others, in the fen or down in the crypt.",
+		"options": [{"text": "[Leave]", "next": ""}],
+	},
+	"corwin_k2": {
+		"speaker": "corwin",
+		"text": "Give them here. Aldous Penn. Mary Thorne. The Vickery boy, he was always wandering off.
+
+This was in my box for forty years. Belonged to the first gravedigger. Wear it, and they'll know you did right by them.",
+		"options": [{"text": "Rest well, all of them. [Receive the reward]", "next": "corwin_k3", "action": "complete_kin"}],
+	},
+	"corwin_k3": {
+		"speaker": "corwin",
+		"text": "I'll say their names tonight. Loud, so the others hear.",
 		"options": [{"text": "[Leave]", "next": ""}],
 	},
 	# ------------------------------------------------------------ The Lamplighter (speaks only in questions)
@@ -236,6 +303,8 @@ static func entry(npc_id: String, quests: Dictionary, flags: Dictionary) -> Stri
 	var lamps := int(quests.get("lamps", 0))
 	var act_end := int(quests.get("act_end", 0))
 	var wardens := int(quests.get("wardens", 0))
+	var southwatch := int(quests.get("southwatch", 0))
+	var kin := int(quests.get("kin", 0))
 	match npc_id:
 		"maud":
 			if bell < 3:
@@ -249,8 +318,12 @@ static func entry(npc_id: String, quests: Dictionary, flags: Dictionary) -> Stri
 				2: return "maud_l2"
 			return "maud_l0"
 		"edda":
+			if southwatch == 3:
+				return "edda_s3"
 			return "edda_0"
 		"corwin":
+			if kin == 2:
+				return "corwin_k2"
 			match wardens:
 				1: return "corwin_w1"
 				2: return "corwin_w2"

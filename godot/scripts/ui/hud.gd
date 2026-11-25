@@ -16,10 +16,8 @@ var _mana_orb: Orb
 var _slots: Array = []  # [slot, kind, index]
 var _xp_bar: ProgressBar
 var _xp_label: Label
-var _quest_label: Label
-var _quest_title: Label
-var _side_title: Label
-var _side_label: Label
+## The quest tracker under the minimap (up to three active quests; J opens the full log).
+var _tracker: VBoxContainer
 var _act_complete: PanelContainer
 var _area_label: Label
 var _target_panel: PanelContainer
@@ -154,7 +152,7 @@ func _build_bottom() -> void:
 	menu.position = Vector2(470, -6)
 	menu.add_theme_constant_override("separation", 4)
 	bar.add_child(menu)
-	for spec in [["Character", "inventory", func(): toggle_panel("character")], ["Skills", "skills", func(): toggle_panel("skills")],
+	for spec in [["Character", "inventory", func(): toggle_panel("character")], ["Skills", "skills", func(): toggle_panel("skills")], ["Quests", "quests", func(): toggle_panel("quests")],
 			["Map", "map", func(): toggle_map()], ["Menu", "pause", func(): escape()]]:
 		var b := Button.new()
 		b.text = spec[0]
@@ -248,25 +246,16 @@ func _build_top() -> void:
 	tl.add_child(_area_label)
 	var who := UiTheme.label("%s  ·  %s" % [Boot.character.get("name", "Wanderer"), Game.class_data.get("title", "")], 15, Color(0.75, 0.7, 0.68))
 	tl.add_child(who)
-	var q := PanelContainer.new()
-	q.custom_minimum_size = Vector2(340, 0)
-	q.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tl.add_child(q)
-	var qv := VBoxContainer.new()
-	q.add_child(qv)
-	_quest_title = UiTheme.label("", 16, UiTheme.EMBER.lightened(0.2))
-	qv.add_child(_quest_title)
-	_quest_label = UiTheme.label("", 14)
-	_quest_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_quest_label.custom_minimum_size = Vector2(320, 0)
-	qv.add_child(_quest_label)
-	# The optional quest in progress (The Wardens' Oath), under the main one.
-	_side_title = UiTheme.label("", 15, Color(0.6, 0.7, 0.95))
-	qv.add_child(_side_title)
-	_side_label = UiTheme.label("", 14)
-	_side_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_side_label.custom_minimum_size = Vector2(320, 0)
-	qv.add_child(_side_label)
+	# Quest tracker, top right under the minimap, the way the genre puts it.
+	_tracker = VBoxContainer.new()
+	_tracker.anchor_left = 1.0
+	_tracker.anchor_right = 1.0
+	_tracker.offset_left = -360
+	_tracker.offset_right = -20
+	_tracker.offset_top = 200
+	_tracker.add_theme_constant_override("separation", 8)
+	_tracker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_tracker)
 
 	_target_panel = PanelContainer.new()
 	_target_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -381,6 +370,7 @@ func _build_panels() -> void:
 		"character": [preload("res://scripts/ui/character_panel.gd"), Vector2(1030, 670)],
 		"skills": [preload("res://scripts/ui/skills_panel.gd"), Vector2(960, 690)],
 		"settings": [preload("res://scripts/ui/settings_panel.gd"), Vector2(800, 640)],
+		"quests": [preload("res://scripts/ui/quests_panel.gd"), Vector2(920, 600)],
 	}
 	for name in specs:
 		var panel: PanelContainer = specs[name][0].new()
@@ -601,6 +591,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("skills"):
 		toggle_panel("skills")
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("quests"):
+		toggle_panel("quests")
+		get_viewport().set_input_as_handled()
 
 
 func toggle_map() -> void:
@@ -686,15 +679,23 @@ func _on_save_status(text: String) -> void:
 
 
 func _refresh_quest() -> void:
-	var main: Array = Game.main_quest()
-	_quest_title.text = main[0]
-	_quest_label.text = main[1]
-	var side: Array = Game.side_quest()
-	_side_title.visible = not side.is_empty()
-	_side_label.visible = not side.is_empty()
-	if not side.is_empty():
-		_side_title.text = "%s  (optional)" % side[0]
-		_side_label.text = side[1]
+	if _tracker == null:
+		return
+	for c in _tracker.get_children():
+		c.queue_free()
+	var head := UiTheme.label("Quests  (%s)" % Settings.key_text("quests"), 14, UiTheme.GOLD_DIM.lightened(0.2))
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_tracker.add_child(head)
+	for e in Game.tracked_quests():
+		var t := UiTheme.label(("◆ " if e["kind"] == "main" else "◇ ") + str(e["title"]), 17,
+			UiTheme.EMBER.lightened(0.25) if e["kind"] == "main" else Color(0.62, 0.72, 0.95))
+		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_tracker.add_child(t)
+		var o := UiTheme.label(str(e["objective"]), 14, Color(0.9, 0.86, 0.8))
+		o.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		o.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		o.custom_minimum_size = Vector2(330, 0)
+		_tracker.add_child(o)
 
 
 func show_boss(e: Node3D) -> void:

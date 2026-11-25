@@ -12,6 +12,9 @@ const Loot = preload("res://scripts/actors/loot.gd")
 const CameraRig = preload("res://scripts/world/camera_rig.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 const Interactable = preload("res://scripts/world/interactable.gd")
+const Fen = preload("res://scripts/world/fen.gd")
+const LevelGrid = preload("res://scripts/world/level_grid.gd")
+const Quests = preload("res://scripts/data/quests.gd")
 const Items = preload("res://scripts/data/items.gd")
 
 var grid  # LevelGrid
@@ -23,6 +26,8 @@ var rng := RandomNumberGenerator.new()
 var boss: Node3D = null
 var _interactables: Array = []
 var _env: Environment
+var _town_spawn := Vector3.ZERO
+var _town_rows: Array = []
 var _danger_check := 1.0
 var _quiet_time := 0.0
 var _zone_check := 0.0
@@ -52,6 +57,8 @@ func _ready() -> void:
 		town.build(self, rng)
 		grid = town.grid
 		spawn = town.gate_spawn if Game.came_from == "catacomb" else town.spawn
+		_town_spawn = town.spawn
+		_town_rows = town.chars
 	rng.randomize()
 
 	player = Player.new()
@@ -71,6 +78,8 @@ func _ready() -> void:
 	listener.position = Vector3.UP
 	listener.make_current()
 
+	if Game.area == "town":
+		_spawn_fen_packs()
 	_add_film_overlay()
 	hud = Hud.new()
 	hud.world = self
@@ -512,6 +521,47 @@ func _spawn_warden_stones(cat) -> void:
 		register_interactable(stone)
 
 
+## Where a new hero arrives in town (the fen road's south end).
+func town_spawn() -> Vector3:
+	return _town_spawn
+
+
+## The Southwatch Fen, south of the town wall, is where the risen roam outside the crypt: packs of four
+## to six, each led by an elite, placed fresh each visit on open ground away from the arrival point and
+## the wall. Nothing spawns inside the town.
+func _spawn_fen_packs() -> void:
+	var fen_rng := RandomNumberGenerator.new()
+	fen_rng.randomize()
+	var lv: int = Game.monster_level()
+	var candidates: Array[Vector2i] = []
+	for y in range(Fen.START_ROW + 3, grid.h - 1):
+		for x in range(1, grid.w - 1):
+			var c := Vector2i(x, y)
+			if grid.get_cell(c) != LevelGrid.FLOOR or _town_rows[y][x] != ".":
+				continue
+			if grid.center(c).distance_to(_town_spawn) < 16.0:
+				continue
+			candidates.append(c)
+	candidates.shuffle()
+	var centers: Array[Vector2i] = []
+	for c in candidates:
+		if centers.size() >= 6:
+			break
+		if centers.any(func(o): return Vector2(o - c).length() < 6.0):
+			continue
+		centers.append(c)
+	for center in centers:
+		var count := fen_rng.randi_range(4, 6)
+		for i in count:
+			var roll := fen_rng.randf()
+			var kind := "crawler" if roll < 0.35 else ("archer" if roll > 0.8 else "hollow")
+			var c: Vector2i = grid.random_floor_near(center, 2, fen_rng)
+			if grid.center(c).distance_to(_town_spawn) < 12.5:
+				c = center
+			var e := spawn_enemy(kind, grid.center(c) + Vector3(fen_rng.randf_range(-0.5, 0.5), 0, fen_rng.randf_range(-0.5, 0.5)), lv, i == 0)
+			e.set_meta("where", "fen")
+
+
 func spawn_enemy(kind: String, pos: Vector3, lv: int, elite: bool) -> Node3D:
 	var e := Enemy.new()
 	e.world = self
@@ -527,8 +577,13 @@ func spawn_enemy(kind: String, pos: Vector3, lv: int, elite: bool) -> Node3D:
 
 func _on_enemy_died(e: Node3D) -> void:
 	var lv: int = e.level
-	var xp := int(float(e.data["xp"]) * (1.0 + 0.2 * (lv - 1)) * (2.5 if e.elite else 1.0))
-	Game.add_xp(xp)
+	Game.add_xp(Game.kill_xp(int(e.data["xp"]), lv, e.elite))
+	Game.on_monster_killed(str(e.get_meta("where", "crypt")), e.elite)
+	if e.elite and Game.wants_grave_token():
+		# Restless Kin: the strong ones still hold the tokens Corwin gave them.
+		if Game.add_item(Quests.grave_token()):
+			pickup_text(e.global_position, "Grave-Token", Color(0.89, 0.71, 0.49))
+			Game.refresh_kin()
 	Game.progress["kills"] = int(Game.progress.get("kills", 0)) + 1
 	_on_kill_powers()
 	var pos := e.global_position
@@ -642,7 +697,16 @@ func interact(it: Node3D) -> void:
 		"stairs", "portal":
 			Game.enter_area("town")
 		"watchfire":
-			hud.banner("Southwatch", "When the bell fell silent, the keeper lit this fire. It still burns for travelers crossing the fen.")
+			if Game.relight_beacon():
+				var flame = it.get_meta("flame") if it.has_meta("flame") else null
+				if flame:
+					flame.visible = true
+				Fx.pillar(self, it.global_position, 1.0, B.EMBER, 0.8)
+				hud.banner("Southwatch", "The beacon burns again over the fen road")
+			elif not Game.beacon_lit():
+				message("The beacon is cold. Clear the fen of the risen first.", Color(0.8, 0.75, 0.7))
+			else:
+				hud.banner("Southwatch", "When the bell fell silent, the keeper lit this fire. It still burns for travelers crossing the fen.")
 		"grave":
 			if Game.dig_grave() == "dug":
 				Fx.ring(self, it.global_position, 2.0, Color(1.0, 0.85, 0.55), 0.5)
@@ -682,8 +746,9 @@ func player_died() -> void:
 func respawn_in_town() -> void:
 	var lost := int(int(Game.progress["gold"]) * 0.1)
 	Game.progress["gold"] = int(Game.progress["gold"]) - lost
-	if lost > 0:
-		message("You lost %d gold in the dark." % lost, Color(0.8, 0.5, 0.4))
+	var lost_xp := Game.death_penalty()
+	if lost > 0 or lost_xp > 0:
+		message("You lost %d experience and %d gold in the dark." % [lost_xp, lost], Color(0.8, 0.5, 0.4))
 	Game.enter_area("town")
 
 
