@@ -1,3 +1,5 @@
+# Assets are in Git LFS: the compile, test and package jobs fetch them (cached; see .github/actions/lfs-pull).
+#
 # Build pipeline: Developer commit → Build server → Compile → Test + Package → Automated QA → Deployment
 #
 # Runs on every push and pull request. Deployment only runs on main, and only when package.json has a
@@ -29,6 +31,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/lfs-pull
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -46,6 +49,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/lfs-pull
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -63,6 +67,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/lfs-pull
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
