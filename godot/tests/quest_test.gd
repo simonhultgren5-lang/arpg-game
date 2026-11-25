@@ -164,6 +164,19 @@ func _fen() -> void:
 	e.take_damage(99999.0, false, Vector3.ZERO)
 	await _frames(5)
 	_check(Game.quest_counter("southwatch") == 1, "killing a fen monster counts for The Southwatch Fire")
+	# Fen monsters never follow the hero through the town wall.
+	var chaser = null
+	for f in w.enemies():
+		if is_instance_valid(f) and not f.dead:
+			chaser = f
+			break
+	if chaser:
+		chaser.hp = chaser.max_hp * 0.5
+		chaser.set_aggro()
+		w.player.global_position = w.grid.center(Vector2i(17, 12))
+		await _frames(10)
+		_check(not chaser.aggro, "a fen monster gives up the chase at the town wall")
+		_check(is_equal_approx(chaser.hp, chaser.max_hp), "and recovers its life, as monsters do when they leash")
 	w.hud.open_panel("quests")
 	await _frames(2)
 	_check(w.hud.panel_open() == "quests", "J opens the quest log")

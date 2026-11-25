@@ -23,6 +23,10 @@ const KINDS := {
 
 signal died(enemy: Node3D)
 
+## How far a monster follows the hero from where it spawned.
+const LEASH_RANGE := 28.0
+const FEN_START_ROW: int = preload("res://scripts/world/fen.gd").START_ROW
+
 var world: Node3D
 var kind := "hollow"
 var level := 1
@@ -215,6 +219,12 @@ func _physics_process(delta: float) -> void:
 		else:
 			_wander(delta)
 			return
+	if _leashed(p):
+		# Give up the chase, heal and drift back home (the genre's leash).
+		aggro = false
+		hp = max_hp
+		_path = PackedVector3Array()
+		return
 	if p.dead:
 		velocity = _knock
 		move_and_slide()
@@ -363,6 +373,16 @@ func _boss_logic(delta: float, p: Node3D, dist: float) -> void:
 		Fx.telegraph(world, global_position, 7.0, Color(1.0, 0.35, 0.1), 1.2)
 		world.message("THE BELL TOLLS", Color(1.0, 0.5, 0.25))
 		_warning_audio = ActAudio.cue("boss_prepare", -8.0, self)
+
+
+## Monsters stop chasing when the hero gets far from their home ground or, for the fen's risen, steps
+## inside the town wall. The boss holds its arena.
+func _leashed(p: Node3D) -> bool:
+	if is_boss:
+		return false
+	if p.global_position.distance_to(_home) > LEASH_RANGE:
+		return true
+	return str(get_meta("where", "")) == "fen" and world.grid.cell_of(p.global_position).y < FEN_START_ROW
 
 
 func set_aggro() -> void:

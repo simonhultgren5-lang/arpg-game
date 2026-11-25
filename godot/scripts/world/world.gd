@@ -539,7 +539,7 @@ func _spawn_fen_packs() -> void:
 			var c := Vector2i(x, y)
 			if grid.get_cell(c) != LevelGrid.FLOOR or _town_rows[y][x] != ".":
 				continue
-			if grid.center(c).distance_to(_town_spawn) < 16.0:
+			if grid.center(c).distance_to(_town_spawn) < 22.0:
 				continue
 			candidates.append(c)
 	candidates.shuffle()
@@ -556,7 +556,7 @@ func _spawn_fen_packs() -> void:
 			var roll := fen_rng.randf()
 			var kind := "crawler" if roll < 0.35 else ("archer" if roll > 0.8 else "hollow")
 			var c: Vector2i = grid.random_floor_near(center, 2, fen_rng)
-			if grid.center(c).distance_to(_town_spawn) < 12.5:
+			if grid.center(c).distance_to(_town_spawn) < 16.0:
 				c = center
 			var e := spawn_enemy(kind, grid.center(c) + Vector3(fen_rng.randf_range(-0.5, 0.5), 0, fen_rng.randf_range(-0.5, 0.5)), lv, i == 0)
 			e.set_meta("where", "fen")
