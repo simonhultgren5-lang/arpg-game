@@ -13,7 +13,9 @@ const UI_FRAMES := ["panel", "header", "well", "well_border", "button", "button_
 const CLIPS := ["idle", "walk", "attack", "cast", "hit", "death"]
 const CHARACTERS := ["warrior", "pyromancer", "rogue", "hollow", "crawler", "archer", "boss"]
 const PROPS := ["torch_sconce", "barrel", "crate", "sarcophagus", "crypt_pillar", "gravestone_round",
-	"gravestone_cross", "gravestone_slab", "lamp_post"]
+	"gravestone_cross", "gravestone_slab", "lamp_post",
+	# The town's building shells (docs/art/town-architecture-kit.md).
+	"house_small", "house_medium", "house_large", "chapel", "mausoleum", "crypt_gate"]
 const MATERIALS := ["stone_wall", "flagstone", "cobble", "earth", "timber", "plaster", "roof_slate",
 	"steel", "leather", "cloth", "skin", "bone"]
 

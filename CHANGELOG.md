@@ -10,6 +10,15 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.9 — Stone and Slate (2026-11-25)
+
+### New
+- **Hollowmere is rebuilt.** The houses are now proper timber-framed homes: stone footings, dark oak posts and braces over pale plaster, gable ends and steep slate roofs with rafter ends under the eaves. They come in three sizes to fit each street.
+- **St. Aldric's chapel** stands over the square in carved stone: buttresses down its sides, tall pointed windows glowing violet, a bell tower with an open, empty belfry, and an eight-sided spire, the tallest thing in town.
+- **The Wardens' mausoleum** has a columned porch, a pediment, bronze doors and stone urns at its corners. One has been knocked off.
+- **The mausoleum gate** is an iron gate between stone piers, one leaf forced open, a broken chain hanging, and worn steps going down into the dark with the ember glow below.
+- Roofs, walls and stone are textured at their real size, so slates and stone courses read at a glance from the camera.
+
 ## 0.5.0-beta.8 — The Long Lens (2026-11-25)
 
 ### New

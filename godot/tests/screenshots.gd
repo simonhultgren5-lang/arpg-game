@@ -49,6 +49,11 @@ func _run() -> void:
 	await _frames(90)
 	await _shot("1_town")
 	var w = get_tree().current_scene
+	# The square, with the chapel and houses, and the graveyard with the mausoleum and the crypt gate.
+	for spot in [["1b_square", Vector2i(17, 12)], ["1c_graveyard", Vector2i(27, 8)]]:
+		w.player.global_position = w.grid.center(spot[1])
+		await _frames(45)
+		await _shot(spot[0])
 	w.hud.open_dialogue("maud")
 	await _frames(5)
 	await _shot("2_dialogue")
