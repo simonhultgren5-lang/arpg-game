@@ -28,6 +28,10 @@ const isPortable = Boolean(process.env.PORTABLE_EXECUTABLE_FILE);
 const launcherVersion = app.getVersion();
 const MAX_DOWNLOAD = 300 * 1024 * 1024;
 const SAFE_PATH = /^[A-Za-z0-9_.\-]+(\/[A-Za-z0-9_.\-]+)*$/;
+// While the launcher is open it checks again every POLL_MS (and when its window gets focus), so a new
+// release shows up without restarting. Checks closer together than MIN_GAP_MS are skipped.
+const POLL_MS = Number(process.env.DOD_UPDATE_POLL_MS) || 5 * 60e3;
+const MIN_GAP_MS = Math.min(60e3, POLL_MS);
 
 const versionsDir = () => path.join(app.getPath('userData'), 'game-versions');
 const activeFile = () => path.join(versionsDir(), 'active.json');
@@ -101,8 +105,11 @@ let gameManifest = null;
 let launcherManifest = null;
 let lastCheck = 0;
 let checking = null;
+let seenVersions = '';
 
-function check({ force = false } = {}) {
+// `quiet` is for background checks: the launcher keeps showing its current state instead of
+// "Checking for updates…" every few minutes.
+function check({ force = false, quiet = false } = {}) {
   if (!enabled) {
     status.game.state = 'disabled';
     status.launcher.state = 'disabled';
@@ -110,30 +117,42 @@ function check({ force = false } = {}) {
     return Promise.resolve(status);
   }
   if (checking) return checking;
-  if (!force && Date.now() - lastCheck < 10 * 60e3 && status.game.state !== 'error') return Promise.resolve(status);
+  if (!force && Date.now() - lastCheck < MIN_GAP_MS && status.game.state !== 'error') return Promise.resolve(status);
   lastCheck = Date.now();
   checking = (async () => {
-    if (!['downloading', 'installing'].includes(status.game.state)) status.game.state = 'checking';
-    status.game.error = '';
-    emit();
+    if (!quiet && !['downloading', 'installing'].includes(status.game.state)) {
+      status.game.state = 'checking';
+      status.game.error = '';
+      emit();
+    }
     try {
       const [game, launcher] = await Promise.all([fetchManifest('game-update.json'), fetchManifest('launcher-update.json')]);
       gameManifest = game;
       launcherManifest = launcher;
     } catch {
+      // A failed background check keeps what the player already sees; the next poll tries again.
+      if (quiet && status.game.state !== 'checking') return status;
       status.game.state = 'error';
       status.game.error = "Couldn't check for updates. You can still play this version.";
       emit();
       return status;
     }
+    // A new release brings new patch notes: fetch them again next time they're asked for.
+    const versions = `${gameManifest?.version}|${launcherManifest?.version}`;
+    if (versions !== seenVersions) {
+      seenVersions = versions;
+      remoteNotes = null;
+    }
 
     // Launcher
     const lm = launcherManifest;
     if (lm && compare(lm.version, launcherVersion) > 0) {
+      const newer = status.launcher.latest !== lm.version;
       status.launcher.latest = lm.version;
       status.launcher.notes = lm.notes || '';
       if (isPortable) status.launcher.state = 'manual';
-      else if (!['downloading', 'ready'].includes(status.launcher.state)) downloadLauncher();
+      // While one download runs, downloadLauncher() picks up a newer version itself when it finishes.
+      else if (status.launcher.state !== 'downloading' && (newer || status.launcher.state !== 'ready')) downloadLauncher();
     } else {
       status.launcher.state = 'up-to-date';
     }
@@ -149,7 +168,8 @@ function check({ force = false } = {}) {
       } else if (status.game.state !== 'downloading') {
         installGame(); // small and safe: start right away
       }
-    } else {
+    } else if (!['updated', 'downloading', 'installing'].includes(status.game.state)) {
+      // Keep "Updated to vX" showing after a patch was installed this session.
       status.game.state = 'up-to-date';
       status.game.latest = active.version;
     }
@@ -221,9 +241,11 @@ async function installGame() {
 
 // ---------------------------------------------------------------- launcher update
 let installerPath = null;
+let launcherDownload = null; // version being downloaded
 async function downloadLauncher() {
   const lm = launcherManifest;
-  if (!lm?.url) return;
+  if (!lm?.url || launcherDownload === lm.version) return;
+  launcherDownload = lm.version;
   status.launcher.state = 'downloading';
   status.launcher.progress = 0;
   emit();
@@ -251,6 +273,9 @@ async function downloadLauncher() {
     status.launcher.state = 'error';
     status.launcher.error = error.message;
   }
+  if (launcherDownload === lm.version) launcherDownload = null;
+  // A newer launcher was published while this one downloaded: get that one instead.
+  if (launcherManifest && launcherManifest.version !== lm.version) return downloadLauncher();
   emit();
 }
 
@@ -283,7 +308,7 @@ function cleanNotes(raw) {
   return { latest: versions[0].version, generatedAt: String(raw.generatedAt || ''), versions };
 }
 
-let remoteNotes = null; // cached for this run
+let remoteNotes = null; // cached until a check finds a new release
 async function getPatchNotes() {
   let bundled = null;
   try {
@@ -312,6 +337,7 @@ module.exports = {
   gameRoot,
   gameVersion,
   check,
+  POLL_MS,
   installGame,
   installLauncher,
   onChange,

@@ -115,11 +115,16 @@ function openLauncher() {
   });
   guardWindow(launcherWindow, `${SCHEME}://launcher/`);
   launcherWindow.once('ready-to-show', () => launcherWindow.show());
+  // Keep looking for new releases while the launcher is open, so players see them without a restart.
+  // (Only then: a game patch must not replace the files of a 2D game that is running.)
+  const poll = setInterval(() => updates.check({ quiet: true }), updates.POLL_MS);
+  launcherWindow.on('focus', () => updates.check({ quiet: true }));
   launcherWindow.on('closed', () => {
+    clearInterval(poll);
     launcherWindow = null;
   });
   launcherWindow.loadURL(`${SCHEME}://launcher/index.html`);
-  updates.check(); // at most every 10 minutes unless forced
+  updates.check(); // skipped if the last check was less than a minute ago
 }
 
 // ---- updates (see electron/updates.cjs)

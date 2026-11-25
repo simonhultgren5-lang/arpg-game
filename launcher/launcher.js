@@ -1068,7 +1068,11 @@
     upd = await api.getUpdateStatus();
     api.onUpdateStatus((next) => {
       const justUpdated = next.game.state === 'updated' && upd?.game.state !== 'updated';
+      const newRelease =
+        (next.game.latest && next.game.latest !== upd?.game.latest) ||
+        (next.launcher.latest && next.launcher.latest !== upd?.launcher.latest);
       upd = next;
+      if (newRelease) loadPatchNotes();
       renderUpdates();
       renderNotesCard();
       renderPlay();
