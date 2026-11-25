@@ -25,17 +25,17 @@ A grim gothic descent in four acts. Each act goes one layer further down, from a
 - **Sister Maud Ashcombe**, last sister of St. Aldric's. Brisk, exhausted, faith worn down to habit. Quest giver for the act. Knows more about the founders than she says.
 - **Edda Varge**, the smith. Her forge has gone cold; she brews grave-moss draughts (healing potions) instead. Her brother came back three nights after his burial and stood outside her window until dawn.
 - **Old Corwin**, the gravedigger. Has dug most graves in Hollowmere twice. Gives the hero his lantern-charm. Gallows humour, real fear underneath.
-- *(later in the act)* **The Lamplighter**, a child who walks the town at night lighting lamps no one fuelled. Speaks only in questions. Recurs in every act.
+- **The Lamplighter** *(in game)*, a child who walks the town at night lighting lamps no one fuelled. Speaks only in questions. Recurs in every act.
 
 **Quest beats**
 1. **The Silent Bell** *(in game)*. Every night the bell of St. Aldric's tolls thirteen times, though the bell was cut down and smashed. Maud sends the hero through the mausoleum gate to find what rings below.
 2. **The Sunken Crypt** *(in game)*. A procedurally assembled crypt of halls, pillared naves, ossuaries and flooded chapels. Hollows (risen townsfolk), Grave Crawlers and Bone Archers.
 3. **Boss: Hask, the Bell-Warden** *(in game)*. A huge warden buried in the bell-pit holding the old bell's clapper as penance; the clapper is now fused into his chest. He tolls it to send shockwaves through the pit, and halfway through the fight the toll raises the dead to his side. Drops **the Black Clapper**.
 4. **The Thirteen Names** *(in game)*. Maud takes the clapper. It is warm and whispers thirteen names: the saints walled up beneath the town. Hask was not ringing to wake Hollowmere; he was ringing to wake *them*, and something deeper was ringing back.
-5. *(planned)* **Lamps Without Oil**. Follow the Lamplighter to an unmarked grave. It holds the founders' charter, which names the saints and calls them "the Seal".
-6. *(planned)* **The Wardens' Oath**. Optional: lay the wardens to rest by returning their names to the mausoleum. Reward: the Warden's Vigil, the first of the Act I unique items.
+5. **Lamps Without Oil** *(in game)*. Once the bell is silent, the Lamplighter waits in the square and asks the hero to follow their lamps. The lamps light a trail through the graveyard to an unmarked grave. It holds the Founders' Charter, which names the thirteen saints and calls them "the Seal". Reward: the Lamplighter's Wick.
+6. **The Wardens' Oath** *(in game, optional)*. Old Corwin explains that the wardens can't rest without their names. Three name-stones lie in the Sunken Crypt; set back on the plinth by the mausoleum, they lay the wardens to rest. Reward: the Warden's Vigil, one of the Act I unique items (with the Lamplighter's Wick, Hask's Toll and the Knuckle of the Thirteenth).
 
-**Act transition.** The town's wells begin to toll. Maud opens the chapel's sealed undercroft, where a stair leads far below the crypt into the Ossuary.
+**Act transition** *(in game)*. When Maud reads the charter, the town's wells begin to toll. She opens the chapel's sealed undercroft, where a stair leads far below the crypt into the Ossuary; going down it ends Act I.
 
 ---
 

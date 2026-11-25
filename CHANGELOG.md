@@ -10,6 +10,26 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.0 — Act I: Complete
+
+The bell is silent, but Hollowmere isn't finished with you. Act I now runs to its end, and the way down to Act II is open.
+
+### New
+- **The rest of Act I's story.** After the bell falls silent, a child with a lamp waits in the square, and answers every question with another. Follow the Lamplighter's lamps to an unmarked grave in **Lamps Without Oil**, and bring what you find to Sister Maud. Then listen to the wells.
+- **The end of the act.** The wells of Hollowmere toll, and Maud opens the stair beneath St. Aldric's. Go down it to finish Act I; you can keep playing afterwards.
+- **The Wardens' Oath**, an optional quest from Old Corwin: find the wardens' lost name-stones in the Sunken Crypt and set them back where they belong.
+- **Two new skills for every class**, in slots 3 and 4. They unlock at level 3 and level 5.
+  - **Warrior:** Grave Roar and Sexton's Whirl.
+  - **Pyromancer:** Ashen Ward and Cinder Rain.
+  - **Rogue:** Bone Caltrops and Death Flurry.
+- **Unique items**, each with a power of its own: the Warden's Vigil, the Lamplighter's Wick, Hask's Toll and the Knuckle of the Thirteenth. They glow pale gold on the ground.
+- **New models** for the Rogue, the Pyromancer, the Grave Crawler and Hask, the Bell-Warden.
+- **Music and ambience:** Hollowmere, the Sunken Crypt and Hask's fight each have their own music, with wind in the town and dripping water below. Hask's toll, and the wells, ring out loud.
+
+### Changes
+- The quest log shows the main quest and the optional one you're on.
+- Your life orb shows how much damage a ward will still absorb.
+
 ## 0.4.1
 
 ### Changes
