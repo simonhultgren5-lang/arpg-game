@@ -5,6 +5,8 @@ signal stats_changed
 signal xp_changed
 signal leveled_up(level: int)
 signal inventory_changed
+## The skill bar, a variant or a passive changed (Skills panel).
+signal build_changed
 signal quest_changed
 signal message(text: String, color: Color)
 ## Story moments the world reacts to: "wells_toll" (Lamps Without Oil done), "act_complete".
@@ -12,6 +14,7 @@ signal story_event(id: String)
 
 const Classes = preload("res://scripts/data/classes.gd")
 const Items = preload("res://scripts/data/items.gd")
+const Passives = preload("res://scripts/data/passives.gd")
 const Dialogue = preload("res://scripts/data/act1_dialogue.gd")
 
 ## 2 (0.5.0-beta.5): 13 gear slots; armor became chest, charm became amulet (see migrate()).
@@ -27,6 +30,10 @@ const QUEST := "silent_bell"
 ## All Act I quests and their last step (see scripts/data/act1_dialogue.gd for what each step means).
 const QUESTS := {"silent_bell": 3, "lamps": 3, "act_end": 2, "wardens": 3}
 const WARDEN_STONES := 3
+## The skill bar: LMB, RMB, then keys 1-4. LMB only takes a primary skill.
+const BAR_SIZE := 6
+## No changing skills with a foe this close (metres).
+const BUILD_LOCK_RANGE := 12.0
 
 var progress: Dictionary = {}
 var hero_class := "warrior"
@@ -63,7 +70,7 @@ func _process(delta: float) -> void:
 func new_progress() -> Dictionary:
 	return {
 		"version": SAVE_VERSION, "level": 1, "xp": 0, "gold": 20, "potions": 3,
-		"inventory": [], "equipped": empty_equipped(),
+		"inventory": [], "equipped": empty_equipped(), "build": default_build(hero_class),
 		"quests": {"silent_bell": 0, "lamps": 0, "act_end": 0, "wardens": 0}, "flags": {}, "depth": 1, "kills": 0, "playtime": 0.0,
 	}
 
@@ -90,6 +97,7 @@ func load_hero() -> void:
 	if not (progress.get("flags") is Dictionary):
 		progress["flags"] = {}
 	progress["level"] = clampi(int(progress["level"]), 1, MAX_LEVEL)
+	sanitize_build()
 	if saved.is_empty():
 		# A new hero starts with a worn weapon of their class.
 		progress["equipped"]["weapon"] = Items.roll_item(1, hero_class, -1.0, "weapon")
@@ -207,7 +215,11 @@ func gear_stat(key: String) -> int:
 
 func max_hp() -> float:
 	var lv := level() - 1
-	return float(class_data["hp"]) + class_data["hp_per_level"] * lv + gear_stat("life")
+	return (float(class_data["hp"]) + class_data["hp_per_level"] * lv + gear_stat("life")) * max_hp_bonus()
+
+
+func max_hp_bonus() -> float:
+	return 1.0 + passive_bonus("life")
 
 
 func max_mana() -> float:
@@ -215,7 +227,7 @@ func max_mana() -> float:
 
 
 func armor() -> float:
-	return float(class_data["armor"]) + level() * 1.5 + gear_stat("armor")
+	return (float(class_data["armor"]) + level() * 1.5 + gear_stat("armor")) * (1.0 + passive_bonus("armor"))
 
 
 func damage_range() -> Vector2:
@@ -225,12 +237,12 @@ func damage_range() -> Vector2:
 
 
 func crit_chance() -> float:
-	return 0.05 + gear_stat("crit") / 100.0
+	return 0.05 + gear_stat("crit") / 100.0 + passive_bonus("crit")
 
 
 ## Damage multiplier of a critical strike.
 func crit_damage() -> float:
-	return BASE_CRIT_DAMAGE + gear_stat("crit_dmg") / 100.0
+	return BASE_CRIT_DAMAGE + gear_stat("crit_dmg") / 100.0 + passive_bonus("crit_dmg")
 
 
 ## Multiplier on attack rate (divide attack cooldowns by it).
@@ -240,7 +252,7 @@ func attack_speed() -> float:
 
 ## Multiplier on skill cooldowns; never below 1 - MAX_CDR.
 func cooldown_mult() -> float:
-	return maxf(1.0 - MAX_CDR, 1.0 - gear_stat("cdr") / 100.0)
+	return maxf(1.0 - MAX_CDR, 1.0 - gear_stat("cdr") / 100.0 - passive_bonus("cdr"))
 
 
 ## Life per second from gear (on top of the hero's own slow recovery).
@@ -249,7 +261,7 @@ func life_regen() -> float:
 
 
 func move_speed() -> float:
-	return float(class_data["speed"]) * (1.0 + gear_stat("speed") / 100.0)
+	return float(class_data["speed"]) * (1.0 + gear_stat("speed") / 100.0 + passive_bonus("speed"))
 
 
 ## Damage taken after armor.
@@ -269,6 +281,7 @@ func add_xp(amount: int) -> void:
 	while level() < MAX_LEVEL and int(progress["xp"]) >= xp_to_next():
 		progress["xp"] = int(progress["xp"]) - xp_to_next()
 		progress["level"] = level() + 1
+		_autoslot_unlocked()
 		leveled_up.emit(level())
 		stats_changed.emit()
 		save()
@@ -283,6 +296,171 @@ func add_gold(amount: int) -> void:
 func add_potion(n := 1) -> void:
 	progress["potions"] = mini(int(progress["potions"]) + n, 9)
 	stats_changed.emit()
+
+
+# ------------------------------------------------------------------ skills: bar, variants, passives
+# progress["build"] = {"bar": [6 skill ids or ""], "variants": {skill_id: variant_id}, "passives": [3 ids or ""]}
+
+func build() -> Dictionary:
+	return progress["build"]
+
+
+## A new hero's build: their first primary on LMB, then the first skills in unlock order.
+static func default_build(cls_id: String) -> Dictionary:
+	var list: Array = Classes.skills(cls_id)
+	return {"bar": [list[0]["id"], list[2]["id"], list[3]["id"], list[5]["id"], list[6]["id"], ""],
+		"variants": {}, "passives": ["", "", ""]}
+
+
+## Drops anything a save names that this class doesn't have (renamed skills, another class's ids).
+func sanitize_build() -> void:
+	var b = progress.get("build")
+	var fresh := default_build(hero_class)
+	if not (b is Dictionary) or not (b.get("bar") is Array):
+		progress["build"] = fresh
+		return
+	var bar := []
+	var seen := {}
+	for i in BAR_SIZE:
+		var id := str(b["bar"][i]) if i < b["bar"].size() else ""
+		var sk := Classes.skill(hero_class, id)
+		if sk.is_empty() or seen.has(id) or (i == 0 and not sk.get("primary", false)):
+			id = ""
+		if id != "":
+			seen[id] = true
+		bar.append(id)
+	if bar[0] == "" and not seen.has(fresh["bar"][0]):
+		bar[0] = fresh["bar"][0]
+	var variants := {}
+	if b.get("variants") is Dictionary:
+		for sid in b["variants"]:
+			var sk := Classes.skill(hero_class, str(sid))
+			if sk.is_empty():
+				continue
+			for v in sk["variants"]:
+				if v["id"] == str(b["variants"][sid]):
+					variants[str(sid)] = v["id"]
+	var passives := []
+	var pv = b.get("passives")
+	for i in Passives.SLOT_LEVELS.size():
+		var id := str(pv[i]) if pv is Array and i < pv.size() else ""
+		if Passives.find(hero_class, id).is_empty() or passives.has(id):
+			id = ""
+		passives.append(id)
+	progress["build"] = {"bar": bar, "variants": variants, "passives": passives}
+
+
+## "" when the hero may change skills now, else why not.
+func can_change_build() -> String:
+	var w = get_tree().current_scene if is_inside_tree() else null
+	if w and w.has_method("enemies") and w.get("player") != null:
+		var at: Vector3 = w.player.global_position
+		for e in w.enemies():
+			if is_instance_valid(e) and not e.dead and e.global_position.distance_to(at) < BUILD_LOCK_RANGE:
+				return "Not with foes this close."
+	return ""
+
+
+## Puts skill `id` in bar slot `i` (moving it if it's already on the bar). "" clears the slot.
+## Returns "" on success, else the reason it can't.
+func set_bar(i: int, id: String) -> String:
+	if i < 0 or i >= BAR_SIZE:
+		return "No such slot."
+	var why := can_change_build()
+	if why != "":
+		return why
+	var bar: Array = build()["bar"]
+	if id != "":
+		var sk := Classes.skill(hero_class, id)
+		if sk.is_empty():
+			return "Unknown skill."
+		if i == 0 and not sk.get("primary", false):
+			return "The left mouse button takes a primary skill."
+		var at := bar.find(id)
+		if at >= 0:
+			bar[at] = ""
+	bar[i] = id
+	build_changed.emit()
+	return ""
+
+
+## Chooses variant `variant_id` ("" for none) of skill `id`. A locked variant can be chosen; it applies
+## once the hero reaches its level.
+func set_variant(id: String, variant_id: String) -> String:
+	var sk := Classes.skill(hero_class, id)
+	if sk.is_empty():
+		return "Unknown skill."
+	var why := can_change_build()
+	if why != "":
+		return why
+	if variant_id == "":
+		build()["variants"].erase(id)
+		build_changed.emit()
+		return ""
+	for v in sk["variants"]:
+		if v["id"] == variant_id:
+			build()["variants"][id] = variant_id
+			build_changed.emit()
+			return ""
+	return "Unknown variant."
+
+
+## Puts passive `id` ("" clears) in passive slot `i`, which must be open at the hero's level.
+func set_passive(i: int, id: String) -> String:
+	if i < 0 or i >= Passives.SLOT_LEVELS.size():
+		return "No such slot."
+	if level() < int(Passives.SLOT_LEVELS[i]):
+		return "This slot opens at level %d." % int(Passives.SLOT_LEVELS[i])
+	if id != "" and Passives.find(hero_class, id).is_empty():
+		return "Unknown passive."
+	var why := can_change_build()
+	if why != "":
+		return why
+	var ps: Array = build()["passives"]
+	if id != "":
+		var at := ps.find(id)
+		if at >= 0:
+			ps[at] = ""
+	ps[i] = id
+	build_changed.emit()
+	stats_changed.emit()
+	return ""
+
+
+## The sum of `stat` over the passives in open slots.
+func passive_bonus(stat: String) -> float:
+	if not progress.has("build"):
+		return 0.0
+	var total := 0.0
+	var ps: Array = build()["passives"]
+	for i in ps.size():
+		if ps[i] == "" or level() < int(Passives.SLOT_LEVELS[i]):
+			continue
+		total += float(Passives.find(hero_class, ps[i]).get("effect", {}).get(stat, 0.0))
+	return total
+
+
+## Skill `id` as this hero casts it now (with the chosen variant, if unlocked). {} if unknown.
+func resolved(id: String) -> Dictionary:
+	return Classes.resolved(hero_class, id, str(build()["variants"].get(id, "")), level())
+
+
+func skill_unlocked_for(id: String) -> bool:
+	return level() >= int(Classes.skill(hero_class, id).get("unlock", 1))
+
+
+## A skill unlocked at this level that isn't on the bar goes into the first empty slot after LMB.
+func _autoslot_unlocked() -> void:
+	var bar: Array = build()["bar"]
+	for sk in Classes.skills(hero_class):
+		if int(sk.get("unlock", 1)) != level() or sk.get("primary", false) or bar.has(sk["id"]):
+			continue
+		for i in range(1, BAR_SIZE):
+			if bar[i] == "":
+				bar[i] = sk["id"]
+				message.emit("%s joins your skill bar." % sk["name"], Color(0.89, 0.71, 0.49))
+				build_changed.emit()
+				break
 
 
 # ------------------------------------------------------------------ inventory

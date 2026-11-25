@@ -190,7 +190,7 @@ func register_interactable(node: Node3D) -> void:
 # ------------------------------------------------------------------ combat helpers
 
 ## Melee sweep from the hero. Returns how many foes were hit.
-func hit_arc(origin: Vector3, dir: Vector3, reach: float, arc_deg: float, mult: float, source: Node3D) -> int:
+func hit_arc(origin: Vector3, dir: Vector3, reach: float, arc_deg: float, mult: float, source: Node3D, opts := {}) -> int:
 	var hits := 0
 	var cos_half := cos(deg_to_rad(arc_deg) * 0.5)
 	for e in enemies():
@@ -203,6 +203,7 @@ func hit_arc(origin: Vector3, dir: Vector3, reach: float, arc_deg: float, mult: 
 			continue
 		var roll: Array = source.roll_damage(mult)
 		e.take_damage(roll[0], roll[1], dir)
+		apply_effects(e, to, opts, roll[0], source)
 		hits += 1
 	if hits > 0:
 		shake(0.08)
@@ -218,12 +219,37 @@ func hit_radius(center: Vector3, radius: float, mult: float, source: Node3D, opt
 			continue
 		var roll: Array = source.roll_damage(mult)
 		e.take_damage(roll[0], roll[1], to)
-		if float(opts.get("stun", 0.0)) > 0.0 and not e.dead:
-			e.stun(opts["stun"])
-		if float(opts.get("knockback", 0.0)) > 0.0 and not e.dead:
-			e.knockback(to if to.length() > 0.1 else Vector3.FORWARD, opts["knockback"])
+		apply_effects(e, to, opts, roll[0], source)
 		hits += 1
 	return hits
+
+
+## The on-hit effects a skill carries (see scripts/data/classes.gd).
+static func effects_of(sk: Dictionary) -> Dictionary:
+	return preload("res://scripts/data/classes.gd").effects_of(sk)
+
+
+## Stun, knockback, slow and burn on one foe that just took `dealt` damage.
+func apply_effects(e: Node3D, to: Vector3, opts: Dictionary, dealt: float, source: Node3D) -> void:
+	if opts.is_empty() or not is_instance_valid(e) or e.dead:
+		return
+	if float(opts.get("stun", 0.0)) > 0.0:
+		e.stun(opts["stun"])
+	if float(opts.get("knockback", 0.0)) > 0.0:
+		e.knockback(to if to.length() > 0.1 else Vector3.FORWARD, opts["knockback"])
+	if float(opts.get("slow", 0.0)) > 0.0:
+		e.slow(float(opts.get("slow_time", 2.0)), 1.0 - float(opts["slow"]))
+	if float(opts.get("burn", 0.0)) > 0.0:
+		_burn(e, dealt * float(opts["burn"]), source)
+
+
+## Burn, bleed or poison: `total` damage over 3 seconds in six ticks.
+func _burn(e: Node3D, total: float, source: Node3D) -> void:
+	for i in 6:
+		await get_tree().create_timer(0.5).timeout
+		if not is_instance_valid(e) or e.dead or not is_inside_tree():
+			return
+		e.take_damage(total / 6.0, false, Vector3.ZERO)
 
 
 ## Pyromancer's Pyre: telegraph, blast, then burning ground.
@@ -236,7 +262,9 @@ func cast_pyre(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 	Fx.pillar(self, at, sk["radius"] * 0.6, color, 0.7)
 	Fx.ring(self, at, sk["radius"], color, 0.4)
 	shake(0.25)
-	hit_radius(at, sk["radius"], sk["mult"], source, {})
+	var fx := effects_of(sk)
+	fx.erase("burn")  # the pyre's burn is its burning ground
+	hit_radius(at, sk["radius"], sk["mult"], source, fx)
 	var ground := B.cylinder(sk["radius"], sk["radius"], 0.04, Fx.glow_mat(Color(1.0, 0.3, 0.05), 0.35), at + Vector3(0, 0.05, 0), self, 24)
 	var burn_light := B.omni(Color(1.0, 0.4, 0.1), 1.5, sk["radius"] * 2.5, at + Vector3(0, 0.8, 0), self)
 	var ticks := int(float(sk["burn_time"]) / 0.5)
@@ -262,7 +290,7 @@ func cast_rain(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 		var p := at + Vector3(cos(a), 0, sin(a)) * rng.randf_range(0.0, float(sk["radius"]) - 0.6)
 		Fx.pillar(self, p, float(sk["impact"]) * 0.5, color, 0.4)
 		Fx.ring(self, p, sk["impact"], color, 0.3)
-		hit_radius(p, sk["impact"], sk["mult"], source, {})
+		hit_radius(p, sk["impact"], sk["mult"], source, effects_of(sk))
 	shake(0.2)
 
 
@@ -282,7 +310,9 @@ func cast_trap(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 			if is_instance_valid(e) and not e.dead and Vector2(e.global_position.x - at.x, e.global_position.z - at.z).length() < float(sk["radius"]) + e.radius:
 				e.slow(0.6, 1.0 - float(sk["slow"]))
 		if is_instance_valid(source):
-			hit_radius(at, sk["radius"], float(sk["mult"]), source, {})
+			var fx := effects_of(sk)
+			fx.erase("slow")  # the ground slows on its own above
+			hit_radius(at, sk["radius"], float(sk["mult"]), source, fx if t % 2 == 0 else {})
 		await get_tree().create_timer(0.5).timeout
 		if not is_inside_tree():
 			return
@@ -400,6 +430,9 @@ func _on_enemy_died(e: Node3D) -> void:
 func _on_kill_powers() -> void:
 	if player and not player.dead and Game.has_unique("saints_knuckle"):
 		player.hp = minf(Game.max_hp(), player.hp + Game.max_hp() * 0.04)
+	var heal := Game.passive_bonus("kill_heal")
+	if player and not player.dead and heal > 0.0:
+		player.hp = minf(Game.max_hp(), player.hp + Game.max_hp() * heal)
 
 
 func _scatter(pos: Vector3) -> Vector3:

@@ -77,7 +77,7 @@ func _run() -> void:
 		w.player.mana = 999.0
 		w.player.cast_skill(2)
 		w.player.cast_skill(3)
-		_check(w.player.skill_cd[2] == 0.0 and w.player.skill_cd[3] == 0.0, "skills 3 and 4 locked at level 1")
+		_check(w.player.slot_cd(2) == 0.0 and w.player.slot_cd(3) == 0.0, "skills 3 and 4 locked at level 1")
 		# skills in town (no enemies) must not error
 		w.player.cast_skill(0)
 		await _frames(5)
@@ -106,7 +106,7 @@ func _run() -> void:
 		await _frames(60)
 		_check(not is_instance_valid(e) or e.dead or e.hp < hp0, "basic attack damages a monster")
 		w.player.cast_skill(0)
-		w.player.skill_cd = [0.0, 0.0, 0.0, 0.0]
+		w.player.reset_cooldowns()
 		w.player.cast_skill(1)
 		await _frames(60)
 		w.player.hp = 9999.0
@@ -251,7 +251,7 @@ func _act_one_story(w: Node, hero_class: String) -> Node:
 		await _frames(10)
 		w.player.cast_skill(3)
 		await _frames(110)
-		_check(w.player.skill_cd[2] > 0.0 or w.player.skill_cd[3] > 0.0, "skills 3 and 4 cast (%s)" % hero_class)
+		_check(w.player.slot_cd(2) > 0.0 or w.player.slot_cd(3) > 0.0, "skills 3 and 4 cast (%s)" % hero_class)
 		_check(not is_instance_valid(foe) or foe.dead or foe.hp < hp0 or (hero_class == "pyromancer" and warded), "skills 3 and 4 hurt or ward (%s)" % hero_class)
 	for st in stones:
 		if is_instance_valid(st):

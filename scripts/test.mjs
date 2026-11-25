@@ -57,7 +57,8 @@ else {
       const checks = (out.match(/^\s+ok\s/gm) || []).length;
       const failures = out.split('\n').filter((l) => /FAIL|SCRIPT ERROR|Parse Error/.test(l));
       if (failures.length) console.log(failures.slice(0, 20).join('\n'));
-      const ok = r.status === 0 && out.includes(marker);
+      // A script error that the test survives still fails it.
+      const ok = r.status === 0 && out.includes(marker) && !/SCRIPT ERROR/.test(out);
       step(name, ok, r.error ? `timed out or failed to start (${r.error.code})` : `${checks} checks`);
     }
   }

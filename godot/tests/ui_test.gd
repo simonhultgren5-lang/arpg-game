@@ -4,6 +4,8 @@ extends Node
 ## Prints "UI TEST PASSED" and exits 0 when everything passed, 1 otherwise.
 
 const Items = preload("res://scripts/data/items.gd")
+const Classes = preload("res://scripts/data/classes.gd")
+const Passives = preload("res://scripts/data/passives.gd")
 
 var _failures := PackedStringArray()
 
@@ -41,6 +43,10 @@ func _hero(cls: String) -> void:
 func _run() -> void:
 	print("== gear")
 	await _gear()
+	print("== skills")
+	await _skills()
+	print("== skills in the world")
+	await _skills_in_world()
 	if _failures.is_empty():
 		print("UI TEST PASSED")
 		get_tree().quit(0)
@@ -133,7 +139,8 @@ func _gear() -> void:
 	var d: Dictionary = Items.compare(x, y)
 	_check(int(d.get("armor", 0)) == 6 and int(d.get("life", 0)) == 5 and int(d.get("crit", 0)) == -2, "compare gives signed deltas")
 
-	# New stats.
+	# New stats (nothing else worn, so random affixes can't interfere).
+	Game.progress["equipped"] = Game.empty_equipped()
 	Game.progress["equipped"]["ring_1"] = {"slot": "ring", "stats": {"cdr": 90, "crit_dmg": 20, "attack_speed": 10, "regen": 3}}
 	_check(is_equal_approx(Game.cooldown_mult(), 0.6), "cooldown reduction caps at 40%")
 	_check(is_equal_approx(Game.crit_damage(), 1.95), "crit damage = 1.75 + 20%")
@@ -144,3 +151,109 @@ func _gear() -> void:
 	_check(Game.has_unique("saints_knuckle"), "a unique works from a ring slot")
 	Game.progress["equipped"]["ring_1"] = null
 	Game.progress["equipped"]["ring_2"] = null
+
+
+# ------------------------------------------------------------------ skills
+
+func _skills() -> void:
+	for cls in ["warrior", "pyromancer", "rogue"]:
+		var list: Array = Classes.skills(cls)
+		_check(list.size() == 8, "%s has 8 skills" % cls)
+		_check(list.filter(func(s): return s.get("primary", false)).size() == 2, "%s has 2 primaries" % cls)
+		_check(list.all(func(s): return (s["variants"] as Array).size() == 4), "%s skills have 4 variants each" % cls)
+		var unlocks := list.map(func(s): return int(s.get("unlock", 1)))
+		_check(unlocks == [1, 1, 1, 1, 2, 3, 5, 6], "%s unlock order %s" % [cls, unlocks])
+		_check(Passives.for_class(cls).size() == 8, "%s has 8 passives" % cls)
+		var ids := {}
+		for s in list:
+			ids[s["id"]] = true
+			for v in s["variants"]:
+				ids[v["id"]] = true
+		_check(ids.size() == 8 + 32, "%s skill and variant ids are unique" % cls)
+	_check(Passives.SLOT_LEVELS == [3, 6, 10], "passive slots open at 3, 6, 10")
+
+	await _hero("warrior")
+	Game.progress["level"] = 1
+	Game.sanitize_build()
+	var b: Dictionary = Game.build()
+	_check(b["bar"] == ["grave_cleave", "earthsplitter", "iron_rush", "grave_roar", "sextons_whirl", ""], "default warrior bar %s" % [b["bar"]])
+	_check(Game.set_bar(0, "earthsplitter") != "", "LMB refuses a non-primary")
+	_check(Game.set_bar(0, "shield_bash") == "" and Game.build()["bar"][0] == "shield_bash", "LMB takes the second primary")
+	_check(Game.set_bar(5, "shield_bash") == "" and Game.build()["bar"][0] == "" , "a skill moves, not copies, between slots")
+	_check(Game.set_bar(0, "grave_cleave") == "", "LMB back to Grave Cleave")
+	_check(Game.set_bar(3, "no_such_skill") != "", "unknown skill refused")
+
+	var sk: Dictionary = Classes.skill("warrior", "earthsplitter")
+	var last: Dictionary = sk["variants"][3]
+	_check(Classes.variant_unlock(sk, 3) == 9 and Classes.variant_unlock(sk, 0) == 2, "variant unlock levels")
+	_check(Game.set_variant("earthsplitter", last["id"]) == "", "a locked variant can be chosen")
+	var r: Dictionary = Game.resolved("earthsplitter")
+	_check(r.get("variant", "") == "", "a locked variant casts as the base skill")
+	Game.progress["level"] = 9
+	r = Game.resolved("earthsplitter")
+	_check(r.get("variant", "") == last["id"], "the variant applies once unlocked")
+	for k in last["mods"]:
+		_check(r[k] == last["mods"][k], "variant sets %s" % k)
+	_check(Game.set_variant("earthsplitter", "nope") != "", "unknown variant refused")
+	_check(Game.set_variant("earthsplitter", "") == "" and Game.resolved("earthsplitter").get("variant", "") == "", "clearing the variant")
+
+	var pid: String = Passives.for_class("warrior")[0]["id"]
+	Game.progress["level"] = 2
+	_check(Game.set_passive(0, pid) != "", "passive slot 1 shut before level 3")
+	Game.progress["level"] = 3
+	_check(Game.set_passive(0, pid) == "", "passive slot 1 opens at level 3")
+	_check(Game.set_passive(1, Passives.for_class("warrior")[1]["id"]) != "", "passive slot 2 shut at level 3")
+	_check(Game.set_passive(0, "nope") != "", "unknown passive refused")
+	var p0: Dictionary = Passives.for_class("warrior")[0]
+	var stat: String = (p0["effect"] as Dictionary).keys()[0]
+	_check(is_equal_approx(Game.passive_bonus(stat), float(p0["effect"][stat])), "passive bonus counts")
+
+	Game.progress["build"] = {"bar": ["grave_cleave", "nope", "", "", "", ""], "variants": {"x": "y", "iron_rush": "zzz"}, "passives": ["bad", "", ""]}
+	Game.sanitize_build()
+	b = Game.build()
+	_check(b["bar"][1] == "" and not b["variants"].has("x") and not b["variants"].has("iron_rush") and b["passives"][0] == "", "sanitize drops unknown ids")
+	Game.progress["build"] = {"bar": [], "variants": [], "passives": "x"}
+	Game.sanitize_build()
+	_check((Game.build()["bar"] as Array).size() == 6 and Game.build()["bar"][0] == "grave_cleave", "sanitize rebuilds a broken build")
+
+	# A skill that unlocks goes into the first empty bar slot.
+	Game.progress["level"] = 1
+	Game.progress["xp"] = 0
+	Game.progress["build"] = Game.default_build("warrior")
+	Game.add_xp(Game.xp_to_next())
+	_check(Game.level() == 2 and Game.build()["bar"][5] == "grave_leap", "Grave Leap slots itself at level 2")
+
+
+func _skills_in_world() -> void:
+	for cls in ["warrior", "pyromancer", "rogue"]:
+		await _hero(cls)
+		Game.progress["level"] = 20
+		Game.area = "town"
+		get_tree().change_scene_to_file("res://scenes/world.tscn")
+		await _frames(20)
+		var w = get_tree().current_scene
+		var p = w.player
+		var first: String = Game.build()["bar"][1]
+		p.mana = 999.0
+		p.cast_slot(1)
+		var cd0: float = p.cooldown_left(first)
+		_check(cd0 > 0.0, "%s: casting starts its cooldown" % first)
+		Game.set_bar(1, Classes.skills(cls)[4]["id"])
+		Game.set_bar(1, first)
+		_check(p.cooldown_left(first) > 0.0 and p.cooldown_left(first) <= cd0, "%s: cooldown follows the skill" % first)
+		var casts := 0
+		for s in Classes.skills(cls):
+			for v in [""] + (s["variants"] as Array).map(func(x): return x["id"]):
+				Game.set_bar(1 if not s.get("primary", false) else 0, s["id"])
+				Game.set_variant(s["id"], v)
+				p.reset_cooldowns()
+				p.mana = 999.0
+				p.dead = false
+				p.hp = 9999.0
+				p.cast_slot(1 if not s.get("primary", false) else 0)
+				await _frames(2)
+				casts += 1
+		_check(casts == 40, "%s: every skill and variant cast (%d)" % [cls, casts])
+		await _frames(60)
+		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		await _frames(5)

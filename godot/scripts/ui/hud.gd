@@ -141,12 +141,11 @@ func _build_bottom() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(row)
-	var cls: Dictionary = Game.class_data
-	_add_slot(row, "LMB", cls["basic"], "basic", 0)
-	_add_slot(row, "RMB/1", cls["skills"][0], "skill", 0)
-	_add_slot(row, "2", cls["skills"][1], "skill", 1)
-	_add_slot(row, "3", cls["skills"][2], "skill", 2)
-	_add_slot(row, "4", cls["skills"][3], "skill", 3)
+	for k in Game.BAR_SIZE:
+		_add_slot(row, ["LMB", "RMB", "1", "2", "3", "4"][k], {}, "bar", k)
+	Game.build_changed.connect(_refresh_bar)
+	Game.leveled_up.connect(func(_lv): _refresh_bar())
+	_refresh_bar.call_deferred()
 	var sep := Control.new()
 	sep.custom_minimum_size = Vector2(10, 10)
 	row.add_child(sep)
@@ -188,6 +187,36 @@ func _add_slot(row: HBoxContainer, key: String, sk: Dictionary, kind: String, in
 		s.tooltip_text = "%s\n%s%s%s%s" % [s.title, sk.get("desc", ""), cost, cd, unlock]
 	row.add_child(s)
 	_slots.append([s, kind, index])
+
+
+## Shows the skills of the current build on the bar slots.
+func _refresh_bar() -> void:
+	for entry in _slots:
+		if entry[1] != "bar":
+			continue
+		var s = entry[0]
+		var id: String = Game.build()["bar"][entry[2]]
+		var sk: Dictionary = Game.resolved(id) if id != "" else {}
+		s.locked = sk.is_empty() or not Game.skill_unlocked_for(id)
+		s.title = sk.get("name", "")
+		s.color = sk.get("color", UiTheme.GOLD)
+		s.glyph = ""
+		for w in s.title.split(" "):
+			if w.length() > 0 and s.glyph.length() < 2 and w[0] == w[0].to_upper():
+				s.glyph += w[0]
+		if sk.is_empty():
+			s.tooltip_text = "Empty. Choose a skill for this slot in the Skills panel (K)."
+		else:
+			var cost := ""
+			if int(sk.get("mana", 0)) > 0:
+				cost = "
+Cost: %d %s" % [int(sk["mana"]), Game.class_data.get("resource", "Mana")]
+			var cd := "  ·  Cooldown: %.1fs" % float(sk["cooldown"]) if not sk.get("primary", false) else ""
+			var unlock := "
+Unlocks at level %d." % int(sk.get("unlock", 1)) if s.locked else ""
+			s.tooltip_text = "%s
+%s%s%s%s" % [s.title, sk.get("desc", ""), cost, cd, unlock]
+		s.queue_redraw()
 
 
 func _build_top() -> void:
@@ -445,19 +474,14 @@ func _process(_delta: float) -> void:
 		life_text += "  +%d" % int(ceil(p.ward))
 	_hp_orb.set_values(p.hp / mhp, life_text)
 	_mana_orb.set_values(p.mana / mmana, "%d / %d" % [int(p.mana), int(mmana)])
-	var cls: Dictionary = Game.class_data
 	for entry in _slots:
 		var s = entry[0]
 		match entry[1]:
-			"basic":
-				s.update_state(clampf(p.attack_cd / float(cls["basic"]["cooldown"]), 0.0, 1.0), true)
-			"skill":
-				var sk: Dictionary = cls["skills"][entry[2]]
-				var locked: bool = not p.skill_unlocked(entry[2])
-				if s.locked != locked:
-					s.locked = locked
-					s.queue_redraw()
-				s.update_state(clampf(p.skill_cd[entry[2]] / float(sk["cooldown"]), 0.0, 1.0), p.mana >= float(sk["mana"]))
+			"bar":
+				var id: String = Game.build()["bar"][entry[2]]
+				if id != "" and not s.locked:
+					var sk: Dictionary = Game.resolved(id)
+					s.update_state(p.cooldown_frac(id), p.mana >= p.skill_cost(sk))
 			"potion":
 				var n := int(Game.progress.get("potions", 0))
 				s.update_state(0.0, n > 0, n)

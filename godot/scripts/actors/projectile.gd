@@ -14,6 +14,8 @@ var crit := false
 var max_dist := 14.0
 var hit_radius := 0.6
 var pierce := 0
+## On-hit effects (world.effects_of): stun, knockback, slow, burn.
+var effects := {}
 var color := Color(1, 0.5, 0.2)
 var style := "bolt"  # "bolt", "knife", "arrow"
 var _travelled := 0.0
@@ -50,6 +52,7 @@ func _physics_process(delta: float) -> void:
 			if d < hit_radius + e.radius:
 				_hit[e] = true
 				e.take_damage(damage, crit, dir)
+				world.apply_effects(e, dir, effects, damage, world.player)
 				if pierce <= 0:
 					_impact()
 					return
