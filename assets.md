@@ -1,6 +1,6 @@
 # Developing assets
 
-How the game's 3D models, animations and material textures are made, and how to add or change one.
+How the game's 3D models, animations and material textures are made, and how to add or change one. What they must look like (pillars, palette, lighting, budgets, the quality checklist) is in the [art bible](art-bible.md).
 For the folder layout, Git LFS and file locks, see [dev.md](dev.md#6-assets-git-lfs-and-locks). For sound, see `scripts/audio/`.
 
 ## Contents
