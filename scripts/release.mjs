@@ -78,7 +78,33 @@ if (!dryRun) {
   const head = sh('git', ['rev-parse', 'HEAD']).out;
   sh('git', ['fetch', '--quiet', 'origin']);
   if (!sh('git', ['branch', '-r', '--contains', head]).out) fail('Push your commit to GitHub first (git push).');
-  if (sh('gh', ['release', 'view', tag, '-R', repo]).ok) fail(`Release ${tag} already exists. Bump the version first: bun run bump:patch`);
+  // Check the tag too: `gh release view` can fail for other reasons (network, a stale login) and
+  // must not let a duplicate build run. Merging to main publishes betas through the pipeline.
+  const tagged = sh('git', ['ls-remote', '--tags', 'origin', `refs/tags/${tag}`]).out;
+  if (tagged || sh('gh', ['release', 'view', tag, '-R', repo]).ok) {
+    fail(`Release ${tag} already exists (the pipeline publishes a version when its PR merges into main). Bump the version first: bun run bump:${channelArg === 'stable' ? 'patch' : channelArg}`);
+  }
+}
+
+// ---------------------------------------------------------------- disk space
+// A release writes about 2 GB (the game export, the unpacked app, two .7z archives, the installer, the
+// portable .exe and the upload copies). Builds of older versions in release/ are already on GitHub,
+// so they go first; with too little space left, stop now instead of failing deep inside the build.
+if (!publishOnly) {
+  const releaseDir = path.join(root, 'release');
+  let freed = 0;
+  for (const name of fs.existsSync(releaseDir) ? fs.readdirSync(releaseDir) : []) {
+    const full = path.join(releaseDir, name);
+    const old = /\.(exe|blockmap|7z|pak|tar|tar\.gz)$/i.test(name) && !name.includes(version);
+    if (old || name === 'win-unpacked') {
+      freed += fs.statSync(full).isDirectory() ? 0 : fs.statSync(full).size;
+      fs.rmSync(full, { recursive: true, force: true });
+    }
+  }
+  if (freed > 0) console.log(`✓ Removed older builds from release/ (${(freed / 1073741824).toFixed(1)} GB)`);
+  const free = fs.statfsSync(root);
+  const freeGb = (free.bavail * free.bsize) / 1073741824;
+  if (freeGb < 3) fail(`Only ${freeGb.toFixed(1)} GB free on this drive. A release needs about 3 GB: free some space and run it again.`);
 }
 
 // ---------------------------------------------------------------- build
