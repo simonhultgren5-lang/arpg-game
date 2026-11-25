@@ -2,7 +2,7 @@
 
 A three-quarter 3D rebuild of Depths of Darkness in Godot 4 (GDScript). This folder is a playable **vertical slice of Act I**: the cursed town of Hollowmere, a procedurally assembled crypt beneath it, and the first boss. The 2D game in `game/` keeps shipping until this version replaces it.
 
-The Warrior, Hollow, Bone Archer, torch sconces, barrels and sarcophagi use original procedural meshes from `scripts/models/`. The rest of the world uses runtime-built primitives, lights and fog. Open **Field guide** on the title screen to browse 13 original Act I illustrations. The portrait-format 4K editions in `art/field_guide/` were resampled from 941 × 1672 generated paintings. Hero selection and dialogue use smaller portrait textures.
+The Warrior, Hollow, Bone Archer, the townsfolk (Sister Maud, Edda, Old Corwin), torch sconces, barrels and sarcophagi use original procedural meshes from `scripts/models/`. The rest of the world uses runtime-built primitives, lights and fog. Open **Field guide** on the title screen to browse 13 original Act I illustrations. The portrait-format 4K editions in `art/field_guide/` were resampled from 941 × 1672 generated paintings. Hero selection and dialogue use smaller portrait textures.
 
 ## Run it
 
@@ -29,7 +29,7 @@ godot --headless --path godot res://tests/smoke_test.tscn
 
 `res://tests/screenshots.tscn` renders a few screenshots into a folder (needs a window): `godot --path godot res://tests/screenshots.tscn -- --out C:\temp\shots --class rogue`.
 
-Preview the procedural assets with `godot --path godot res://tests/model_gallery.tscn` from the repository root. Add `-- --out C:/temp/gallery` to save the rendered lineup. Include `--effects` after `--` to capture a melee strike and hit sparks.
+Preview the procedural assets with `godot --path godot res://tests/model_gallery.tscn` from the repository root. Add `-- --out C:/temp/gallery` to save the rendered lineup. Include `--effects` after `--` to capture a melee strike and hit sparks. `res://tests/townsfolk_gallery.tscn` does the same for Sister Maud, Edda and Old Corwin.
 
 ## Controls
 
@@ -119,6 +119,7 @@ The game keeps the hero's progress as **one JSON object** (level, XP, gold, drau
 
   On load the game reads `save.data.dod3d`. A character with no `dod3d` yet starts fresh in the 3D game. A copy is also kept in `user://saves/online-<id>.json`; if the server can't be reached, the game plays from that copy and says so in the bottom-left corner.
 - On quit the game waits up to 4 seconds for the last online save to finish.
+- For `http://` servers the game looks up the host name's IPv4 address once and connects to that. Names like `raspberrypi.local` often resolve to an IPv6 link-local address first, which Godot can't connect to. `https://` URLs keep the name for the certificate check.
 
 `meta.depth` is 1 until the hero has entered the crypt, then 2.
 
