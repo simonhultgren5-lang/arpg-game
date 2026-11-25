@@ -1,4 +1,4 @@
-// Renders game/img/emblem.svg into the app icons (run after changing the emblem):
+// Renders launcher/assets/emblem.svg into the app icons (run after changing the emblem):
 //   npx electron scripts/build-icons.cjs
 // Writes launcher/assets/icon.ico (the .exe and installer icon, see "icon" in package.json)
 // and launcher/assets/icon.png (window and taskbar icon).
@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const svg = fs.readFileSync(path.join(root, 'game', 'img', 'emblem.svg'), 'utf8');
+const svg = fs.readFileSync(path.join(root, 'launcher', 'assets', 'emblem.svg'), 'utf8');
 const SIZE = 512;
 
 // ICO with PNG-encoded images (supported since Windows Vista).

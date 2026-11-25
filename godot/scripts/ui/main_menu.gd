@@ -91,7 +91,7 @@ func _ready() -> void:
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(_status)
 
-	var ver := UiTheme.label("v%s  ·  Godot 4 vertical slice" % ProjectSettings.get_setting("application/config/version", "0.1.0"), 13, Color(0.45, 0.4, 0.45))
+	var ver := UiTheme.label("v%s" % ProjectSettings.get_setting("application/config/version", "0.1.0"), 13, Color(0.45, 0.4, 0.45))
 	ver.anchor_top = 1.0
 	ver.anchor_bottom = 1.0
 	ver.offset_left = 16

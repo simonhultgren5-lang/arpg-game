@@ -1,29 +1,29 @@
 // Publishes a new version to GitHub Releases so installed launchers update themselves.
 //
-//   bun run release                  game patch only (game/ changed)
-//   bun run release:launcher         game patch + new launcher/installer (electron/ or launcher/ changed)
+//   bun run release                  build the game and the launcher installer, then publish
 //   add -- --dry-run                 build everything into release/upload/ but don't publish
 //
+// The game (godot/) ships inside the installer, so every release is a launcher release.
 // Before releasing: bump the version (bun run bump:patch), add a "## <version>" section to
 // CHANGELOG.md (shown to players in the launcher), commit and push.
 //
 // Every release gets:
-//   depths-game-<v>.pak       the game files (what launchers download)
-//   game-update.json          { version, url, size, sha256, minLauncher, notes }
-//   launcher-update.json      newest launcher installer (copied from the previous release if unchanged)
-//   patch-notes.json          every version's notes from CHANGELOG.md (the launcher's Patch Notes panel)
-// Launchers read both .json files from https://github.com/<repo>/releases/latest/download/
+//   Depths-of-Darkness-Setup-<v>.exe   installer (what launchers download to update)
+//   Depths-of-Darkness-<v>-portable.exe
+//   launcher-update.json               { version, url, size, sha256, notes, date }
+//   depths-server-<v>.tar.gz           the game server for the Pi
+//   server-update.json                 what game servers check (game-server/update.sh installs it)
+//   patch-notes.json                   every version's notes from CHANGELOG.md (the launcher's Patch Notes panel)
+// Launchers and servers read the .json files from https://github.com/<repo>/releases/latest/download/
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildGamePak } from './build-game-pak.mjs';
 import { writePatchNotes } from './patch-notes.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-const withLauncher = args.includes('--launcher');
 const dryRun = args.includes('--dry-run');
 
 const sh = (cmd, cmdArgs, opts = {}) => {
@@ -44,7 +44,7 @@ const repo = pkg.desktop?.githubRepo;
 if (!repo) fail('package.json is missing desktop.githubRepo');
 const tag = `v${version}`;
 const download = (name) => `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(name)}`;
-console.log(`Release ${tag}${withLauncher ? ' (game + launcher)' : ' (game patch)'}${dryRun ? ' — dry run' : ''}`);
+console.log(`Release ${tag}${dryRun ? ' — dry run' : ''}`);
 
 const changelog = fs.existsSync(path.join(root, 'CHANGELOG.md')) ? fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8') : '';
 const section = changelog.split(/^## /m).find((part) => part.match(/^([\d.]+)/)?.[1] === version);
@@ -73,47 +73,32 @@ writePatchNotes(path.join(uploadDir, 'patch-notes.json'));
 uploads.push(path.join(uploadDir, 'patch-notes.json'));
 console.log('✓ Patch notes from CHANGELOG.md');
 
-const pak = buildGamePak();
-fs.copyFileSync(pak.file, path.join(uploadDir, pak.name));
-uploads.push(path.join(uploadDir, pak.name));
-console.log(`✓ Game patch ${pak.name} (${(pak.size / 1024).toFixed(0)} KB)`);
-
-let launcherManifest = null;
-if (withLauncher) {
-  // The installer bundles the 3D preview (godot/), so export it first.
-  const exported = sh('node', ['scripts/export-godot.mjs'], { stdio: 'inherit' });
-  if (!exported.ok) fail('Exporting the 3D game failed (see above).');
-  console.log('Building the launcher installer (this takes a few minutes)…');
-  const build = sh('npx', ['electron-builder', '--win'], { stdio: 'inherit', shell: process.platform === 'win32' });
-  if (!build.ok) fail('electron-builder failed.');
-  const setupName = `Depths-of-Darkness-Setup-${version}.exe`;
-  const portableName = `Depths-of-Darkness-${version}-portable.exe`;
-  for (const name of [setupName, portableName]) {
-    const file = path.join(root, 'release', name);
-    if (!fs.existsSync(file)) fail(`Expected ${name} in release/ after the build.`);
-    fs.copyFileSync(file, path.join(uploadDir, name));
-    uploads.push(path.join(uploadDir, name));
-  }
-  const setupFile = path.join(uploadDir, setupName);
-  launcherManifest = {
-    version,
-    url: download(setupName),
-    size: fs.statSync(setupFile).size,
-    sha256: sha256(setupFile),
-    notes,
-    date: new Date().toISOString(),
-  };
-  console.log(`✓ Launcher installer ${setupName}`);
-} else {
-  // Carry the newest launcher forward so "latest" always points at it.
-  try {
-    const res = await fetch(`https://github.com/${repo}/releases/latest/download/launcher-update.json`);
-    if (res.ok) launcherManifest = await res.json();
-  } catch {
-    // No previous launcher manifest: launchers simply see no launcher update.
-  }
-  console.log(launcherManifest ? `✓ Launcher stays at ${launcherManifest.version}` : '! No launcher-update.json found on GitHub yet (run release:launcher once)');
+// The installer bundles the game (godot/), so export it first.
+const exported = sh('node', ['scripts/export-godot.mjs'], { stdio: 'inherit' });
+if (!exported.ok) fail('Exporting the game failed (see above).');
+console.log('Building the launcher installer (this takes a few minutes)…');
+const build = sh('npx', ['electron-builder', '--win'], { stdio: 'inherit', shell: process.platform === 'win32' });
+if (!build.ok) fail('electron-builder failed.');
+const setupName = `Depths-of-Darkness-Setup-${version}.exe`;
+const portableName = `Depths-of-Darkness-${version}-portable.exe`;
+for (const name of [setupName, portableName]) {
+  const file = path.join(root, 'release', name);
+  if (!fs.existsSync(file)) fail(`Expected ${name} in release/ after the build.`);
+  fs.copyFileSync(file, path.join(uploadDir, name));
+  uploads.push(path.join(uploadDir, name));
 }
+const setupFile = path.join(uploadDir, setupName);
+const launcherManifest = {
+  version,
+  url: download(setupName),
+  size: fs.statSync(setupFile).size,
+  sha256: sha256(setupFile),
+  notes,
+  date: new Date().toISOString(),
+};
+fs.writeFileSync(path.join(uploadDir, 'launcher-update.json'), JSON.stringify(launcherManifest, null, 2));
+uploads.push(path.join(uploadDir, 'launcher-update.json'));
+console.log(`✓ Launcher installer ${setupName}`);
 
 // The game server: the package for the Pi and a manifest the server checks (see game-server/update.sh).
 const packed = sh('node', ['scripts/pack-server.mjs'], { stdio: 'inherit' });
@@ -133,26 +118,11 @@ fs.writeFileSync(
 uploads.push(path.join(uploadDir, 'server-update.json'));
 console.log(`✓ Game server ${serverName}`);
 
-const gameManifest = {
-  version,
-  url: download(pak.name),
-  size: pak.size,
-  sha256: pak.sha256,
-  minLauncher: pkg.desktop?.minLauncherVersion || '0.0.0',
-  notes,
-  date: new Date().toISOString(),
-};
-fs.writeFileSync(path.join(uploadDir, 'game-update.json'), JSON.stringify(gameManifest, null, 2));
-uploads.push(path.join(uploadDir, 'game-update.json'));
-if (launcherManifest) {
-  fs.writeFileSync(path.join(uploadDir, 'launcher-update.json'), JSON.stringify(launcherManifest, null, 2));
-  uploads.push(path.join(uploadDir, 'launcher-update.json'));
-}
 const notesFile = path.join(uploadDir, 'release-notes.md');
 fs.writeFileSync(
   notesFile,
   `${notes}\n\n---\nInstalled players get this update automatically through the launcher.` +
-    (withLauncher ? `\nNew players: download **Depths-of-Darkness-Setup-${version}.exe**.` : ''),
+    `\nNew players: download **Depths-of-Darkness-Setup-${version}.exe**.`,
 );
 
 if (dryRun) {

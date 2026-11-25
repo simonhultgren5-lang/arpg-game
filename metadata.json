@@ -1,6 +1,0 @@
-{
-  "name": "Depths of Darkness",
-  "description": "Dark fantasy top-down dungeon crawler with procedural depths, warrior abilities, talent builds, and loot progression.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

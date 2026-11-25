@@ -1,20 +1,18 @@
 // Automatic updates, published by `bun run release` to GitHub Releases.
 //
-// Game patches: the launcher downloads depths-game-<v>.pak (the whole game/ folder, ~0.6 MB),
-// checks its SHA-256, unpacks it to <userData>/game-versions/<v>/ and serves the game from there.
-// The bundled game inside the app is used until a newer patch is installed.
+// The game (the Godot export in godot/) ships inside the launcher installer, so one update covers
+// both: the installed app downloads the new installer in the background and, when the player presses
+// "Restart to update", runs it silently and relaunches. Portable builds can't replace themselves, so
+// they link to the download page instead.
 //
-// Launcher updates: the installed app downloads the new installer in the background and, when the
-// player presses "Restart to update", runs it silently and relaunches. Portable builds can't replace
-// themselves, so they link to the download page instead.
+// `status.game` only reports whether the check worked (the game's version is the launcher's).
 //
-// Running from source (bun run game) never patches itself; set DOD_UPDATES=1 to test the flow, and
+// Running from source (bun run launcher) never updates itself; set DOD_UPDATES=1 to test the flow, and
 // DOD_UPDATE_URL to point it at another update folder (for example a local test server).
 const { app } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
 const pkg = require('../package.json');
 
@@ -23,18 +21,13 @@ const enabled = !isDev || process.env.DOD_UPDATES === '1';
 const repo = pkg.desktop?.githubRepo;
 const BASE = (process.env.DOD_UPDATE_URL || `https://github.com/${repo}/releases/latest/download/`).replace(/\/?$/, '/');
 const RELEASES_PAGE = `https://github.com/${repo}/releases/latest`;
-const BUNDLED_GAME = path.join(__dirname, '..', 'game');
 const isPortable = Boolean(process.env.PORTABLE_EXECUTABLE_FILE);
 const launcherVersion = app.getVersion();
 const MAX_DOWNLOAD = 300 * 1024 * 1024;
-const SAFE_PATH = /^[A-Za-z0-9_.\-]+(\/[A-Za-z0-9_.\-]+)*$/;
 // While the launcher is open it checks again every POLL_MS (and when its window gets focus), so a new
 // release shows up without restarting. Checks closer together than MIN_GAP_MS are skipped.
 const POLL_MS = Number(process.env.DOD_UPDATE_POLL_MS) || 5 * 60e3;
 const MIN_GAP_MS = Math.min(60e3, POLL_MS);
-
-const versionsDir = () => path.join(app.getPath('userData'), 'game-versions');
-const activeFile = () => path.join(versionsDir(), 'active.json');
 
 // "0.1.10" > "0.1.9"
 function compare(a, b) {
@@ -47,32 +40,20 @@ function compare(a, b) {
   return 0;
 }
 
-// ---------------------------------------------------------------- installed game version
-let active = { version: launcherVersion, dir: BUNDLED_GAME };
-function loadActive() {
-  active = { version: launcherVersion, dir: BUNDLED_GAME };
-  try {
-    const { version } = JSON.parse(fs.readFileSync(activeFile(), 'utf8'));
-    const dir = path.join(versionsDir(), version);
-    if (compare(version, launcherVersion) > 0 && fs.existsSync(path.join(dir, 'index.html'))) active = { version, dir };
-  } catch {
-    // No patch installed: use the game bundled with the app.
-  }
-  return active;
+// Folders left behind by 2D game patches (before 0.4.0). Removed once at start-up.
+function removeOldGamePatches() {
+  fs.rmSync(path.join(app.getPath('userData'), 'game-versions'), { recursive: true, force: true });
 }
-const gameRoot = () => active.dir;
-const gameVersion = () => active.version;
 
 // ---------------------------------------------------------------- status (sent to the launcher)
 const status = {
   enabled,
   releasesPage: RELEASES_PAGE,
-  game: { current: launcherVersion, latest: null, state: 'idle', progress: 0, size: 0, notes: '', error: '' },
+  game: { current: launcherVersion, latest: null, state: 'idle', error: '' },
   launcher: { current: launcherVersion, latest: null, state: 'idle', progress: 0, notes: '', portable: isPortable, error: '' },
 };
 const listeners = new Set();
 const emit = () => {
-  status.game.current = active.version;
   for (const fn of listeners) fn(JSON.parse(JSON.stringify(status)));
 };
 const onChange = (fn) => listeners.add(fn);
@@ -101,7 +82,6 @@ async function download(url, expectedSize, onProgress) {
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 
 // ---------------------------------------------------------------- check
-let gameManifest = null;
 let launcherManifest = null;
 let lastCheck = 0;
 let checking = null;
@@ -120,15 +100,13 @@ function check({ force = false, quiet = false } = {}) {
   if (!force && Date.now() - lastCheck < MIN_GAP_MS && status.game.state !== 'error') return Promise.resolve(status);
   lastCheck = Date.now();
   checking = (async () => {
-    if (!quiet && !['downloading', 'installing'].includes(status.game.state)) {
+    if (!quiet) {
       status.game.state = 'checking';
       status.game.error = '';
       emit();
     }
     try {
-      const [game, launcher] = await Promise.all([fetchManifest('game-update.json'), fetchManifest('launcher-update.json')]);
-      gameManifest = game;
-      launcherManifest = launcher;
+      launcherManifest = await fetchManifest('launcher-update.json');
     } catch {
       // A failed background check keeps what the player already sees; the next poll tries again.
       if (quiet && status.game.state !== 'checking') return status;
@@ -138,7 +116,7 @@ function check({ force = false, quiet = false } = {}) {
       return status;
     }
     // A new release brings new patch notes: fetch them again next time they're asked for.
-    const versions = `${gameManifest?.version}|${launcherManifest?.version}`;
+    const versions = String(launcherManifest?.version);
     if (versions !== seenVersions) {
       seenVersions = versions;
       remoteNotes = null;
@@ -157,86 +135,14 @@ function check({ force = false, quiet = false } = {}) {
       status.launcher.state = 'up-to-date';
     }
 
-    // Game
-    const gm = gameManifest;
-    if (gm && compare(gm.version, active.version) > 0) {
-      status.game.latest = gm.version;
-      status.game.notes = gm.notes || '';
-      status.game.size = gm.size || 0;
-      if (gm.minLauncher && compare(gm.minLauncher, launcherVersion) > 0) {
-        status.game.state = 'needs-launcher';
-      } else if (status.game.state !== 'downloading') {
-        installGame(); // small and safe: start right away
-      }
-    } else if (!['updated', 'downloading', 'installing'].includes(status.game.state)) {
-      // Keep "Updated to vX" showing after a patch was installed this session.
-      status.game.state = 'up-to-date';
-      status.game.latest = active.version;
-    }
+    status.game.state = 'up-to-date';
+    status.game.latest = lm?.version || launcherVersion;
     emit();
     return status;
   })().finally(() => {
     checking = null;
   });
   return checking;
-}
-
-// ---------------------------------------------------------------- game patch
-async function installGame() {
-  const gm = gameManifest;
-  if (!gm) return;
-  status.game.state = 'downloading';
-  status.game.progress = 0;
-  status.game.error = '';
-  emit();
-  const tmp = path.join(versionsDir(), `${gm.version}.tmp`);
-  try {
-    let last = 0;
-    const buf = await download(gm.url || `depths-game-${gm.version}.pak`, gm.size, (p) => {
-      status.game.progress = p;
-      if (p - last >= 0.02 || p === 1) {
-        last = p;
-        emit();
-      }
-    });
-    if (gm.sha256 && sha256(buf) !== gm.sha256) throw new Error('The download was damaged (checksum mismatch).');
-    status.game.state = 'installing';
-    emit();
-
-    const pak = JSON.parse(zlib.gunzipSync(buf).toString('utf8'));
-    if (pak.format !== 1 || pak.version !== gm.version || !pak.files || typeof pak.files !== 'object') {
-      throw new Error('The update file is not valid.');
-    }
-    fs.rmSync(tmp, { recursive: true, force: true });
-    for (const [rel, b64] of Object.entries(pak.files)) {
-      if (!SAFE_PATH.test(rel) || rel.split('/').includes('..') || typeof b64 !== 'string') {
-        throw new Error(`The update contains an unsafe file name: ${rel}`);
-      }
-      const dest = path.join(tmp, ...rel.split('/'));
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.writeFileSync(dest, Buffer.from(b64, 'base64'));
-    }
-    if (!fs.existsSync(path.join(tmp, 'index.html'))) throw new Error('The update is missing index.html.');
-
-    // Swap in the new version, then remove older downloaded versions.
-    const finalDir = path.join(versionsDir(), gm.version);
-    fs.rmSync(finalDir, { recursive: true, force: true });
-    fs.renameSync(tmp, finalDir);
-    fs.writeFileSync(activeFile(), JSON.stringify({ version: gm.version, installedAt: new Date().toISOString() }));
-    loadActive();
-    for (const entry of fs.readdirSync(versionsDir(), { withFileTypes: true })) {
-      if (entry.isDirectory() && entry.name !== active.version) {
-        fs.rmSync(path.join(versionsDir(), entry.name), { recursive: true, force: true });
-      }
-    }
-    status.game.state = 'updated';
-    status.game.progress = 1;
-  } catch (error) {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    status.game.state = 'error';
-    status.game.error = `Update failed: ${error.message} You can still play this version.`;
-  }
-  emit();
 }
 
 // ---------------------------------------------------------------- launcher update
@@ -289,7 +195,7 @@ function installLauncher() {
 
 // ---------------------------------------------------------------- patch notes
 // Bundled with the launcher (built from CHANGELOG.md) and uploaded with every release. The newest
-// copy wins, so a game-only patch still brings its notes to launchers that are a version behind.
+// copy wins, so a launcher that is a version behind still shows the newest notes.
 const BUNDLED_NOTES = path.join(__dirname, '..', 'launcher', 'patch-notes.json');
 const VERSION_RE = /^\d+\.\d+\.\d+$/;
 
@@ -333,17 +239,11 @@ async function getPatchNotes() {
 
 module.exports = {
   getPatchNotes,
-  loadActive,
-  gameRoot,
-  gameVersion,
+  removeOldGamePatches,
   check,
   POLL_MS,
-  installGame,
   installLauncher,
   onChange,
-  getStatus: () => {
-    status.game.current = active.version;
-    return JSON.parse(JSON.stringify(status));
-  },
+  getStatus: () => JSON.parse(JSON.stringify(status)),
   releasesPage: RELEASES_PAGE,
 };

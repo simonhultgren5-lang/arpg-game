@@ -104,6 +104,18 @@ db.exec(`
   DELETE FROM saves WHERE account_id IN (SELECT account_id FROM characters);
 `);
 
+// 0.4.0: the game is the 3D game. A character's level and depth in the launcher used to follow the
+// old 2D game; take them from the 3D save instead (level 1, depth 1 for heroes not played in 3D yet).
+if (db.prepare('PRAGMA user_version').get().user_version < 1) {
+  db.exec(`
+    UPDATE characters SET
+      hero_level = COALESCE(CAST(json_extract(json_extract(data, '$.dod3d'), '$.level') AS INTEGER), 1),
+      depth = COALESCE(CAST(json_extract(json_extract(data, '$.dod3d'), '$.depth') AS INTEGER), 1)
+    WHERE data IS NULL OR json_valid(data);
+    PRAGMA user_version = 1;
+  `);
+}
+
 const q = {
   accountByName: db.prepare('SELECT * FROM accounts WHERE username = ?'),
   createAccount: db.prepare('INSERT INTO accounts (username, password_hash, created_at) VALUES (?, ?, ?)'),
@@ -257,9 +269,9 @@ function cleanSaveData(data) {
   return clean;
 }
 const intOrNull = (v) => (v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
-// The 2D game and the 3D game (godot/) share a character's save. The 3D game only writes keys that
-// start with "dod3d"; the 2D game writes everything else. Each write replaces only its own side, so
-// playing one never erases the other's progress.
+// The game (godot/) writes its progress under the "dod3d" key. Saves from the old 2D game (other
+// "dod…" keys, from launchers before 0.4.0) are kept beside it, and each write replaces only its own
+// side, so an old launcher can never erase the game's progress.
 const is3dKey = (key) => key.startsWith('dod3d');
 function writeCharacterSave(accountId, characterId, body) {
   const incoming = cleanSaveData(body.data);
@@ -276,8 +288,8 @@ function writeCharacterSave(accountId, characterId, body) {
   const merged = {};
   for (const [key, value] of Object.entries(existing)) if (is3dKey(key) !== from3d) merged[key] = value;
   for (const [key, value] of Object.entries(incoming)) if (is3dKey(key) === from3d) merged[key] = value;
-  // The launcher's level and depth follow the 2D game while 3D is a preview.
-  const meta = !from3d && body.meta && typeof body.meta === 'object' ? body.meta : {};
+  // The launcher's level and depth follow the game; old 2D saves don't change them.
+  const meta = from3d && body.meta && typeof body.meta === 'object' ? body.meta : {};
   const updatedAt = Date.now();
   const { changes } = q.putCharacterSave.run(
     JSON.stringify(merged),
