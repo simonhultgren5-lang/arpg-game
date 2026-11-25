@@ -22,13 +22,17 @@ static func build(parent: Node3D, body_mat: StandardMaterial3D, weapon: Node3D) 
 
 	# Legs: slim thighs, shin wraps, cuffed boots.
 	for side in [-1.0, 1.0]:
-		var foot := K.arm(parent, dark, Vector3(side * 0.13, 0.95, 0), 0.09, 0.07, 0.055, 0.46, 0.46,
+		var leg := Node3D.new()
+		leg.name = "LeftLeg" if side < 0 else "RightLeg"
+		leg.position = Vector3(side * 0.13, 0.95, 0)
+		parent.add_child(leg)
+		var foot := K.arm(leg, dark, Vector3.ZERO, 0.09, 0.07, 0.055, 0.46, 0.46,
 			Vector3.ZERO, 0.0)
 		K.add(foot, K.bevel_box(Vector3(0.13, 0.08, 0.28), 0.03), leather, Vector3(0, -0.005, 0.06))
-		K.add(parent, K.lathe(PackedVector2Array([
+		K.add(leg, K.lathe(PackedVector2Array([
 			Vector2(0.075, 0.28), Vector2(0.105, 0.28), Vector2(0.1, 0.46), Vector2(0.08, 0.46), Vector2(0.075, 0.28)]), 8),
-			leather, Vector3(side * 0.13, 0.0, 0.0))  # boot shaft
-		K.add(parent, K.bevel_box(Vector3(0.16, 0.05, 0.05), 0.012), strap, Vector3(side * 0.13, 0.4, 0.07))
+			leather, Vector3(0, -0.95, 0))  # boot shaft
+		K.add(leg, K.bevel_box(Vector3(0.16, 0.05, 0.05), 0.012), strap, Vector3(0, -0.55, 0.07))
 	K.add(parent, K.bevel_box(Vector3(0.46, 0.24, 0.3), 0.05), dark, Vector3(0, 0.96, 0))  # hips
 	# Layered leather jerkin: slim waist, broader chest.
 	K.add(parent, K.lathe(PackedVector2Array([

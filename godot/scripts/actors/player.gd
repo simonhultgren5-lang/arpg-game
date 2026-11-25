@@ -42,6 +42,8 @@ var _weapon: Node3D
 var _swing := 0.0
 var _hurt := 0.0
 var _body_mat: StandardMaterial3D
+var _legs: Array[Node3D] = []
+var _stride := 0.0
 var _step_t := 0.0
 
 
@@ -60,6 +62,7 @@ func setup() -> void:
 	cs.position = Vector3(0, 0.9, 0)
 	add_child(cs)
 	_build_model()
+	_legs.assign([_model.get_node("LeftLeg"), _model.get_node("RightLeg")])
 	hp = Game.max_hp()
 	mana = Game.max_mana()
 	# The hero's own light: the dark never quite closes in.
@@ -92,7 +95,12 @@ func _build_model() -> void:
 			return
 	# legs, body, head
 	for side in [-0.15, 0.15]:
-		B.box(Vector3(0.18, 0.8, 0.2), dark, Vector3(side, 0.4, 0), _model)
+		var leg := Node3D.new()
+		leg.name = "LeftLeg" if side < 0 else "RightLeg"
+		leg.position = Vector3(side, 0.8, 0)
+		_model.add_child(leg)
+		B.box(Vector3(0.18, 0.8, 0.2), dark, Vector3(0, -0.4, 0), leg)
+		B.box(Vector3(0.19, 0.13, 0.29), dark, Vector3(0, -0.73, 0.05), leg)
 	B.capsule(0.32, 1.0, _body_mat, Vector3(0, 1.15, 0), _model)
 	B.sphere(0.21, skin, Vector3(0, 1.82, 0), _model, 10)
 	B.box(Vector3(0.5, 0.08, 0.35), gold, Vector3(0, 0.88, 0), _model)  # belt
@@ -231,9 +239,13 @@ func _physics_process(delta: float) -> void:
 	global_position.y = 0.0
 	if move.length() > 0.1:
 		_face(move, 0.3)
-		_step_t += delta * 9.0
-	else:
-		_step_t = 0.0
+	var distance_moved := get_position_delta().length()
+	_stride = move_toward(_stride, clampf(distance_moved / maxf(delta * Game.move_speed(), 0.001), 0, 1), delta * 8)
+	var old_step := floori(_step_t / PI)
+	_step_t += distance_moved * 1.8
+	if floori(_step_t / PI) != old_step:
+		var foot := _legs[old_step % 2]
+		Fx.footfall(world, Vector3(foot.global_position.x, 0.035, foot.global_position.z), _model.rotation.y)
 
 
 func _auto_move(delta: float) -> Vector3:
@@ -329,7 +341,12 @@ func _animate(delta: float) -> void:
 		_:
 			_weapon.rotation.x = -0.3 - s * 1.4
 			_weapon.rotation.z = s * 0.9
-	_model.position.y = absf(sin(_step_t)) * 0.07
+	var step := sin(_step_t) * _stride
+	_legs[0].rotation.x = step * 0.48
+	_legs[1].rotation.x = -step * 0.48
+	_weapon.rotation.x += step * 0.09 * (1.0 - _swing)
+	_model.rotation.z = step * 0.028
+	_model.position.y = absf(step) * 0.065
 
 
 # ------------------------------------------------------------------ combat

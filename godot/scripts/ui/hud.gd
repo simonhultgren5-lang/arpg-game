@@ -9,6 +9,7 @@ const Items = preload("res://scripts/data/items.gd")
 
 var world: Node3D
 
+var _map := preload("res://scripts/ui/area_map.gd").new()
 var _root: Control
 var _hp_orb: Orb
 var _mana_orb: Orb
@@ -61,6 +62,9 @@ func _ready() -> void:
 	_build_pause()
 	_build_death()
 	_build_act_complete()
+	_map.world = world
+	_root.add_child(_map)
+	_map.toggle_requested.connect(toggle_map)
 	Game.message.connect(_on_message)
 	Game.quest_changed.connect(_refresh_quest)
 	Game.inventory_changed.connect(_refresh_inventory)
@@ -110,6 +114,11 @@ func _build_bottom() -> void:
 	center.size = Vector2(540, 100)
 	center.add_theme_constant_override("separation", 6)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tray := Panel.new()
+	tray.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tray.position = Vector2(128, 22)
+	tray.size = Vector2(584, 100)
+	bar.add_child(tray)
 	bar.add_child(center)
 	var xp_row := Control.new()
 	xp_row.custom_minimum_size = Vector2(540, 14)
@@ -262,13 +271,13 @@ func _build_top() -> void:
 	_help.anchor_right = 1.0
 	_help.offset_left = -330
 	_help.offset_right = -16
-	_help.offset_top = 16
+	_help.offset_top = 190
 	_help.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_help)
 	var hl := UiTheme.label(
 		"Left click  move / attack (hold to keep going)\nShift + left click  attack in place\nRight click or 1  skill · 2  skill\nQ  draught · E  talk / use · WASD  move\nI  pack and hero · Esc  menu · Wheel  zoom\nH  hide this help", 14)
 	_help.add_child(hl)
-	_help.visible = Game.is_new_hero() or Game.area == "town"
+	_help.hide()
 
 
 func _panel(width: float) -> PanelContainer:
@@ -480,7 +489,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+func toggle_map() -> void:
+	if not _map.expanded and (is_blocking() or _inventory.visible or get_tree().paused):
+		return
+	_map.set_expanded(not _map.expanded)
+	get_tree().paused = _map.expanded
+
+
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_M:
+		toggle_map()
+		get_viewport().set_input_as_handled()
+		return
+	if _map.expanded and event is InputEventKey:
+		if event.is_action_pressed("pause"):
+			toggle_map()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("pause"):
 		if _dialogue.visible:
 			close_dialogue()
@@ -500,7 +525,7 @@ func _input(event: InputEvent) -> void:
 
 
 func is_blocking() -> bool:
-	return _dialogue.visible or _pause.visible or _death.visible or _act_complete.visible
+	return _map.expanded or _dialogue.visible or _pause.visible or _death.visible or _act_complete.visible
 
 
 func _toggle_pause() -> void:

@@ -191,3 +191,18 @@ static func number(parent: Node, pos: Vector3, text: String, color: Color, big :
 	tw.tween_property(l, "position:y", l.position.y + 1.4, 0.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tw.tween_property(l, "modulate:a", 0.0, 0.8).set_delay(0.3)
 	tw.chain().tween_callback(l.queue_free)
+
+
+## A boot scuff briefly catches the light at foot contact.
+static func footfall(parent: Node3D, pos: Vector3, heading: float) -> void:
+	var mark := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(0.16, 0.32)
+	mark.mesh = plane
+	mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var dust := glow_mat(Color("#baa588"), 0.4, false)
+	mark.material_override = dust
+	parent.add_child(mark)
+	mark.global_position = pos
+	mark.rotation.y = heading
+	_fade_free(mark, dust, 0.48)

@@ -10,6 +10,12 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.1 — Survey of Hollowmere
+
+- Follow the minimap through town and the crypt. Press **M** or click the map to see the whole area, your heading, townsfolk and passages. Press **Esc** to resume.
+- The combat bar, dialogue, inventory and menus have a slate-and-brass finish. Press **H** to show the controls.
+- All three heroes take alternating steps, sway with their stride and leave fading boot scuffs.
+
 ## 0.5.0-beta.0 — Act I: Complete
 
 The bell is silent, but Hollowmere isn't finished with you. Act I now runs to its end, and the way down to Act II is open.
