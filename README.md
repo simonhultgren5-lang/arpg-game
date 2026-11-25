@@ -12,6 +12,8 @@ The story is planned in four acts ([godot/story/ACTS.md](godot/story/ACTS.md)). 
 
 ---
 
+**Developers:** [dev.md](dev.md) covers setup, everyday development, the dev tools, testing, assets and Git LFS, the build pipeline and releasing.
+
 ## Requirements
 
 - **Node.js 22 or newer** (developed on Node 24): <https://nodejs.org>
