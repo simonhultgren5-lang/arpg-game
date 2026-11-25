@@ -43,6 +43,7 @@ var _swing := 0.0
 var _hurt := 0.0
 var _body_mat: StandardMaterial3D
 var _legs: Array[Node3D] = []
+var _breath_phase := 0.0
 var _stride := 0.0
 var _step_t := 0.0
 
@@ -346,7 +347,10 @@ func _animate(delta: float) -> void:
 	_legs[1].rotation.x = -step * 0.48
 	_weapon.rotation.x += step * 0.09 * (1.0 - _swing)
 	_model.rotation.z = step * 0.028
-	_model.position.y = absf(step) * 0.065
+	_breath_phase = fmod(_breath_phase + delta * 2.1, TAU)
+	var breath := sin(_breath_phase) * (1.0 - _stride)
+	_model.position.y = absf(step) * 0.065 + breath * 0.012
+	_model.rotation.x = breath * 0.008 - s * 0.08
 
 
 # ------------------------------------------------------------------ combat

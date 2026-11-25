@@ -85,3 +85,23 @@ static func sarcophagus(parent: Node, pos: Vector3) -> Node3D:
 		for z in [-0.55, 0.55]:
 			K.add(root, K.plate(0.19, 0.29, 0.035, 0.025), brass, Vector3(side * 0.48, 0.42, z), Vector3(0, side * PI / 2, 0))
 	return root
+
+
+## Hollow casting with a flared lip and suspension crown, visible on its side in the bell pit.
+static func founders_bell(parent: Node, pos: Vector3) -> Node3D:
+	var root := _root(parent, pos)
+	var bronze := B.mat(Color("#81704d"), 0.49, Color.BLACK, 1.0, 0.66)
+	var patina := B.mat(Color("#3f655d"), 0.73, Color.BLACK, 1.0, 0.38)
+	var profile := PackedVector2Array([
+		Vector2(1.42, 0.12), Vector2(1.5, 0.06), Vector2(1.57, 0.15),
+		Vector2(1.53, 0.24), Vector2(1.32, 0.4), Vector2(1.12, 0.75),
+		Vector2(0.86, 1.6), Vector2(0.78, 1.78), Vector2(0.48, 1.91),
+		Vector2(0.08, 1.94), Vector2(0.08, 1.78), Vector2(0.66, 1.64),
+		Vector2(0.99, 0.72), Vector2(1.42, 0.12)])
+	K.add(root, K.lathe(profile, 32), bronze)
+	K.add(root, K.lathe(PackedVector2Array([Vector2(1.19, 0.60), Vector2(1.23, 0.62),
+		Vector2(1.2, 0.68), Vector2(1.15, 0.7)]), 32), patina)
+	B.cylinder(0.09, 0.1, 1.5, bronze, Vector3(0, 1.0, 0), root)
+	B.sphere(0.24, bronze, Vector3(0, 0.24, 0), root)
+	B.box(Vector3(0.34, 0.38, 0.28), patina, Vector3(0, 1.99, 0), root)
+	return root

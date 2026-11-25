@@ -81,7 +81,7 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 	var floor_color := func(c: Vector2i) -> Color:
 		var ch: String = chars[c.y][c.x]
 		var n := rng.randf()
-		if ch == ",":
+		if ch == "," or ch == "P":
 			return Color(0.13, 0.12, 0.14).lerp(Color(0.17, 0.15, 0.15), n)
 		if c.x > 21 and c.y < 8:  # graveyard earth
 			return Color(0.065, 0.075, 0.055).lerp(Color(0.09, 0.09, 0.07), n)
@@ -89,7 +89,8 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 	var level := Node3D.new()
 	level.name = "Town"
 	world.add_child(level)
-	var wall_mat := LevelMesh.build(grid, level, 3.2, Color(0.24, 0.21, 0.24), floor_color, rng)
+	var paved := func(c: Vector2i) -> bool: return chars[c.y][c.x] in [",", "P"]
+	var wall_mat := LevelMesh.build(grid, level, 3.2, Color(0.24, 0.21, 0.24), floor_color, rng, paved)
 	world.set("wall_material", wall_mat)
 
 	var done := {}
@@ -169,6 +170,14 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			var lit := rng.randf() < 0.55
 			var win_mat := B.mat(Color(0.9, 0.55, 0.25), 1.0, Color(1.0, 0.5, 0.2), 2.5) if lit else B.mat(Color(0.03, 0.03, 0.05))
 			B.box(Vector3(0.7, 0.7, 0.1), win_mat, Vector3(s.x * 0.22, 2.0, s.z * 0.5 - 0.15), node)
+			var frame_pos := Vector3(s.x * 0.22, 2.0, s.z * 0.5 - 0.06)
+			B.box(Vector3(0.08, 0.84, 0.10), timber, frame_pos, node)
+			B.box(Vector3(0.85, 0.08, 0.10), timber, frame_pos, node)
+			B.box(Vector3(1.04, 0.12, 0.35), timber, frame_pos - Vector3.UP * 0.43, node)
+			var chimney_pos := Vector3(-s.x * 0.22, wall_h + 1.9, -s.z * 0.22)
+			var brick := B.mat(Color("#493c40"))
+			B.box(Vector3(0.72, 2.25, 0.68), brick, chimney_pos, node)
+			B.box(Vector3(0.89, 0.17, 0.85), brick, chimney_pos + Vector3.UP * 1.07, node)
 			if lit:
 				B.omni(Color(1.0, 0.55, 0.25), 0.7, 4.5, Vector3(s.x * 0.22, 2.0, s.z * 0.5 + 0.6), node)
 		"C":

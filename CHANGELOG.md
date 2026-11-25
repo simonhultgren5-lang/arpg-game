@@ -10,6 +10,13 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.3 — Moon over Hollowmere
+
+- Moonlight picks out cottage chimneys and timber window frames above Hollowmere's streets.
+- Follow staggered cobbles through the town and broad, worn flagstones underground.
+- Flooded crypt chambers catch the torchlight in moving ripples. A cast bronze bell with a flared rim, aged band and hanging clapper lies in the Bell-Warden's pit.
+- Grave Crawlers lift and plant their six feet in alternating groups. Heroes breathe at rest and lean into their strikes.
+
 ## 0.5.0-beta.1 — Survey of Hollowmere
 
 - Follow the minimap through town and the crypt. Press **M** or click the map to see the whole area, your heading, townsfolk and passages. Press **Esc** to resume.

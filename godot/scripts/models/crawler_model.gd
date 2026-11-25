@@ -6,7 +6,8 @@ const K = preload("res://scripts/models/mesh_kit.gd")
 const B = preload("res://scripts/world/build.gd")
 
 
-static func build(parent: Node3D, s: float, col: Color, mat_for: Callable) -> void:
+static func build(parent: Node3D, s: float, col: Color, mat_for: Callable) -> Array[Node3D]:
+	var legs: Array[Node3D] = []
 	var skin: Material = mat_for.call(col)
 	var pale: Material = mat_for.call(col.lightened(0.18))
 	var dark: Material = mat_for.call(col.darkened(0.3))
@@ -49,6 +50,11 @@ static func build(parent: Node3D, s: float, col: Color, mat_for: Callable) -> vo
 			var hip := Vector3(side * 0.3, 0.32, z)
 			var knee := Vector3(side * 0.72, 0.5 + (0.06 if i == 1 else 0.0), z + (i - 1) * 0.18)
 			var foot := Vector3(side * 0.95, 0.0, z + (i - 1) * 0.42)
-			K.link(root, hip, knee, 0.05, 0.035, skin)
-			K.link(root, knee, foot, 0.035, 0.015, dark)
-			K.add(root, K.spike(0.03, 0.08, 4), pale, foot, Vector3(0, 0, 0))
+			var pivot := Node3D.new()
+			pivot.position = hip
+			root.add_child(pivot)
+			legs.append(pivot)
+			K.link(pivot, Vector3.ZERO, knee - hip, 0.05, 0.035, skin)
+			K.link(pivot, knee - hip, foot - hip, 0.035, 0.015, dark)
+			K.add(root, K.spike(0.03, 0.08, 4), pale, foot - hip, Vector3.ZERO)
+	return legs

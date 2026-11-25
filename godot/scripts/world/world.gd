@@ -87,8 +87,8 @@ func _build_environment() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.03, 0.025, 0.045)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.36, 0.32, 0.5) if town else Color(0.35, 0.28, 0.4)
-	env.ambient_light_energy = 0.2 if town else 0.28
+	env.ambient_light_color = Color(0.49, 0.55, 0.65) if town else Color(0.36, 0.43, 0.47)
+	env.ambient_light_energy = 0.34 if town else 0.32
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.1
 	env.glow_enabled = true
@@ -96,10 +96,10 @@ func _build_environment() -> void:
 	env.glow_bloom = 0.08
 	env.glow_hdr_threshold = 0.9
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.13, 0.11, 0.18)
+	env.fog_light_color = Color(0.19, 0.23, 0.29) if town else Color(0.09, 0.13, 0.15)
 	env.fog_density = 0.014 if town else 0.01
 	env.ssao_enabled = true
-	if town:
+	if town and RenderingServer.get_current_rendering_method() == "forward_plus":
 		env.volumetric_fog_enabled = true
 		env.volumetric_fog_density = 0.012
 		env.volumetric_fog_albedo = Color(0.32, 0.3, 0.4)
@@ -110,7 +110,7 @@ func _build_environment() -> void:
 	if town:
 		var moon := DirectionalLight3D.new()
 		moon.light_color = Color(0.55, 0.58, 0.9)
-		moon.light_energy = 0.28
+		moon.light_energy = 0.55
 		moon.shadow_enabled = true
 		moon.rotation = Vector3(deg_to_rad(-55), deg_to_rad(35), 0)
 		add_child(moon)
