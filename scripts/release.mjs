@@ -25,6 +25,8 @@ import { writePatchNotes } from './patch-notes.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
+// --channel beta|dev publishes a GitHub pre-release that only launchers on that channel install.
+const channelArg = args.includes('--channel') ? args[args.indexOf('--channel') + 1] : 'stable';
 
 const sh = (cmd, cmdArgs, opts = {}) => {
   const r = spawnSync(cmd, cmdArgs, { cwd: root, encoding: 'utf8', ...opts });
@@ -43,17 +45,23 @@ const { version } = pkg;
 const repo = pkg.desktop?.githubRepo;
 if (!repo) fail('package.json is missing desktop.githubRepo');
 const tag = `v${version}`;
+const prerelease = /-/.test(version);
+if (!['stable', 'beta', 'dev'].includes(channelArg)) fail('--channel must be beta or dev (leave it out for stable).');
+if (channelArg === 'stable' && prerelease) fail(`${version} is a pre-release version. Publish it with --channel beta or --channel dev.`);
+if (channelArg !== 'stable' && !new RegExp(`-${channelArg}\\.\\d+$`).test(version)) {
+  fail(`A ${channelArg} release needs a version like 0.4.1-${channelArg}.1. Run: bun run bump:${channelArg}`);
+}
 const download = (name) => `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(name)}`;
-console.log(`Release ${tag}${dryRun ? ' — dry run' : ''}`);
+console.log(`Release ${tag} on the ${channelArg} channel${dryRun ? ' (dry run)' : ''}`);
 
 const changelog = fs.existsSync(path.join(root, 'CHANGELOG.md')) ? fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8') : '';
-const section = changelog.split(/^## /m).find((part) => part.match(/^([\d.]+)/)?.[1] === version);
+const section = changelog.split(/^## /m).find((part) => part.match(/^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)/)?.[1] === version);
 if (!section) fail(`CHANGELOG.md has no "## ${version}" section. Add patch notes for players first.`);
 const notes = section.split('\n').slice(1).join('\n').trim();
 // "## 0.4.0 — Act I: The Tolling of Hollowmere (date)" names the release.
 const patchName = section
   .split('\n')[0]
-  .replace(/^[\d.]+\s*/, '')
+  .replace(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?\s*/, '')
   .replace(/\(\d{4}-\d{2}-\d{2}\)\s*$/, '')
   .replace(/^[—–:-]\s*/, '')
   .trim();
@@ -143,9 +151,9 @@ console.log('Publishing to GitHub…');
 const head = sh('git', ['rev-parse', 'HEAD']).out;
 const create = sh(
   'gh',
-  ['release', 'create', tag, ...uploads, '-R', repo, '--target', head, '--title', patchName ? `Depths of Darkness ${tag} — ${patchName}` : `Depths of Darkness ${tag}`, '--notes-file', notesFile, '--latest'],
+  ['release', 'create', tag, ...uploads, '-R', repo, '--target', head, '--title', patchName ? `Depths of Darkness ${tag} — ${patchName}` : `Depths of Darkness ${tag}`, '--notes-file', notesFile, ...(prerelease ? ['--prerelease'] : ['--latest'])],
   { stdio: 'inherit' },
 );
 if (!create.ok) fail('gh release create failed.');
-console.log(`\n✓ Published ${tag}. Launchers pick it up the next time they start.`);
+console.log(`\n✓ Published ${tag} on the ${channelArg} channel. Open launchers on that channel offer it within minutes.`);
 console.log(`  https://github.com/${repo}/releases/tag/${tag}`);

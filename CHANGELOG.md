@@ -18,8 +18,13 @@ The bells of St. Aldric's have started ringing on their own, and every toll brin
 - **Depths of Darkness is now a 3D game.** Walk into Hollowmere, take Sister Maud's task, descend into the Sunken Crypt and silence Hask, the Bell-Warden. The old 2D game is gone.
 - **A new launcher.** Your chosen hero stands in the chapel niche at the center, your characters line up along the bottom, and Play is one click away. Patch notes have their own **News** page, and servers and your account live under **Settings**.
 - Your characters keep their name, class and armor colour, and start their story in Hollowmere. Progress from the 2D game doesn't carry over.
+- **News from your server** in the launcher: the newest post shows next to your hero, and the **News** page has every post alongside the patch notes.
+- **Release channels:** choose **Stable**, **Beta** or **Dev** in Settings to get new versions earlier. Beta and Dev builds can have rough edges.
+- **Change your password** in Settings.
+- **Optional crash reports and usage statistics.** The launcher asks once. Reports only go to the server you play on, never to anyone else, and aren't linked to your account. Change your mind any time in Settings.
 
 ### Changes
+- Updates show their size and download speed, and you can choose to download them yourself instead of automatically.
 - The character list shows each hero's level and depth in Act I.
 - Updates now come as one download that brings the launcher and the game together.
 
@@ -27,7 +32,8 @@ The bells of St. Aldric's have started ringing on their own, and every toll brin
 - **In-game dev console** (F1 or `): god mode, levels, gold and gear, spawning monsters, jumping to the crypt or the boss. Only in builds run from source, or when the launcher starts with `--dev`.
 - **Dev tools page in the launcher** (same builds): start the game windowed or next to the boss, open the save and log folders, and test updates against a local folder.
 - **`bun run dev`** starts a local server with a test account and three heroes, then the launcher. **`bun run test`** runs every check. **`bun run dev:reset`** wipes the dev data.
-- **Server admin commands** for the Pi: list accounts and characters, reset a password, rename or delete a character, and back up or restore the database: `docker exec -it depths-server node admin.mjs`.
+- **Feature flags** set on the server (`admin.mjs flag-set`) reach the launcher and the game, for things like a double-XP weekend or a banner over the hero.
+- **Server admin commands** for the Pi: news posts, feature flags, crash reports and a usage summary, as well as listing accounts and characters, resetting a password, renaming or deleting a character, and backing up or restoring the database: `docker exec -it depths-server node admin.mjs`.
 
 ## 0.3.3 (2026-11-25)
 

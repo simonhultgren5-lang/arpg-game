@@ -18,6 +18,14 @@ contextBridge.exposeInMainWorld('launcher', {
   createCharacter: call('launcher:create-character'),
   deleteCharacter: call('launcher:delete-character'),
   getGameStatus: call('launcher:game-status'),
+  // Settings, news, feature flags, crash reports (electron/studio.cjs)
+  getSettings: call('launcher:settings'),
+  setSettings: call('launcher:set-settings'),
+  getNews: call('launcher:news'),
+  getFlags: call('launcher:flags'),
+  reportError: (report) => ipcRenderer.send('launcher:report-error', report),
+  downloadUpdate: call('launcher:download-update'),
+  changePassword: call('launcher:change-password'),
   // Dev tools (only answer when running from source or with --dev; see electron/dev-tools.cjs)
   getDevInfo: call('launcher:dev-info'),
   setDevFlags: call('launcher:dev-set-flags'),

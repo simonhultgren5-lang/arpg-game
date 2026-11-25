@@ -39,6 +39,17 @@ Press **F1** or **`** (backtick) to open the developer console. It works in buil
 
 `--dev-start crypt` or `--dev-start boss` (with `--dev`) goes there right after **Enter Hollowmere**. The console's code is `scripts/autoload/dev_console.gd`; `res://tests/dev_console_test.tscn` tests it headless.
 
+### Feature flags
+
+The launcher passes the server's feature flags in the boot file (`"flags": { "game.xp_multiplier": 2 }`). Read one with `Boot.flag("game.xp_multiplier", 1.0)`: you get the fallback when the flag isn't set, or is set to a different type. Flags the game uses:
+
+| Flag | Effect |
+| --- | --- |
+| `game.xp_multiplier` | Multiplies experience (0–10), for example `2` for a double-XP weekend |
+| `game.dev_console` | `true` turns on the F1 dev console, for testers on a server |
+
+Server owners set them with `admin.mjs flag-set` (see `game-server/README.md`).
+
 ### Smoke test
 
 Plays the slice headless for all three classes (walk, talk, crypt, fight, boss, loot, portal, quest hand-in, death, save) and exits with code 0 when every check passes:

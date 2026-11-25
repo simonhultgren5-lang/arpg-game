@@ -94,5 +94,14 @@ func _run() -> void:
 	_check(Game.area == "town", "tp town")
 	Dev.run("speed 1")
 
+	# Feature flags from the boot file
+	Boot.flags = {"game.xp_multiplier": 2}
+	Dev.run("level 1")
+	Game.add_xp(10)
+	_check(int(Game.progress["xp"]) == 20, "flag game.xp_multiplier doubles XP")
+	Boot.flags = {"game.xp_multiplier": "lots"}
+	_check(Boot.flag("game.xp_multiplier", 1.0) == 1.0, "a flag of the wrong type falls back")
+	Boot.flags = {}
+
 	print("\nDEV CONSOLE TEST %s" % ("PASSED" if _failures.is_empty() else "FAILED: " + ", ".join(_failures)))
 	get_tree().quit(0 if _failures.is_empty() else 1)

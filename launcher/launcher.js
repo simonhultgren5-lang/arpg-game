@@ -2,6 +2,9 @@
 // through window.launcher (see electron/launcher-preload.cjs).
 (() => {
   const api = window.launcher;
+  // Errors in this window become crash reports (sent only if the player agreed; see electron/studio.cjs).
+  window.addEventListener('error', (e) => api?.reportError?.({ message: e.message, stack: e.error?.stack || `${e.filename}:${e.lineno}` }));
+  window.addEventListener('unhandledrejection', (e) => api?.reportError?.({ message: String(e.reason?.message || e.reason), stack: e.reason?.stack || '' }));
   const $ = (id) => document.getElementById(id);
   const POLL_MS = 8000;
   // ---------------------------------------------------------------- Act I film
@@ -90,7 +93,7 @@
       else b.removeAttribute('aria-current');
     }
     document.body.classList.toggle('view-away', name !== 'play');
-    if (name === 'news') renderNewsView();
+    if (name === 'news') (newsTab === 'server' ? renderServerNewsPage() : renderNewsView());
     if (name === 'dev') renderDev();
   }
   for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('click', () => setView(b.dataset.view));
@@ -160,6 +163,10 @@
   let upd = null; // update status from electron/updates.cjs
   let playAction = 'play'; // 'play' | 'install-launcher' | 'open-releases'
   let gameInstalled = true; // the game export (godot/) ships with the launcher
+  let prefs = { channel: 'stable', autoDownload: true, consent: { asked: true, crashes: false, usage: false } };
+  const serverNews = {}; // serverId -> [{ id, title, body, date }]
+  const serverFlags = {}; // serverId -> { flag: value }
+  const NEWS_SEEN_KEY = 'dodServerNewsSeenV1';
   let playError = '';
 
   function readPref(key) {
@@ -316,6 +323,7 @@
 
     // Settings: account panel
     $('btnLogout').hidden = offline || !signedIn;
+    $('passwordForm').hidden = offline || !signedIn;
     if (offline) {
       $('avatar').textContent = '⌂';
       $('ownerName').textContent = 'Offline play';
@@ -637,7 +645,6 @@
     card.hidden = !latest || updateShowsNotes;
     $('btnFooterNotes').hidden = !latest;
     const unseen = Boolean(latest) && readSeen() !== latest.version;
-    $('newsDot').hidden = !unseen;
     if (!latest) return;
     $('notesNew').hidden = !unseen;
     // A named patch shows "Version x, date" above its name; an unnamed one shows its version as the title.
@@ -710,9 +717,29 @@
     renderNotesCard();
   }
 
+  let newsTab = 'server';
+  function setNewsTab(tab) {
+    newsTab = tab;
+    $('tabServerNews').setAttribute('aria-selected', String(tab === 'server'));
+    $('tabPatchNotes').setAttribute('aria-selected', String(tab === 'patch'));
+    $('serverNews').hidden = tab !== 'server';
+    $('patchNotesBody').hidden = tab !== 'patch';
+    $('notesSource').hidden = tab !== 'patch';
+    if (tab === 'server') renderServerNewsPage();
+    else renderNewsView();
+    renderServerNews();
+  }
+  $('tabServerNews').addEventListener('click', () => setNewsTab('server'));
+  $('tabPatchNotes').addEventListener('click', () => setNewsTab('patch'));
+  $('newsCard').addEventListener('click', () => {
+    setView('news');
+    setNewsTab('server');
+  });
+
   function openNotes(version) {
     newsVersion = version || null;
     setView('news');
+    setNewsTab('patch');
   }
 
   $('btnAllNotes').addEventListener('click', () => openNotes());
@@ -742,6 +769,8 @@
     if (view === 'news') renderNewsView();
   }
 
+  const mb = (bytes) => `${(Number(bytes || 0) / 1048576).toFixed(bytes > 104857600 ? 0 : 1)} MB`;
+
   function updateButton(label, onClick, ghost = false) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -754,7 +783,7 @@
   function renderUpdates() {
     if (!upd) return;
     const { game, launcher } = upd;
-    $('versionLabel').textContent = `Version ${launcher.current}`;
+    $('versionLabel').textContent = `Version ${launcher.current}${upd.channel && upd.channel !== 'stable' ? ` (${upd.channel})` : ''}`;
     $('updateState').textContent =
       {
         disabled: 'Updates are off when running from source',
@@ -790,9 +819,16 @@
       error = game.error;
       tone = 'problem';
       actions.append(updateButton('Check again', () => api.checkForUpdates()));
+    } else if (launcher.state === 'available') {
+      label = 'Update';
+      title = `Version ${launcher.latest} is ready to download`;
+      notes = launcher.notes;
+      actions.append(updateButton(launcher.size ? `Download (${mb(launcher.size)})` : 'Download', () => api.downloadUpdate()));
     } else if (launcher.state === 'downloading') {
-      label = 'Launcher update';
-      title = `Downloading launcher v${launcher.latest}`;
+      label = 'Downloading update';
+      title = launcher.total
+        ? `Version ${launcher.latest}: ${mb(launcher.received)} of ${mb(launcher.total)}${launcher.bytesPerSec ? `, ${mb(launcher.bytesPerSec)}/s` : ''}`
+        : `Downloading version ${launcher.latest}`;
       progress = launcher.progress;
     }
 
@@ -815,6 +851,8 @@
     renderUpdates();
     renderNotesCard();
     renderPlay();
+    renderFlags();
+    renderServerNews();
   }
 
   // ---------------------------------------------------------------- server status
@@ -825,8 +863,82 @@
       ? { state: 'online', info: result.info, pingMs: result.pingMs, account: result.account }
       : { state: 'offline', info: null, account: null };
     if (result.account) applyAccountCharacters(serverId, result.account);
+    if (result.online && serverId === state.selectedServerId) loadServerExtras(serverId);
     if (result.sessionExpired) state = await api.getState();
   }
+  // News posts and feature flags of the selected server (admin.mjs news-post / flag-set).
+  let extrasAt = 0;
+  async function loadServerExtras(serverId, force = false) {
+    if (!force && Date.now() - extrasAt < 30e3) return;
+    extrasAt = Date.now();
+    const [news, flags] = await Promise.all([api.getNews?.(serverId) || [], api.getFlags?.(serverId) || {}]);
+    serverNews[serverId] = Array.isArray(news) ? news : [];
+    serverFlags[serverId] = flags && typeof flags === 'object' ? flags : {};
+    renderServerNews();
+    renderFlags();
+  }
+  const newsSeen = () => {
+    try {
+      return Number(localStorage.getItem(NEWS_SEEN_KEY) || 0);
+    } catch {
+      return 0;
+    }
+  };
+  function renderServerNews() {
+    const server = selected();
+    const list = (server && serverNews[server.id]) || [];
+    const newest = list[0];
+    const unseen = Boolean(newest) && newest.date > newsSeen();
+    $('newsCard').hidden = !newest;
+    if (newest) {
+      $('newsCardFrom').textContent = `News from ${statusOf(server.id).info?.name || server.name}`;
+      $('newsCardNew').hidden = !unseen;
+      $('newsCardTitle').textContent = newest.title;
+      $('newsCardText').textContent = newest.body;
+    }
+    const patchUnseen = patchNotes.versions[0] && readSeen() !== patchNotes.versions[0].version;
+    $('newsDot').hidden = !(unseen || patchUnseen);
+    if (view === 'news' && newsTab === 'server') renderServerNewsPage();
+  }
+  function renderServerNewsPage() {
+    const server = selected();
+    const list = (server && serverNews[server.id]) || [];
+    const ol = $('serverNewsList');
+    ol.textContent = '';
+    $('serverNewsEmpty').textContent = !server
+      ? 'Choose a server in Settings to see its news.'
+      : list.length
+        ? ''
+        : `${statusOf(server.id).info?.name || server.name} hasn't posted any news yet.`;
+    for (const n of list) {
+      const li = document.createElement('li');
+      const meta = document.createElement('p');
+      meta.className = 'news-meta';
+      meta.textContent = new Date(n.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+      const h = document.createElement('h2');
+      h.textContent = n.title;
+      const body = document.createElement('p');
+      body.textContent = n.body;
+      li.append(meta, h, body);
+      ol.append(li);
+    }
+    if (list[0]) {
+      try {
+        localStorage.setItem(NEWS_SEEN_KEY, String(list[0].date));
+      } catch {
+        // stays unseen
+      }
+    }
+  }
+  // Flags the launcher itself uses: launcher.banner (text shown above the hero).
+  function renderFlags() {
+    const server = selected();
+    const flags = (mode === 'online' && server && serverFlags[server.id]) || {};
+    const banner = typeof flags['launcher.banner'] === 'string' ? flags['launcher.banner'].slice(0, 140) : '';
+    $('flagBanner').hidden = !banner;
+    $('flagBanner').textContent = banner;
+  }
+
   function applyAccountCharacters(serverId, account) {
     const scope = { key: `server:${serverId}`, serverId };
     if (Array.isArray(account.characters)) setRoster(scope, account);
@@ -844,6 +956,7 @@
 
   async function selectServer(id) {
     state = await api.selectServer(id);
+    extrasAt = 0;
     clearAuthError();
     render();
     await check(id);
@@ -987,6 +1100,74 @@
     });
   }
   $('btnChangeServer').addEventListener('click', () => setView('settings'));
+
+  // ---------------------------------------------------------------- settings: channel, downloads, privacy
+  const CHANNEL_NOTES = {
+    stable: 'Tested releases. Recommended for everyone.',
+    beta: 'Pre-releases of the next version. They can have rough edges. Switching back to Stable waits until Stable passes your version.',
+    dev: 'Every build as soon as it is published. Expect bugs.',
+  };
+  function renderPrefs() {
+    $('channelSelect').value = prefs.channel;
+    $('channelNote').textContent = CHANNEL_NOTES[prefs.channel];
+    $('autoDownload').checked = prefs.autoDownload;
+    $('consentCrashes').checked = prefs.consent.crashes;
+    $('consentUsage').checked = prefs.consent.usage;
+    $('privacyNote').textContent = prefs.consent.crashes || prefs.consent.usage ? '' : 'Nothing is sent right now.';
+  }
+  async function savePrefs(change) {
+    prefs = await api.setSettings(change);
+    renderPrefs();
+    if (change.channel) {
+      extrasAt = 0;
+      const server = selected();
+      if (server) loadServerExtras(server.id, true);
+      loadPatchNotes();
+    }
+  }
+  $('channelSelect').addEventListener('change', () => savePrefs({ channel: $('channelSelect').value }));
+  $('autoDownload').addEventListener('change', () => savePrefs({ autoDownload: $('autoDownload').checked }));
+  for (const id of ['consentCrashes', 'consentUsage']) {
+    $(id).addEventListener('change', () => savePrefs({ consent: { crashes: $('consentCrashes').checked, usage: $('consentUsage').checked } }));
+  }
+  // First launch: ask once.
+  function askConsent() {
+    $('consentAskCrashes').checked = false;
+    $('consentAskUsage').checked = false;
+    $('consentPanel').hidden = false;
+    $('consentAskCrashes').focus();
+  }
+  $('consentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await savePrefs({ consent: { crashes: $('consentAskCrashes').checked, usage: $('consentAskUsage').checked } });
+    $('consentPanel').hidden = true;
+  });
+  $('btnConsentNone').addEventListener('click', async () => {
+    await savePrefs({ consent: { crashes: false, usage: false } });
+    $('consentPanel').hidden = true;
+  });
+
+  // ---------------------------------------------------------------- settings: change password
+  $('passwordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const server = selected();
+    $('passwordError').hidden = true;
+    $('passwordOk').hidden = true;
+    if (form.next.value.length < 6) {
+      $('passwordError').textContent = 'The new password must be at least 6 characters.';
+      $('passwordError').hidden = false;
+      return;
+    }
+    const result = await api.changePassword(server.id, form.current.value, form.next.value);
+    if (result?.error) {
+      $('passwordError').textContent = result.error;
+      $('passwordError').hidden = false;
+      return;
+    }
+    form.reset();
+    $('passwordOk').hidden = false;
+  });
   $('btnCheckUpdates').addEventListener('click', () => api.checkForUpdates());
   async function loadOfflineCharacters() {
     const scope = { key: 'offline', offline: true };
@@ -1290,6 +1471,9 @@
     await refreshDev();
     $('navDev').hidden = !dev?.enabled;
     setAuthMode('login');
+    prefs = (await api.getSettings?.()) || prefs;
+    renderPrefs();
+    if (!prefs.consent.asked) askConsent();
     gameInstalled = Boolean((await api.getGameStatus())?.installed);
     api.onGameClosed(() => {
       // Back from the game: refresh the character list (levels may have changed).

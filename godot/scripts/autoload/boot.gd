@@ -24,11 +24,20 @@ var boot_error := ""
 var dev_mode := false
 ## --dev-start crypt|boss: go straight there after entering the world (dev mode only).
 var dev_start := ""
+## Feature flags from the game server (admin.mjs flag-set), handed over in the boot file.
+## Read them with Boot.flag("game.xp_multiplier", 1.0).
+var flags: Dictionary = {}
 
 
 func _ready() -> void:
 	_setup_input()
 	_read_boot()
+	# One line for crash reports: what was running.
+	print("[boot] Depths of Darkness %s · %s · %s · %d flags%s" % [
+		ProjectSettings.get_setting("application/config/version", "?"),
+		character.get("heroClass", "no hero") if not character.is_empty() else "no hero",
+		"online" if is_online() else "offline", flags.size(), " · dev" if dev_mode else "",
+	])
 
 
 func is_online() -> bool:
@@ -87,6 +96,13 @@ func _read_boot() -> void:
 		if opts.has(key):
 			data[map[key]] = opts[key]
 
+	if data.get("flags") is Dictionary:
+		flags = data["flags"]
+	# A server can let its testers use the dev console.
+	if flag("game.dev_console", false) == true:
+		dev_mode = true
+		dev_start = str(opts.get("dev-start", ""))
+
 	if data.has("id") and str(data["id"]) != "":
 		character = _clean_character(data)
 		from_launcher = true
@@ -94,6 +110,16 @@ func _read_boot() -> void:
 		token = str(data.get("token", "")).strip_edges()
 		if server_url != "" and not server_url.begins_with("http"):
 			server_url = "http://" + server_url
+
+
+## A feature flag's value, or `fallback` when the server didn't set it (or set it to another type).
+func flag(name: String, fallback = null):
+	if not flags.has(name):
+		return fallback
+	var v = flags[name]
+	if fallback != null and typeof(v) != typeof(fallback) and not (typeof(fallback) == TYPE_FLOAT and typeof(v) == TYPE_INT):
+		return fallback
+	return v
 
 
 func _all_args() -> PackedStringArray:

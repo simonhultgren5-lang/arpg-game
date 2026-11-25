@@ -158,3 +158,54 @@ describe('admin CLI', () => {
     assert.match(r.stderr, /Stop the server/);
   });
 });
+
+describe('news, flags, crash reports, telemetry', () => {
+  test('news posted with admin shows per channel', async () => {
+    assert.equal(admin('news-post', 'Maintenance', 'Down Friday.').status, 0);
+    assert.equal(admin('news-post', 'Beta test', 'Try the new crypt.', '--channel', 'beta').status, 0);
+    const stable = (await call('GET', '/api/news')).body.news.map((n) => n.title);
+    const beta = (await call('GET', '/api/news?channel=beta')).body.news.map((n) => n.title);
+    assert.deepEqual(stable, ['Maintenance']);
+    assert.ok(beta.includes('Beta test') && beta.includes('Maintenance'));
+  });
+  test('flags: channel values win, values are typed', async () => {
+    assert.equal(admin('flag-set', 'game.xp_multiplier', '2').status, 0);
+    assert.equal(admin('flag-set', 'game.xp_multiplier', '3', '--channel', 'beta').status, 0);
+    assert.equal(admin('flag-set', 'launcher.banner', 'Double XP weekend', '--note', 'event').status, 0);
+    assert.deepEqual((await call('GET', '/api/flags')).body.flags, { 'game.xp_multiplier': 2, 'launcher.banner': 'Double XP weekend' });
+    assert.equal((await call('GET', '/api/flags?channel=beta')).body.flags['game.xp_multiplier'], 3);
+    assert.equal(admin('flag-unset', 'launcher.banner').status, 0);
+    assert.equal((await call('GET', '/api/flags')).body.flags['launcher.banner'], undefined);
+    assert.notEqual(admin('flag-set', 'Bad Key', '1').status, 0);
+  });
+  test('crash reports are stored and readable with admin', async () => {
+    const r = await call('POST', '/api/crash', null, { source: 'game', version: '0.4.0', channel: 'stable', message: 'Game exited with code 3', detail: 'log tail' });
+    assert.equal(r.status, 200);
+    assert.equal((await call('POST', '/api/crash', null, { source: 'game' })).status, 400);
+    const list = admin('crashes');
+    assert.match(list.stdout, /Game exited with code 3/);
+    const id = list.stdout.match(/^(\d+)\s/m)[1];
+    assert.match(admin('crash', id).stdout, /log tail/);
+  });
+  test('telemetry is stored and summarised; bad event names are dropped', async () => {
+    const r = await call('POST', '/api/telemetry', null, {
+      installId: 'abc', version: '0.4.0', channel: 'stable',
+      events: [{ event: 'game.start', props: { heroClass: 'rogue' } }, { event: 'game.exit', props: { minutes: 12 } }, { event: 'DROP TABLE' }],
+    });
+    assert.equal(r.status, 200);
+    const t = admin('telemetry');
+    assert.equal(t.status, 0, t.stderr);
+    assert.match(t.stdout, /game sessions\s+1 \(avg 12\.0 min\)/);
+    assert.match(t.stdout, /rogue/);
+    assert.doesNotMatch(t.stdout, /DROP/);
+  });
+  test('change password signs other sessions out', async () => {
+    await call('POST', '/api/auth/register', null, { username: 'carol', password: 'secret1' });
+    const a = (await call('POST', '/api/auth/login', null, { username: 'carol', password: 'secret1' })).body.token;
+    const b = (await call('POST', '/api/auth/login', null, { username: 'carol', password: 'secret1' })).body.token;
+    assert.equal((await call('POST', '/api/auth/password', a, { current: 'nope', password: 'newpass1' })).status, 401);
+    assert.equal((await call('POST', '/api/auth/password', a, { current: 'secret1', password: 'newpass1' })).status, 200);
+    assert.equal((await call('GET', '/api/auth/me', a)).status, 200);
+    assert.equal((await call('GET', '/api/auth/me', b)).status, 401);
+  });
+});

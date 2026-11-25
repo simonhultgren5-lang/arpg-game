@@ -41,6 +41,15 @@ const COMMANDS = {
   'delete-account': ['<username> --yes', 'Delete an account, its characters and its progress'],
   'sign-out': ['<username>', 'End all login sessions of an account'],
   stats: ['', 'Counts and database size'],
+  news: ['', 'List news posts shown in the launcher'],
+  'news-post': ['<title> <text> [--channel beta|dev]', 'Post news to every launcher (or one channel)'],
+  'news-delete': ['<id> --yes', 'Delete a news post'],
+  flags: ['', 'List feature flags'],
+  'flag-set': ['<key> <value> [--channel beta|dev] [--note text]', 'Set a flag (value: true, false, a number or text)'],
+  'flag-unset': ['<key> [--channel beta|dev]', 'Remove a flag'],
+  crashes: ['[count]', 'Newest crash reports (default 20)'],
+  crash: ['<id>', 'One crash report with its stack trace or game log'],
+  telemetry: ['[days]', 'Usage summary for the last days (default 7)'],
   backup: ['[file]', 'Copy the database to a file (default: data/backups/depths-<date>.db)'],
   restore: ['<file> --yes', 'Replace the database with a backup (stop the server first)'],
 };
@@ -224,10 +233,132 @@ const run = {
   },
 };
 
+// ---------------------------------------------------------------- news, flags, crashes, telemetry
+const CHANNELS = ['beta', 'dev'];
+function channelOption() {
+  if (!options.channel) return '';
+  if (!CHANNELS.includes(options.channel)) fail('--channel must be beta or dev (leave it out for everyone).');
+  return options.channel;
+}
+function needTable(db, name) {
+  const ok = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+  if (!ok) fail('This database has no news, flags or reports yet. Start the 0.4.0 server once to add them.');
+}
+Object.assign(run, {
+  news() {
+    const db = openDb();
+    needTable(db, 'news');
+    const rows = db.prepare('SELECT id, title, channel, created_at FROM news ORDER BY created_at DESC').all()
+      .map((r) => ({ ...r, channel: r.channel || 'everyone', posted: date(r.created_at) }));
+    table(rows, [['id', 'Id'], ['posted', 'Posted'], ['channel', 'For'], ['title', 'Title']]);
+  },
+  'news-post'(title, body) {
+    const db = openDb();
+    needTable(db, 'news');
+    if (!title || !body) fail('Give a title and the text, each in quotes: news-post "Server maintenance" "Down Friday 20:00 for an hour."');
+    const channel = channelOption();
+    const { lastInsertRowid } = db.prepare('INSERT INTO news (title, body, channel, created_at) VALUES (?, ?, ?, ?)')
+      .run(title.slice(0, 120), body.slice(0, 4000), channel, Date.now());
+    console.log(`Posted news #${lastInsertRowid}${channel ? ` for the ${channel} channel` : ''}. Launchers show it within a minute.`);
+  },
+  'news-delete'(id) {
+    const db = openDb();
+    needTable(db, 'news');
+    const row = db.prepare('SELECT * FROM news WHERE id = ?').get(Number(id));
+    if (!row) fail(`No news post #${id}.`);
+    if (!flags.yes) fail(`This deletes "${row.title}". Add --yes to confirm.`);
+    db.prepare('DELETE FROM news WHERE id = ?').run(row.id);
+    console.log(`Deleted "${row.title}".`);
+  },
+  flags() {
+    const db = openDb();
+    needTable(db, 'flags');
+    const rows = db.prepare('SELECT key, channel, value, note, updated_at FROM flags ORDER BY key, channel').all()
+      .map((r) => ({ ...r, channel: r.channel || 'everyone', changed: date(r.updated_at), note: r.note || '' }));
+    table(rows, [['key', 'Flag'], ['channel', 'For'], ['value', 'Value'], ['changed', 'Changed'], ['note', 'Note']]);
+  },
+  'flag-set'(key, value) {
+    const db = openDb();
+    needTable(db, 'flags');
+    if (!key || !/^[a-z][a-z0-9_.]{1,60}$/.test(key)) fail('Flag names use lowercase letters, digits, _ and dots, like game.xp_multiplier.');
+    if (value === undefined) fail('Give a value: true, false, a number or text.');
+    let parsed;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      parsed = value; // plain text
+    }
+    const channel = channelOption();
+    db.prepare(`INSERT INTO flags (key, channel, value, note, updated_at) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(key, channel) DO UPDATE SET value = excluded.value, note = COALESCE(excluded.note, flags.note),
+                updated_at = excluded.updated_at`)
+      .run(key, channel, JSON.stringify(parsed), options.note || null, Date.now());
+    console.log(`${key} = ${JSON.stringify(parsed)}${channel ? ` on ${channel}` : ''}. Applies the next time players press Play.`);
+  },
+  'flag-unset'(key) {
+    const db = openDb();
+    needTable(db, 'flags');
+    const channel = channelOption();
+    const { changes } = db.prepare('DELETE FROM flags WHERE key = ? AND channel = ?').run(String(key), channel);
+    if (!changes) fail(`No flag ${key}${channel ? ` on ${channel}` : ''}.`);
+    console.log(`Removed ${key}${channel ? ` on ${channel}` : ''}.`);
+  },
+  crashes(count = '20') {
+    const db = openDb();
+    needTable(db, 'crashes');
+    const rows = db.prepare('SELECT id, at, source, version, channel, message FROM crashes ORDER BY at DESC LIMIT ?')
+      .all(Math.max(1, Math.min(500, Number(count) || 20)))
+      .map((r) => ({ ...r, when: date(r.at), message: r.message.length > 70 ? `${r.message.slice(0, 69)}…` : r.message }));
+    table(rows, [['id', 'Id'], ['when', 'When'], ['source', 'From'], ['version', 'Version'], ['channel', 'Channel'], ['message', 'Message']]);
+    if (rows.length) console.log('\nDetails: node admin.mjs crash <id>');
+  },
+  crash(id) {
+    const db = openDb();
+    needTable(db, 'crashes');
+    const r = db.prepare('SELECT * FROM crashes WHERE id = ?').get(Number(id));
+    if (!r) fail(`No crash report #${id}.`);
+    console.log(`Crash #${r.id}, ${date(r.at)}, ${r.source} ${r.version || ''} (${r.channel || '?'}) on ${r.platform || '?'}`);
+    console.log(`Install ${r.install_id || '?'}\n\n${r.message}\n`);
+    if (r.detail) console.log(r.detail);
+  },
+  telemetry(days = '7') {
+    const db = openDb();
+    needTable(db, 'telemetry');
+    const since = Date.now() - Math.max(1, Number(days) || 7) * 864e5;
+    const one = (sql, ...p) => db.prepare(sql).get(since, ...p);
+    console.log(`Last ${Math.max(1, Number(days) || 7)} days\n`);
+    console.log(`${'installs'.padEnd(20)} ${one('SELECT COUNT(DISTINCT install_id) AS n FROM telemetry WHERE at > ?').n}`);
+    const sessions = one("SELECT COUNT(*) AS n, AVG(CAST(json_extract(props, '$.minutes') AS REAL)) AS avg FROM telemetry WHERE at > ? AND event = 'game.exit'");
+    console.log(`${'game sessions'.padEnd(20)} ${sessions.n}${sessions.avg ? ` (avg ${sessions.avg.toFixed(1)} min)` : ''}`);
+    console.log(`${'crashes'.padEnd(20)} ${db.prepare('SELECT COUNT(*) AS n FROM crashes WHERE at > ?').get(since).n}\n`);
+    const events = db.prepare('SELECT event, COUNT(*) AS count FROM telemetry WHERE at > ? GROUP BY event ORDER BY count DESC').all(since);
+    table(events, [['event', 'Event'], ['count', 'Count']]);
+    const classes = db.prepare("SELECT json_extract(props, '$.heroClass') AS class, COUNT(*) AS plays FROM telemetry WHERE at > ? AND event = 'game.start' GROUP BY class ORDER BY plays DESC").all(since);
+    if (classes.length) {
+      console.log('');
+      table(classes, [['class', 'Class'], ['plays', 'Plays']]);
+    }
+    const versions = db.prepare('SELECT version, channel, COUNT(DISTINCT install_id) AS installs FROM telemetry WHERE at > ? GROUP BY version, channel ORDER BY installs DESC').all(since);
+    if (versions.length) {
+      console.log('');
+      table(versions, [['version', 'Version'], ['channel', 'Channel'], ['installs', 'Installs']]);
+    }
+  },
+});
+
 // ---------------------------------------------------------------- main
 const argv = process.argv.slice(2);
 const flags = { yes: argv.includes('--yes') || argv.includes('-y') };
-const [command, ...args] = argv.filter((a) => a !== '--yes' && a !== '-y');
+// --channel <name> and --note <text> take a value.
+const options = {};
+const rest = [];
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (a === '--yes' || a === '-y') continue;
+  if ((a === '--channel' || a === '--note') && i + 1 < argv.length) options[a.slice(2)] = argv[++i];
+  else rest.push(a);
+}
+const [command, ...args] = rest;
 if (!command || command === 'help' || command === '--help' || !run[command]) {
   if (command && !run[command] && command !== 'help' && command !== '--help') console.error(`Unknown command: ${command}\n`);
   usage();

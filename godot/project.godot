@@ -16,6 +16,8 @@ boot_splash/image="res://art/splash.png"
 boot_splash/fullsize=false
 boot_splash/use_filter=true
 config/icon="res://icon.svg"
+; Write each log line to the log file right away, so a crash report has the end of the log.
+run/flush_stdout_on_print=true
 
 [autoload]
 

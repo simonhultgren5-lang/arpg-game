@@ -48,15 +48,40 @@ The launcher has four pages in its top bar: **Play**, **News**, **Settings** and
   - **Online / Offline** (top right) switches between your characters on the selected server and characters stored on this PC only (also up to 5).
   - **Play** hides the launcher and starts the game with that character. The game loads and saves the hero's progress on the server (see [godot/README.md](godot/README.md), "Launcher contract"). When the game closes, the launcher comes back with the character list refreshed.
   - The left side shows the newest patch (its name, with a **New** badge until you've read it), update progress and the server's message. The right side shows the server you play on and the **Act I film**, which also loops behind the launcher.
-- **News:** every version's patch notes.
-- **Settings:** the server list, with a live online/offline dot, ping and server version for each. **+** adds a server by address (`192.168.1.50` or `my-pi.local:4100`; port 4100 is assumed). Hover a server and press ✕ to remove it. When a newer server is released, it shows **Server update available**. Also your account (log out) and updates (version, check now).
+- **News:** posts from the server you play on (the server owner writes them with `admin.mjs news-post`), and every version's patch notes. The newest server post also shows on the Play page, and **News** gets a dot while something is unread.
+- **Settings:**
+  - **Servers:** the list, with a live online/offline dot, ping and server version for each. **+** adds a server by address (`192.168.1.50` or `my-pi.local:4100`; port 4100 is assumed). Hover a server and press ✕ to remove it. When a newer server is released, it shows **Server update available**.
+  - **Account:** log out, and change your password (this signs out your other devices).
+  - **Updates:** the version, the **release channel** (see below), and whether updates download by themselves. With automatic downloads off, the Play page offers **Download (size)**. Downloads show their size and speed.
+  - **Privacy:** crash reports and usage statistics, each off until the player turns it on. The launcher asks once on first launch.
 - **Dev tools** (see [Developing](#developing)).
 
 The app icon and logo come from `launcher/assets/emblem.svg` (the game has its own copy in `godot/art/`). After changing it, run `bun run icons` to regenerate `launcher/assets/icon.ico` and `icon.png`.
 
+### Release channels
+
+Players pick a channel in **Settings → Updates**:
+
+| Channel | Gets | Published with |
+| --- | --- | --- |
+| Stable | Normal releases | `bun run release` |
+| Beta | Stable releases and `-beta.N` pre-releases | `bun run bump:beta`, then `bun run release -- --channel beta` |
+| Dev | Stable, beta and `-dev.N` pre-releases | `bun run bump:dev`, then `bun run release -- --channel dev` |
+
+Pre-releases are GitHub pre-releases, so `releases/latest` (what Stable reads) never points at them. A launcher always moves to the highest version its channel allows; switching back from Beta to Stable waits until a stable release passes the installed version. A pre-release needs its own changelog section, like `## 0.4.1-beta.1`. Stable launchers hide beta and dev patch notes.
+
+### Crash reports, usage statistics and feature flags
+
+All three go through the game server the player has selected; nothing goes to a third party.
+
+- **Crash reports** (only with the player's consent): errors in the launcher, and the game closing with an error code. A game crash includes the end of the game's log. Paths have the Windows user folder replaced with `~`, and login tokens are hidden. Read them on the server with `admin.mjs crashes` and `admin.mjs crash <id>`.
+- **Usage statistics** (only with consent): launcher opened, game started (class, online or offline), and game closed (minutes played, exit code), with the version, channel and a random install id. No account, name or chat. `admin.mjs telemetry` summarizes them, and the server deletes them after 90 days.
+- Reports made while no server is reachable wait in `report-queue.json` in the launcher's data folder (at most 100) and are sent later. Turning consent off drops the queue.
+- **Feature flags** need no consent: the launcher fetches them from the server (`admin.mjs flag-set`) and passes them to the game in its boot file. Flags can differ per channel. Built in: `launcher.banner` (text shown above the hero), `game.xp_multiplier` (for example `2` for a double-XP weekend) and `game.dev_console` (`true` opens the F1 console to everyone on that server, for testers). The game reads any flag with `Boot.flag("name", default)`.
+
 **Where things are stored on the PC:**
 
-- The launcher's server list and logins (`launcher.json`) and offline characters (`offline-characters.json`) are in `%APPDATA%\Depths of Darkness\`. Running the launcher from source uses `%APPDATA%\Depths of Darkness (dev)\` instead.
+- The launcher's server list and logins (`launcher.json`), offline characters (`offline-characters.json`), settings (`settings.json`: channel, downloads, privacy choices, install id) and queued reports (`report-queue.json`) are in `%APPDATA%\Depths of Darkness\`. Running the launcher from source uses `%APPDATA%\Depths of Darkness (dev)\` instead.
 - The game's saves are in `%APPDATA%\Godot\app_userdata\Depths of Darkness\saves\`: `<id>.json` for an offline hero, and `online-<server>-<id>.json` as a local copy of an online hero.
 
 ## Building the `.exe`
