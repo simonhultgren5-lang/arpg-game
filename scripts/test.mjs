@@ -47,6 +47,7 @@ else {
     for (const [name, scene, marker] of [
       ['Godot smoke test (Act I, every class)', 'res://tests/smoke_test.tscn', 'SMOKE TEST PASSED'],
       ['Godot dev console test', 'res://tests/dev_console_test.tscn', 'DEV CONSOLE TEST PASSED'],
+      ['Godot asset test (models, clips, textures)', 'res://tests/asset_test.tscn', 'ASSET TEST PASSED'],
     ]) {
       console.log(`\n${name}…`);
       // A script error leaves headless Godot running, so give each test a time limit.

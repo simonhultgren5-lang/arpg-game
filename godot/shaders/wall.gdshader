@@ -6,6 +6,12 @@ uniform vec4 albedo_top : source_color = vec4(0.10, 0.08, 0.11, 1.0);
 uniform vec3 player_pos = vec3(0.0);
 uniform float cut_radius = 4.0;
 uniform float cut_enabled = 1.0;
+// Ashlar texture set (scripts/assets/blender/materials.py); one repeat covers `stone_size` metres.
+uniform sampler2D stone_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D stone_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D stone_roughness : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float stone_size = 2.4;
+uniform float use_texture = 0.0;
 
 varying vec3 wpos;
 varying vec3 wnormal;
@@ -36,6 +42,16 @@ void fragment() {
 	if (wnormal.y > 0.7) {
 		col = albedo_top.rgb;
 	}
+	if (use_texture > 0.5) {
+		// Walls run along X or Z, so X+Z walks along every face; Y goes up the wall.
+		vec2 uv = vec2(wpos.x + wpos.z, -wpos.y) / stone_size;
+		col = texture(stone_albedo, uv).rgb * albedo.rgb * 3.2;
+		NORMAL_MAP = texture(stone_normal, uv).rgb;
+		NORMAL_MAP_DEPTH = 1.4;
+		if (wnormal.y > 0.7) {
+			col = albedo_top.rgb;
+		}
+	}
 	ALBEDO = col;
-	ROUGHNESS = 0.92;
+	ROUGHNESS = use_texture > 0.5 ? texture(stone_roughness, vec2(wpos.x + wpos.z, -wpos.y) / stone_size).r : 0.92;
 }

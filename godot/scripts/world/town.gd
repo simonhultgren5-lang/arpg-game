@@ -246,6 +246,12 @@ func _gate(world: Node3D, level: Node3D, rect: Rect2i) -> void:
 
 
 func _grave(level: Node3D, p: Vector3, rng: RandomNumberGenerator) -> void:
+	# The Blender gravestones (three kinds), turned a little; code-built stones if they're missing.
+	var kind: String = ["gravestone_round", "gravestone_cross", "gravestone_slab"][rng.randi() % 3]
+	var modelled := preload("res://scripts/models/props_model.gd").asset(level, kind, p + Vector3(rng.randf_range(-0.2, 0.2), 0, rng.randf_range(-0.2, 0.2) - 0.4))
+	if modelled:
+		modelled.rotation.y = rng.randf_range(-0.25, 0.25)  # the carved face looks toward the camera (+Z)
+		return
 	var stone := B.mat(Color(0.3, 0.29, 0.3).lerp(Color(0.2, 0.2, 0.22), rng.randf()))
 	var g := Node3D.new()
 	g.position = p + Vector3(rng.randf_range(-0.3, 0.3), 0, rng.randf_range(-0.3, 0.3))
@@ -274,6 +280,16 @@ func _tree(level: Node3D, p: Vector3, rng: RandomNumberGenerator) -> void:
 
 
 func _lamp(level: Node3D, p: Vector3) -> void:
+	var post := preload("res://scripts/models/props_model.gd").asset(level, "lamp_post", p)
+	if post:
+		# The lantern hangs 0.52 m out at 2.2 m; it gets the same flickering light as a torch.
+		var glow := Node3D.new()
+		glow.position = p + Vector3(0.52, 2.2, 0)
+		var light := B.omni(Color(1.0, 0.68, 0.36), 1.8, 10.0, Vector3.ZERO, glow)
+		glow.set_meta("light", light)
+		glow.set_script(preload("res://scripts/world/flicker.gd"))
+		level.add_child(glow)
+		return
 	var iron := B.mat(Color(0.07, 0.06, 0.07), 0.6, Color.BLACK, 1.0, 0.6)
 	B.cylinder(0.08, 0.12, 3.2, iron, p + Vector3(0, 1.6, 0), level, 6)
 	B.box(Vector3(0.7, 0.08, 0.08), iron, p + Vector3(0.3, 3.1, 0), level)

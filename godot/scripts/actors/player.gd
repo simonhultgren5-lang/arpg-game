@@ -5,6 +5,7 @@ extends CharacterBody3D
 
 const B = preload("res://scripts/world/build.gd")
 const WarriorModel = preload("res://scripts/models/warrior_model.gd")
+const AssetModels = preload("res://scripts/models/asset_models.gd")
 const RogueModel = preload("res://scripts/models/rogue_model.gd")
 const MageModel = preload("res://scripts/models/mage_model.gd")
 const Fx = preload("res://scripts/world/fx.gd")
@@ -43,6 +44,8 @@ var _swing := 0.0
 var _hurt := 0.0
 var _body_mat: StandardMaterial3D
 var _legs: Array[Node3D] = []
+## The Blender model's animator (assets/models/characters/<class>.gltf), or null for code models.
+var _anim: Node = null
 var _breath_phase := 0.0
 var _stride := 0.0
 var _step_t := 0.0
@@ -84,6 +87,20 @@ func _build_model() -> void:
 	_weapon = Node3D.new()
 	_weapon.position = Vector3(0.38, 1.25, 0.05)
 	_model.add_child(_weapon)
+	# The Blender model, when there is one: tint_* surfaces take the hero's armour colour.
+	var asset := AssetModels.character(Game.hero_class)
+	if asset:
+		_model.add_child(asset)
+		var mats := AssetModels.prepare(asset, armor_color)
+		if not mats.is_empty():
+			_body_mat = mats[0]
+		_anim = AssetModels.animate(asset)
+		for side in [-0.11, 0.11]:  # where footfalls land
+			var leg := Node3D.new()
+			leg.name = "LeftLeg" if side > 0 else "RightLeg"
+			leg.position = Vector3(side, 0.8, 0)
+			_model.add_child(leg)
+		return
 	match Game.hero_class:
 		"warrior":
 			WarriorModel.build(_model, _body_mat, _weapon)
@@ -332,6 +349,10 @@ func facing() -> Vector3:
 
 func _animate(delta: float) -> void:
 	_swing = maxf(0.0, _swing - delta * 5.0)
+	if _anim:
+		_anim.update(delta, _stride)
+		_breath_phase = fmod(_breath_phase + delta * 2.1, TAU)
+		return
 	var s := sin((1.0 - _swing) * PI) if _swing > 0.0 else 0.0
 	match Game.hero_class:
 		"warrior":
@@ -372,6 +393,8 @@ func roll_damage(mult: float) -> Array:
 func _basic_attack(at: Vector3) -> void:
 	var basic: Dictionary = cls["basic"]
 	attack_cd = basic["cooldown"]
+	if _anim:
+		_anim.one_shot("cast" if basic["kind"] == "bolt" else "attack", 1.4)
 	ActAudio.spell(self, basic["id"])
 	_swing = 1.0
 	var dir := at - global_position
@@ -441,6 +464,8 @@ func cast_skill(i: int) -> void:
 	mana -= float(sk["mana"])
 	ActAudio.spell(self, sk["id"])
 	skill_cd[i] = sk["cooldown"]
+	if _anim:
+		_anim.one_shot("cast" if Game.hero_class == "pyromancer" or sk["kind"] in ["nova", "ward", "buff"] else "attack", 1.2)
 	_swing = 1.0
 	_face(dir, 1.0)
 	var color: Color = sk["color"]
@@ -567,8 +592,11 @@ func take_damage(amount: float) -> void:
 		hp = 0.0
 		dead = true
 		_dash = {}
-		var tw := create_tween()
-		tw.tween_property(_model, "rotation:x", -PI * 0.5, 0.5).set_trans(Tween.TRANS_BOUNCE)
+		if _anim:
+			_anim.die()
+		else:
+			var tw := create_tween()
+			tw.tween_property(_model, "rotation:x", -PI * 0.5, 0.5).set_trans(Tween.TRANS_BOUNCE)
 		world.player_died()
 
 
