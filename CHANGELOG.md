@@ -10,6 +10,21 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.8 — The Long Lens (2026-11-25)
+
+### New
+- **A Diablo IV style camera.** Pulled back and higher, with a longer lens, a soft spring follow, a gentle lean toward your cursor so you see where you are heading, and a tilt that lowers as you zoom in with the mouse wheel. Far scenery softens with a touch of depth of field.
+- **The area map is now a live 3D view of the real level.** The minimap and the full map show the actual lit streets, roofs and walls from above, not a flat painted chart.
+- **Hollowmere's buildings have real surfaces.** Houses, the chapel and the mausoleum use textured materials with normal maps and roughness: plaster, timber, slate and stone.
+- **A cinematic finish:** soft vignette and fine film grain over the world, sharper and softer shadows, better edge smoothing.
+- The Play button in the launcher breathes like an ember, panels are frosted glass, and a fine film grain covers the window.
+
+### Changes
+- Braziers burn with a flickering flame instead of a solid glow.
+- The plaza under lamp posts and townsfolk is cobbled all the way, with no dark squares.
+- The town is a little brighter so the streets and walls read at a glance.
+- The chapel's stained glass is deeper and less harsh.
+
 ## 0.5.0-beta.7 — Embers and Mist (2026-11-25)
 
 ### New

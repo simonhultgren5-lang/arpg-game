@@ -144,6 +144,16 @@ static func brazier(parent: Node, pos: Vector3, light_range := 9.0, energy := 2.
 			_flame_mat.shader = preload("res://shaders/torch_flame.gdshader")
 		K.add(root, K.lathe(PackedVector2Array([Vector2(0, 0), Vector2(0.2, 0), Vector2(0.28, 0.25),
 			Vector2(0.14, 0.6), Vector2(0, 0.9)]), 8), _flame_mat, Vector3(0, 1.08, 0))
+	if modelled != null and modelled.get_child_count() > 0 and not modelled.has_meta("flamed"):
+		modelled.set_meta("flamed", true)
+		if _flame_mat == null:
+			_flame_mat = ShaderMaterial.new()
+			_flame_mat.shader = preload("res://shaders/torch_flame.gdshader")
+		var f := Node3D.new()
+		f.position = Vector3(0, 1.08, 0)
+		K.add(f, K.lathe(PackedVector2Array([Vector2(0, 0), Vector2(0.2, 0), Vector2(0.28, 0.25),
+			Vector2(0.14, 0.6), Vector2(0, 0.9)]), 8), _flame_mat)
+		modelled.add_child(f)
 	var glow := Node3D.new()
 	glow.position = Vector3(0, 1.5, 0)
 	var light := B.omni(Color(1.0, 0.6, 0.28), energy, light_range, Vector3.ZERO, glow)

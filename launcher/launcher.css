@@ -328,3 +328,17 @@ legend{padding:0;margin-bottom:6px;color:var(--dim);font-size:12.5px;font-weight
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:1120px){.view-play{grid-template-columns:220px 1fr 220px;gap:0 18px;padding:18px 20px}.char{width:150px}}
 ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#4e4059;border-radius:8px}::-webkit-scrollbar-track{background:transparent}
+
+/* ---- 0.5.0-beta.8: cinematic finish ---- */
+/* Fine film grain and a cold bloom over the whole window, like the in-game grade. */
+body::after{content:"";position:fixed;inset:0;z-index:50;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+/* Glass panels: frosted, with a thin bronze rim light on the top edge. */
+.panel{backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);
+  box-shadow:inset 0 1px 0 rgba(224,178,120,.22),0 18px 50px rgba(0,0,0,.45)}
+/* The Play button breathes like an ember and sweeps a highlight on hover. */
+.play-btn{position:relative;overflow:hidden;animation:ember-breathe 3.6s ease-in-out infinite}
+.play-btn::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,226,190,.35) 50%,transparent 65%);transform:translateX(-120%);transition:transform .7s}
+.play-btn:hover:not(:disabled)::after{transform:translateX(120%)}
+@keyframes ember-breathe{0%,100%{box-shadow:inset 0 1px #ffd9b055,0 8px 28px rgba(212,89,43,.32)}50%{box-shadow:inset 0 1px #ffd9b077,0 10px 38px rgba(240,138,75,.5)}}
+@media (prefers-reduced-motion:reduce){.play-btn{animation:none}}

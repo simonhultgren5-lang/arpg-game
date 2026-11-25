@@ -71,6 +71,7 @@ func _ready() -> void:
 	listener.position = Vector3.UP
 	listener.make_current()
 
+	_add_film_overlay()
 	hud = Hud.new()
 	hud.world = self
 	add_child(hud)
@@ -84,6 +85,21 @@ func _ready() -> void:
 		message("Sister Maud waits by the chapel. Click her to speak.", B.GOLD)
 	elif Game.area == "town" and Game.quest("act_end") == 1:
 		message("The wells of Hollowmere are tolling. The undercroft stair is open behind the chapel door.", Color(0.6, 0.75, 0.95))
+
+
+## A soft vignette and fine film grain over the 3D view (under the interface), the last step of the grade.
+func _add_film_overlay() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 1
+	layer.name = "FilmOverlay"
+	var rect := ColorRect.new()
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://shaders/film_overlay.gdshader")
+	rect.material = m
+	layer.add_child(rect)
+	add_child(layer)
 
 
 ## Graphics settings (quality, shadows, brightness) on this level; Settings calls it when they change.
@@ -108,7 +124,7 @@ func _build_environment() -> void:
 	env.background_color = Color(0.03, 0.025, 0.045)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.49, 0.55, 0.65) if town else Color(0.36, 0.43, 0.47)
-	env.ambient_light_energy = 0.34 if town else 0.32
+	env.ambient_light_energy = 0.52 if town else 0.34
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.1
 	env.glow_enabled = true
@@ -159,8 +175,12 @@ func _build_environment() -> void:
 	if town:
 		var moon := DirectionalLight3D.new()
 		moon.light_color = Color(0.55, 0.58, 0.9)
-		moon.light_energy = 0.55
+		moon.light_energy = 0.85
 		moon.shadow_enabled = true
+		moon.directional_shadow_max_distance = 70.0
+		moon.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+		moon.shadow_blur = 1.6
+		moon.light_angular_distance = 1.2
 		moon.rotation = Vector3(deg_to_rad(-55), deg_to_rad(35), 0)
 		add_child(moon)
 

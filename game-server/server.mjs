@@ -36,7 +36,7 @@ const HOST = setting('HOST', '0.0.0.0');
 const DATA_DIR = path.resolve(here, setting('DATA_DIR', 'data'));
 const SERVER_NAME = String(setting('SERVER_NAME', 'Depths Server')).slice(0, 40);
 const MOTD = String(setting('MOTD', '')).slice(0, 200);
-const SERVER_VERSION = '0.5.0-beta.7'; // kept equal to package.json by scripts/sync-version.mjs
+const SERVER_VERSION = '0.5.0-beta.8'; // kept equal to package.json by scripts/sync-version.mjs
 const UPDATE_URL = String(
   setting('UPDATE_URL', 'https://github.com/simonhultgren5-lang/arpg-game/releases/latest/download/server-update.json'),
 );

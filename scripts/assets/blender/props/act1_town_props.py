@@ -12,7 +12,7 @@ def mats():
         "wood": ddk.material("wood", (0.9, 0.85, 0.8), 0.8, 0.0, materials.get("timber"), scale=1.0),
         "iron": ddk.material("iron", (0.28, 0.27, 0.29), 0.5, 0.9, materials.get("steel"), scale=1.5),
         "bone": ddk.material("bone", (0.8, 0.76, 0.66), 0.65, 0.0, materials.get("bone"), scale=2.0),
-        "ember": ddk.material("ember", (1.0, 0.4, 0.12), 0.6, emission=(1.0, 0.35, 0.08), emission_strength=2.5),
+        "ember": ddk.material("ember", (1.0, 0.4, 0.12), 0.6, emission=(1.0, 0.35, 0.08), emission_strength=1.6),
         "bark": ddk.material("bark", (0.2, 0.17, 0.15), 0.95, 0.0, materials.get("timber"), scale=1.5),
     }
 
@@ -38,7 +38,7 @@ for i in range(3):
 ddk.lathe("bowl", [(0.0, 0.0), (0.2, 0.02), (0.42, 0.22), (0.46, 0.27), (0.4, 0.27), (0.2, 0.1), (0.0, 0.08)], 20, m["iron"], loc=(0, 0, 0.86))
 ddk.lathe("rim_ring", [(0.44, 0.0), (0.48, 0.02), (0.48, 0.06), (0.44, 0.05)], 20, m["iron"], loc=(0, 0, 1.1))
 ddk.lathe("coals", [(0.0, 0.0), (0.36, 0.0), (0.38, 0.05), (0.0, 0.1)], 14, m["ember"], loc=(0, 0, 1.04))
-ddk.lathe("flame", [(0.0, 0.0), (0.22, 0.04), (0.26, 0.2), (0.16, 0.5), (0.07, 0.72), (0.0, 0.9)], 10, m["ember"], loc=(0, 0, 1.1))
+# The flame itself is animated in the game (shaders/torch_flame.gdshader), so only the coals are modelled.
 done("brazier")
 
 # ---------------------------------------------------------------------------- bone pile (~0.9 m wide)

@@ -32,6 +32,40 @@ static func surface_grain(material: StandardMaterial3D, frequency: Vector3) -> v
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 
 
+static var _pbr_cache := {}
+
+
+## A full PBR surface from a shared texture set (assets/textures/materials/<name>_albedo/_normal/_roughness),
+## projected in object space (triplanar) so it fits meshes built without UVs. `per_metre` is how many times
+## the texture repeats across one metre. Falls back to a flat colour if the set is missing.
+static func pbr(set_name: String, tint := Color.WHITE, per_metre := 0.35, roughness := 1.0, metallic := 0.0, normal_scale := 1.0) -> StandardMaterial3D:
+	var key := "%s|%s|%.2f|%.2f|%.2f|%.2f" % [set_name, tint.to_html(), per_metre, roughness, metallic, normal_scale]
+	if _pbr_cache.has(key):
+		return _pbr_cache[key]
+	var base := "res://assets/textures/materials/%s_%s.png"
+	var m := StandardMaterial3D.new()
+	m.albedo_color = tint
+	m.metallic = metallic
+	if ResourceLoader.exists(base % [set_name, "albedo"]):
+		m.albedo_texture = load(base % [set_name, "albedo"])
+		if ResourceLoader.exists(base % [set_name, "normal"]):
+			m.normal_enabled = true
+			m.normal_texture = load(base % [set_name, "normal"])
+			m.normal_scale = normal_scale
+		if ResourceLoader.exists(base % [set_name, "roughness"]):
+			m.roughness_texture = load(base % [set_name, "roughness"])
+			m.roughness = roughness
+		else:
+			m.roughness = 0.9
+		m.uv1_triplanar = true
+		m.uv1_scale = Vector3.ONE * per_metre
+		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	else:
+		m.roughness = 0.9
+	_pbr_cache[key] = m
+	return m
+
+
 static func unique_mat(color: Color, roughness := 0.8) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
@@ -145,6 +179,7 @@ static func label(text: String, color: Color, pos: Vector3, parent: Node, font_s
 	l.pixel_size = pixel
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
+	l.layers = 1 << 1  # layer 2: seen by the play camera, kept off the top-down map camera
 	l.fixed_size = false
 	l.position = pos
 	parent.add_child(l)

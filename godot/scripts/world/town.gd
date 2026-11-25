@@ -107,7 +107,7 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 	var floor_color := func(c: Vector2i) -> Color:
 		var ch: String = chars[c.y][c.x]
 		var n := rng.randf()
-		if ch == "," or ch == "P":
+		if ch in [",", "P", "L", "M", "A", "W"]:
 			return Color(0.13, 0.12, 0.14).lerp(Color(0.17, 0.15, 0.15), n)
 		if c.x > 21 and c.y < 8:  # graveyard earth
 			return Color(0.065, 0.075, 0.055).lerp(Color(0.09, 0.09, 0.07), n)
@@ -115,7 +115,7 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 	var level := Node3D.new()
 	level.name = "Town"
 	world.add_child(level)
-	var paved := func(c: Vector2i) -> bool: return chars[c.y][c.x] in [",", "P"]
+	var paved := func(c: Vector2i) -> bool: return chars[c.y][c.x] in [",", "P", "L", "M", "A", "W"]
 	var wall_mat := LevelMesh.build(grid, level, 3.2, Color(0.24, 0.21, 0.24), floor_color, rng, paved, Fen.START_ROW)
 	world.set("wall_material", wall_mat)
 
@@ -214,13 +214,13 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 	match ch:
 		"H":
 			var wall_h := 3.0 + rng.randf() * 0.8
-			var plaster := B.mat(Color(0.30, 0.27, 0.25).lerp(Color(0.24, 0.2, 0.2), rng.randf()))
-			var timber := B.mat(Color(0.11, 0.08, 0.07))
+			var plaster := B.pbr("plaster", Color(0.62, 0.56, 0.52).lerp(Color(0.5, 0.42, 0.42), rng.randf()), 0.45, 1.0, 0.0, 1.4)
+			var timber := B.pbr("timber", Color(0.32, 0.26, 0.24), 0.8, 1.0, 0.0, 1.2)
 			B.box(Vector3(s.x - 0.4, wall_h, s.z - 0.4), plaster, Vector3(0, wall_h * 0.5, 0), node)
 			for corner in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1)]:
 				B.box(Vector3(0.3, wall_h + 0.1, 0.3), timber, Vector3(corner.x * (s.x * 0.5 - 0.25), wall_h * 0.5, corner.z * (s.z * 0.5 - 0.25)), node)
 			B.box(Vector3(s.x - 0.3, 0.25, 0.3), timber, Vector3(0, wall_h * 0.55, s.z * 0.5 - 0.2), node)
-			var roof := B.prism(Vector3(s.z + 0.8, 2.2, s.x + 0.6), B.mat(Color(0.13, 0.09, 0.11)), Vector3(0, wall_h + 1.1, 0), node)
+			var roof := B.prism(Vector3(s.z + 0.8, 2.2, s.x + 0.6), B.pbr("roof_slate", Color(0.42, 0.38, 0.44), 0.6, 1.0, 0.05, 1.5), Vector3(0, wall_h + 1.1, 0), node)
 			roof.rotation.y = PI * 0.5
 			if s.z > s.x:
 				roof.rotation.y = 0.0
@@ -245,8 +245,8 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			if lit:
 				B.omni(Color(1.0, 0.55, 0.25), 0.7, 4.5, Vector3(s.x * 0.22, 2.0, s.z * 0.5 + 0.6), node)
 		"C":
-			var stone := B.mat(Color(0.25, 0.22, 0.26))
-			var dark := B.mat(Color(0.09, 0.07, 0.1))
+			var stone := B.pbr("stone_wall", Color(0.62, 0.58, 0.64), 0.28, 1.0, 0.0, 1.6)
+			var dark := B.pbr("roof_slate", Color(0.3, 0.27, 0.33), 0.5, 1.0, 0.05, 1.5)
 			B.box(Vector3(s.x - 0.6, 6.0, s.z - 0.6), stone, Vector3(0, 3.0, 0), node)
 			var roof := B.prism(Vector3(s.x + 0.2, 3.4, s.z + 0.2), dark, Vector3(0, 7.7, 0), node)
 			roof.rotation.y = 0.0
@@ -260,7 +260,7 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			var spire := B.cylinder(0.0, 2.4, 5.0, dark, Vector3(0, 13.5, s.z * 0.5 - 1.6), node, 4)
 			spire.rotation.y = PI * 0.25
 			# stained glass and door
-			var glass := B.mat(Color(0.5, 0.2, 0.5), 1.0, Color(0.7, 0.25, 0.45), 2.0)
+			var glass := B.mat(Color(0.28, 0.12, 0.3), 0.3, Color(0.55, 0.2, 0.4), 0.7)
 			for wx in [-s.x * 0.32, s.x * 0.32]:
 				B.box(Vector3(0.9, 2.4, 0.1), glass, Vector3(wx, 3.6, s.z * 0.5 - 0.25), node)
 			B.box(Vector3(1.6, 2.6, 0.15), B.mat(Color(0.12, 0.06, 0.05), 1.0, Color(0.5, 0.2, 0.08), 0.4), Vector3(0, 1.3, s.z * 0.5 - 0.05), node)
@@ -271,9 +271,9 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			B.torch(node, Vector3(-1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
 			B.torch(node, Vector3(1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
 		"B":
-			var stone := B.mat(Color(0.2, 0.19, 0.21))
+			var stone := B.pbr("stone_wall", Color(0.5, 0.49, 0.52), 0.3, 1.0, 0.0, 1.6)
 			B.box(Vector3(s.x - 0.6, 3.4, s.z - 0.4), stone, Vector3(0, 1.7, 0), node)
-			var mroof := B.prism(Vector3(s.z + 0.2, 1.4, s.x), B.mat(Color(0.1, 0.09, 0.11)), Vector3(0, 4.1, 0), node)
+			var mroof := B.prism(Vector3(s.z + 0.2, 1.4, s.x), B.pbr("roof_slate", Color(0.34, 0.32, 0.36), 0.5, 1.0, 0.05, 1.5), Vector3(0, 4.1, 0), node)
 			mroof.rotation.y = PI * 0.5
 			for i in 4:
 				B.cylinder(0.22, 0.25, 3.4, stone, Vector3(-s.x * 0.5 + 0.6 + i * (s.x - 1.2) / 3.0, 1.7, s.z * 0.5), node, 8)
