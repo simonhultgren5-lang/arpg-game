@@ -280,6 +280,7 @@ func _boss_logic(delta: float, p: Node3D, dist: float) -> void:
 		_toll_pending = 1.2
 		Fx.telegraph(world, global_position, 7.0, Color(1.0, 0.35, 0.1), 1.2)
 		world.message("THE BELL TOLLS", Color(1.0, 0.5, 0.25))
+		ActAudio.toll(self)
 
 
 func set_aggro() -> void:

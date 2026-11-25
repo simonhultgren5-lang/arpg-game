@@ -66,6 +66,7 @@ func _ready() -> void:
 
 	Game.leveled_up.connect(_on_level_up)
 	Game.story_event.connect(_on_story_event)
+	ActAudio.play_area("crypt" if Game.area == "catacomb" else "town")
 	hud.banner(Game.area_title(), "Act I · The Tolling of Hollowmere" if Game.area == "town" else "Beneath St. Aldric's")
 	if Game.area == "town" and Game.quest_state() == 0:
 		message("Sister Maud waits by the chapel. Click her to speak.", B.GOLD)
@@ -381,6 +382,7 @@ func _on_enemy_died(e: Node3D) -> void:
 		Game.on_boss_slain()
 		hud.boss_defeated()
 		message("Hask, the Bell-Warden, falls silent.", Color(0.92, 0.42, 0.18))
+		ActAudio.play_area("crypt")
 		_open_portal(pos)
 		Game.save()
 		return
@@ -489,6 +491,7 @@ func interact(it: Node3D) -> void:
 
 func boss_engaged(e: Node3D) -> void:
 	hud.show_boss(e)
+	ActAudio.play_area("boss")
 	message("Hask, the Bell-Warden, turns toward you. The clapper in his chest begins to swing.", Color(0.92, 0.42, 0.18))
 
 

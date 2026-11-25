@@ -55,6 +55,8 @@ func _run() -> void:
 		await _frames(20)
 		var w := _world()
 		_check(w != null and w.player != null, "town loaded with hero")
+		_check(ActAudio.music_id() == "hollowmere" and ActAudio._music != null and ActAudio._music.playing, "Hollowmere's music plays")
+		_check(ActAudio._music.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD and ActAudio._ambience != null, "the music loops, with wind")
 		_check(w.grid.walkable_at(w.player.global_position), "hero spawns on walkable ground")
 		# walk somewhere by path
 		var start: Vector3 = w.player.global_position
@@ -84,6 +86,7 @@ func _run() -> void:
 		w = _world()
 		var foes: Array = w.enemies()
 		_check(foes.size() >= 8, "catacomb has monsters (%d)" % foes.size())
+		_check(ActAudio.music_id() == "sunken_crypt", "the crypt has its own music")
 		_check(w.boss != null, "boss spawned")
 		_check(w.grid.walkable_at(w.player.global_position), "hero spawns in the crypt")
 		var reach: PackedVector3Array = w.grid.find_path(w.player.global_position, w.boss.global_position)
@@ -108,6 +111,8 @@ func _run() -> void:
 		var boss: Node3D = w.boss
 		w.player.global_position = boss.global_position + Vector3(2.5, 0, 0)
 		await _frames(10)
+		boss.set_aggro()
+		_check(ActAudio.music_id() == "bell_warden", "Hask's fight has its music")
 		for i in 60:
 			if not is_instance_valid(boss) or boss.dead:
 				break
@@ -116,6 +121,7 @@ func _run() -> void:
 			await _frames(2)
 		await _frames(10)
 		_check(Game.quest_state() == 2, "boss slain: clapper taken")
+		_check(ActAudio.music_id() == "sunken_crypt", "the boss music ends with Hask")
 		_check(Game.level() * 100000 + int(Game.progress["xp"]) > xp_before, "xp gained")
 		_check(_loot(w).size() > 0, "boss dropped loot")
 		# walk over loot to pick it up
@@ -237,11 +243,12 @@ func _act_one_story(w: Node, hero_class: String) -> Node:
 		w.player.global_position = foe.global_position + Vector3(1.0, 0, 0)
 		var hp0: float = foe.hp
 		w.player.cast_skill(2)
+		var warded: bool = w.player.ward > 0.0
 		await _frames(10)
 		w.player.cast_skill(3)
 		await _frames(110)
 		_check(w.player.skill_cd[2] > 0.0 or w.player.skill_cd[3] > 0.0, "skills 3 and 4 cast (%s)" % hero_class)
-		_check(not is_instance_valid(foe) or foe.dead or foe.hp < hp0 or hero_class == "pyromancer" and w.player.ward > 0.0, "skills 3 and 4 hurt or ward (%s)" % hero_class)
+		_check(not is_instance_valid(foe) or foe.dead or foe.hp < hp0 or (hero_class == "pyromancer" and warded), "skills 3 and 4 hurt or ward (%s)" % hero_class)
 	for st in stones:
 		if is_instance_valid(st):
 			w.interact(st)

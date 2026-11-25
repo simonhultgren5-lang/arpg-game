@@ -16,6 +16,7 @@ var _portrait := TextureRect.new()
 
 
 func _ready() -> void:
+	ActAudio.play_area("title")
 	get_tree().paused = false
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	theme = UiTheme.make()

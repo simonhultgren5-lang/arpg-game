@@ -17,6 +17,11 @@ var _music_id := ""
 var _ambience_id := ""
 
 
+func _ready() -> void:
+	# Fades keep running in the pause menu and on the Act I complete screen.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+
 func stop_voice(owner_node: Node) -> void:
 	if is_instance_valid(_voice) and _voice.get_parent() == owner_node:
 		_voice.stop()
