@@ -3,6 +3,29 @@
 **Act I — The Tolling of Hollowmere**  
 PC · isometric 3D · production direction, 25 November 2026
 
+## Implemented sound bank
+
+The audit below describes the baseline before implementation. The new runtime
+bank contains 139 original synthesized WAVs under `godot/assets/audio/hollowmere/`:
+72 spell takes, 55 effects, five scores, two synchronized boss phase layers and
+five environment beds. Speech still uses the existing voice bank. All new WAVs
+are 32 kHz, 16-bit PCM, mono for point effects and stereo for music and beds.
+The scores run at 72 BPM in 4/4 over eight bars. The recording briefs and
+mix targets later in this document remain the reference for final production.
+
+Rebuild with `npm run audio:hollowmere` from the repository root. The editable
+[synthesis program](../scripts/audio/hollowmere-bank.mjs) uses deterministic
+layers of noise, tuned resonances and envelopes. It requires no external samples
+or services. Import with the project editor, then run
+`godot --headless --path godot res://tests/audio_test.tscn` to validate imports,
+the Effects mixer, Hask's warning duration and score transitions.
+
+For new terrain or weather, attach `godot/scripts/world/audio_zone.gd` to an
+Area3D with a CollisionShape3D and a collision mask that detects the hero.
+Choose a surface and/or bed in the Inspector. Higher-priority overlapping zones
+win for each field. Enable thunder on rain zones with visible storms. The town
+map selects earth or cobblestone directly, and the crypt defaults to stone.
+
 ## The sound of Hollowmere
 
 Hollowmere once told time by its bell. Give the town small, irregular sounds made by hands: a shutter caught on a latch, a boot disturbing grit, Edda setting down a bottle. In the crypt, let the architecture answer the player. A step comes back from across the room. A drop falls somewhere beyond the doorway. When Hask moves, the bell finally has a body. After his defeat, allow one ordinary drip to be the first thing the player hears again.

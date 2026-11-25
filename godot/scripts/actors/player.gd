@@ -280,6 +280,9 @@ func _physics_process(delta: float) -> void:
 	_step_t += distance_moved * 1.8
 	if floori(_step_t / PI) != old_step:
 		var foot := _legs[old_step % 2]
+		ActAudio.cue("step_%s_%d" % [world.step_surface(global_position), old_step % 3 + 1], -17.5, self)
+		if old_step % 2 == 0:
+			ActAudio.cue("gear", -24.0, self)
 		Fx.footfall(world, Vector3(foot.global_position.x, 0.035, foot.global_position.z), _model.rotation.y)
 
 
@@ -425,6 +428,10 @@ func _primary_attack(basic: Dictionary, at: Vector3) -> void:
 	if _anim:
 		_anim.one_shot("cast" if basic["kind"] in ["bolt", "fan"] and Game.hero_class == "pyromancer" else "attack", 1.4)
 	ActAudio.spell(self, basic["id"])
+	if basic["id"] == "grave_cleave":
+		var weapon = Game.progress["equipped"].get("weapon")
+		var icon := str(weapon.get("icon", "")) if weapon is Dictionary else ""
+		ActAudio.cue("axe" if icon in ["axe", "maul"] else "sword", -19.0, self)
 	_swing = 1.0
 	var dir := at - global_position
 	dir.y = 0.0
@@ -655,6 +662,7 @@ func drink_potion() -> void:
 	if hp >= mhp:
 		return
 	Game.progress["potions"] = int(Game.progress["potions"]) - 1
+	ActAudio.cue("potion", -16.0, self)
 	Game.stats_changed.emit()
 	potion_cd = 0.8
 	var heal := mhp * 0.45
@@ -687,6 +695,7 @@ func take_damage(amount: float) -> void:
 			Fx.number(world, global_position, "warded", Color(0.6, 0.7, 0.95))
 			return
 	hp -= dealt
+	ActAudio.cue("hurt", -11.0, self, 140)
 	_hurt = 1.0
 	Fx.number(world, global_position, str(int(ceil(dealt))), Color(1.0, 0.3, 0.25))
 	if hp <= 0.0:

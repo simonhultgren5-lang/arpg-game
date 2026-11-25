@@ -52,6 +52,8 @@ func _physics_process(delta: float) -> void:
 			if d < hit_radius + e.radius:
 				_hit[e] = true
 				e.take_damage(damage, crit, dir)
+				if style == "bolt":
+					ActAudio.cue("ember_impact", -16.0, e, 80)
 				world.apply_effects(e, dir, effects, damage, world.player)
 				if pierce <= 0:
 					_impact()
