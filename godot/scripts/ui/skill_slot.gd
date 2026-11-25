@@ -7,6 +7,8 @@ var glyph := ""
 var color := Color(0.89, 0.71, 0.49)
 var cooldown := 0.0  # 0..1 of the cooldown left
 var locked := false
+## No skill in this slot: an open, sunken well (not the locked cross).
+var empty := false
 var usable := true
 var count := -1  # shows a number (potions) when >= 0
 ## The skill's icon (assets/textures/icons/skills/); without one the slot draws a glyph.
@@ -22,7 +24,10 @@ func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
 	draw_rect(r, Color(0.06, 0.04, 0.07))
 	var inner := r.grow(-4)
-	if locked:
+	if empty:
+		draw_rect(inner, Color(0.05, 0.04, 0.06))
+		draw_rect(inner.grow(-2), Color(0.12, 0.1, 0.12, 0.6), false, 1.0)
+	elif locked:
 		draw_rect(inner, Color(0.09, 0.08, 0.1))
 		draw_line(inner.position, inner.end, Color(0.25, 0.2, 0.22), 2.0)
 		draw_line(Vector2(inner.end.x, inner.position.y), Vector2(inner.position.x, inner.end.y), Color(0.25, 0.2, 0.22), 2.0)

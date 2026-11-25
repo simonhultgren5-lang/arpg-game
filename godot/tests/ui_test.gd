@@ -311,6 +311,9 @@ func _panels() -> void:
 	await _frames(20)
 	var w = get_tree().current_scene
 	var hud = w.hud
+	# In the town square, away from the fen's packs.
+	w.player.global_position = w.grid.center(Vector2i(17, 12))
+	await _frames(2)
 	for name in ["character", "skills", "settings"]:
 		hud.open_panel(name)
 		await _frames(2)

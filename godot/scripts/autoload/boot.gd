@@ -160,6 +160,7 @@ func _setup_input() -> void:
 	_key("bar_5", [KEY_3])
 	_key("bar_6", [KEY_4])
 	_key("skills", [KEY_K])
+	_key("quests", [KEY_J, KEY_L])
 	_key("map", [KEY_M])
 	_key("potion", [KEY_Q])
 	_key("interact", [KEY_E])

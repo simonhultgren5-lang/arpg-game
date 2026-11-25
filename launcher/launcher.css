@@ -20,7 +20,7 @@ code{font-size:.92em;color:var(--tallow);background:#ffffff0d;padding:1px 5px;bo
 
 /* ---- backdrop film ---- */
 .backdrop-film{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:0;transition:opacity 1.2s}
-.backdrop-film.playing{opacity:.55}
+.backdrop-film.playing{opacity:.72}
 .backdrop-shade{position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:linear-gradient(90deg,rgba(18,14,22,.92) 0,rgba(18,14,22,.55) 24%,transparent 46%),radial-gradient(ellipse 60% 70% at 50% 46%,transparent 0,rgba(18,14,22,.55) 60%,var(--ink) 100%),linear-gradient(0deg,var(--ink) 0,rgba(18,14,22,.2) 32%,rgba(18,14,22,.6) 100%)}
 body.view-away .backdrop-film.playing{opacity:.18}

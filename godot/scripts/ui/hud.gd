@@ -16,10 +16,10 @@ var _mana_orb: Orb
 var _slots: Array = []  # [slot, kind, index]
 var _xp_bar: ProgressBar
 var _xp_label: Label
-var _quest_label: Label
-var _quest_title: Label
-var _side_title: Label
-var _side_label: Label
+## The quest tracker under the minimap (up to three active quests; J opens the full log).
+var _tracker: VBoxContainer
+var _buffs: HBoxContainer
+var _buff_key := ""
 var _act_complete: PanelContainer
 var _area_label: Label
 var _target_panel: PanelContainer
@@ -149,12 +149,28 @@ func _build_bottom() -> void:
 	_add_slot(row, "Q", {"name": "Grave-moss Draught", "color": Color(0.8, 0.15, 0.15),
 		"desc": "Restores 45% of your life. Edda sells more in Hollowmere."}, "potion", 0)
 
-	# Menu buttons above the bar: Character, Skills, Map, Menu.
+	# Micro-menu in the bottom-right corner (where the genre keeps it): Character, Skills, Quests, Map, Menu.
 	var menu := HBoxContainer.new()
-	menu.position = Vector2(470, -6)
+	menu.anchor_left = 1.0
+	menu.anchor_right = 1.0
+	menu.anchor_top = 1.0
+	menu.anchor_bottom = 1.0
+	menu.offset_left = -420
+	menu.offset_right = -16
+	menu.offset_top = -44
+	menu.offset_bottom = -12
+	menu.alignment = BoxContainer.ALIGNMENT_END
 	menu.add_theme_constant_override("separation", 4)
-	bar.add_child(menu)
-	for spec in [["Character", "inventory", func(): toggle_panel("character")], ["Skills", "skills", func(): toggle_panel("skills")],
+	_root.add_child(menu)
+	# Buffs and wards with their time left, above the skill bar.
+	_buffs = HBoxContainer.new()
+	_buffs.position = Vector2(150, -26)
+	_buffs.custom_minimum_size = Vector2(540, 44)
+	_buffs.alignment = BoxContainer.ALIGNMENT_CENTER
+	_buffs.add_theme_constant_override("separation", 6)
+	_buffs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(_buffs)
+	for spec in [["Character", "inventory", func(): toggle_panel("character")], ["Skills", "skills", func(): toggle_panel("skills")], ["Quests", "quests", func(): toggle_panel("quests")],
 			["Map", "map", func(): toggle_map()], ["Menu", "pause", func(): escape()]]:
 		var b := Button.new()
 		b.text = spec[0]
@@ -210,7 +226,8 @@ func _refresh_bar() -> void:
 		var s = entry[0]
 		var id: String = Game.build()["bar"][entry[2]]
 		var sk: Dictionary = Game.resolved(id) if id != "" else {}
-		s.locked = sk.is_empty() or not Game.skill_unlocked_for(id)
+		s.locked = not sk.is_empty() and not Game.skill_unlocked_for(id)
+		s.empty = sk.is_empty()
 		s.title = sk.get("name", "")
 		s.color = sk.get("color", UiTheme.GOLD)
 		s.icon = UiTheme.skill_icon(id)
@@ -248,25 +265,16 @@ func _build_top() -> void:
 	tl.add_child(_area_label)
 	var who := UiTheme.label("%s  ·  %s" % [Boot.character.get("name", "Wanderer"), Game.class_data.get("title", "")], 15, Color(0.75, 0.7, 0.68))
 	tl.add_child(who)
-	var q := PanelContainer.new()
-	q.custom_minimum_size = Vector2(340, 0)
-	q.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tl.add_child(q)
-	var qv := VBoxContainer.new()
-	q.add_child(qv)
-	_quest_title = UiTheme.label("", 16, UiTheme.EMBER.lightened(0.2))
-	qv.add_child(_quest_title)
-	_quest_label = UiTheme.label("", 14)
-	_quest_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_quest_label.custom_minimum_size = Vector2(320, 0)
-	qv.add_child(_quest_label)
-	# The optional quest in progress (The Wardens' Oath), under the main one.
-	_side_title = UiTheme.label("", 15, Color(0.6, 0.7, 0.95))
-	qv.add_child(_side_title)
-	_side_label = UiTheme.label("", 14)
-	_side_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_side_label.custom_minimum_size = Vector2(320, 0)
-	qv.add_child(_side_label)
+	# Quest tracker, top right under the minimap, the way the genre puts it.
+	_tracker = VBoxContainer.new()
+	_tracker.anchor_left = 1.0
+	_tracker.anchor_right = 1.0
+	_tracker.offset_left = -360
+	_tracker.offset_right = -20
+	_tracker.offset_top = 200
+	_tracker.add_theme_constant_override("separation", 8)
+	_tracker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_tracker)
 
 	_target_panel = PanelContainer.new()
 	_target_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -381,6 +389,7 @@ func _build_panels() -> void:
 		"character": [preload("res://scripts/ui/character_panel.gd"), Vector2(1030, 670)],
 		"skills": [preload("res://scripts/ui/skills_panel.gd"), Vector2(960, 690)],
 		"settings": [preload("res://scripts/ui/settings_panel.gd"), Vector2(800, 640)],
+		"quests": [preload("res://scripts/ui/quests_panel.gd"), Vector2(920, 600)],
 	}
 	for name in specs:
 		var panel: PanelContainer = specs[name][0].new()
@@ -554,6 +563,10 @@ func _process(_delta: float) -> void:
 	var p = world.player if world else null
 	if p == null:
 		return
+	_update_buffs(p)
+	if Game.area == "town" and _area_label:
+		var fen: bool = world.grid.cell_of(p.global_position).y >= preload("res://scripts/world/fen.gd").START_ROW
+		_area_label.text = "Southwatch Fen" if fen else "Hollowmere"
 	var mhp: float = Game.max_hp()
 	var mmana: float = Game.max_mana()
 	var life_text := "%d / %d" % [int(ceil(p.hp)), int(mhp)]
@@ -600,6 +613,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("skills"):
 		toggle_panel("skills")
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("quests"):
+		toggle_panel("quests")
 		get_viewport().set_input_as_handled()
 
 
@@ -685,16 +701,57 @@ func _on_save_status(text: String) -> void:
 	_status.text = online + ("  ·  " + text if text != "" else "")
 
 
+## The buff row: what is on the hero right now, with seconds left.
+func _update_buffs(p) -> void:
+	var active := []
+	if p.buff_t > 0.0:
+		active.append([str(p.buff_id), p.buff_t])
+	if p.ward > 0.0 and p.ward_t > 0.0:
+		active.append([str(p.ward_id) if p.ward_id != "" else "iron_hide", p.ward_t])
+	if p.crit_buff > 0.0:
+		active.append(["veilstep", p.crit_buff])
+	var key := ",".join(active.map(func(a): return a[0]))
+	if key != _buff_key:
+		_buff_key = key
+		for c in _buffs.get_children():
+			c.queue_free()
+		for a in active:
+			var v := VBoxContainer.new()
+			v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var icon := TextureRect.new()
+			icon.texture = UiTheme.skill_icon(a[0])
+			icon.custom_minimum_size = Vector2(34, 34)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			v.add_child(icon)
+			var t := UiTheme.label("", 12, Color(1, 0.95, 0.85))
+			t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			v.add_child(t)
+			_buffs.add_child(v)
+	var i := 0
+	for v in _buffs.get_children():
+		if i < active.size() and v.get_child_count() > 1:
+			v.get_child(1).text = "%ds" % ceili(active[i][1])
+		i += 1
+
+
 func _refresh_quest() -> void:
-	var main: Array = Game.main_quest()
-	_quest_title.text = main[0]
-	_quest_label.text = main[1]
-	var side: Array = Game.side_quest()
-	_side_title.visible = not side.is_empty()
-	_side_label.visible = not side.is_empty()
-	if not side.is_empty():
-		_side_title.text = "%s  (optional)" % side[0]
-		_side_label.text = side[1]
+	if _tracker == null:
+		return
+	for c in _tracker.get_children():
+		c.queue_free()
+	var head := UiTheme.label("Quests  (%s)" % Settings.key_text("quests"), 14, UiTheme.GOLD_DIM.lightened(0.2))
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_tracker.add_child(head)
+	for e in Game.tracked_quests():
+		var t := UiTheme.label(("◆ " if e["kind"] == "main" else "◇ ") + str(e["title"]), 17,
+			UiTheme.EMBER.lightened(0.25) if e["kind"] == "main" else Color(0.62, 0.72, 0.95))
+		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_tracker.add_child(t)
+		var o := UiTheme.label(str(e["objective"]), 14, Color(0.9, 0.86, 0.8))
+		o.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		o.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		o.custom_minimum_size = Vector2(330, 0)
+		_tracker.add_child(o)
 
 
 func show_boss(e: Node3D) -> void:

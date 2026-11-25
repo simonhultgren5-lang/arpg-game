@@ -58,6 +58,7 @@ else {
       ['Godot dev console test', 'res://tests/dev_console_test.tscn', 'DEV CONSOLE TEST PASSED'],
       ['Godot asset test (models, clips, textures)', 'res://tests/asset_test.tscn', 'ASSET TEST PASSED'],
       ['Godot UI test (gear, skills, panels, settings)', 'res://tests/ui_test.tscn', 'UI TEST PASSED'],
+      ['Godot quest test (quest log, side quests, fen, XP)', 'res://tests/quest_test.tscn', 'QUEST TEST PASSED'],
       ['Godot audio bank and mixer', 'res://tests/audio_test.tscn', 'AUDIO TEST PASSED'],
       ['Act I cinematic and gameplay handoff', 'res://tests/opening_test.tscn', 'OPENING TEST PASSED'],
     ]) {

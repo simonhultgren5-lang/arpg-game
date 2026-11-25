@@ -11,6 +11,9 @@
   // Loops silently behind the hero art. "Watch the Act I film" plays it full size from the start with
   // sound and captions; Esc, the back button or the end of the film returns to the silent loop.
   const film = $('actFilm');
+  // The silent background loop and the Act I film share one <video>; the source swaps while watching.
+  const LOOP_SRC = 'assets/hollowmere-night.mp4';
+  const FILM_SRC = 'assets/act-i.mp4';
   const filmBar = $('filmBar');
   const btnCaptions = $('btnFilmCaptions');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -40,7 +43,8 @@
     film.muted = false;
     film.controls = true;
     film.removeAttribute('aria-hidden');
-    film.currentTime = 0;
+    film.src = FILM_SRC;
+    film.load();
     showCaptions(captionsWanted);
     film.play().catch(() => { /* the native controls remain */ });
     nudgeIdle();
@@ -57,6 +61,8 @@
     film.loop = true;
     film.setAttribute('aria-hidden', 'true');
     showCaptions(false);
+    film.src = LOOP_SRC;
+    film.load();
     $('btnTrailer').focus();
     playBackground();
   }

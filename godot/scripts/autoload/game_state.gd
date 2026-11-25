@@ -16,6 +16,7 @@ const Classes = preload("res://scripts/data/classes.gd")
 const Items = preload("res://scripts/data/items.gd")
 const Passives = preload("res://scripts/data/passives.gd")
 const Dialogue = preload("res://scripts/data/act1_dialogue.gd")
+const Quests = preload("res://scripts/data/quests.gd")
 
 ## 2 (0.5.0-beta.5): 13 gear slots; armor became chest, charm became amulet (see migrate()).
 const SAVE_VERSION := 2
@@ -28,7 +29,9 @@ const BASE_CRIT_DAMAGE := 1.75
 const POTION_PRICE := 25
 const QUEST := "silent_bell"
 ## All Act I quests and their last step (see scripts/data/act1_dialogue.gd for what each step means).
-const QUESTS := {"silent_bell": 3, "lamps": 3, "act_end": 2, "wardens": 3}
+const QUESTS := {"silent_bell": 3, "lamps": 3, "act_end": 2, "wardens": 3, "southwatch": 4, "kin": 3}
+## Dying costs this share of the XP the current level needs (never a level).
+const DEATH_XP_LOSS := 0.1
 const WARDEN_STONES := 3
 ## The skill bar: LMB, RMB, then keys 1-4. LMB only takes a primary skill.
 const BAR_SIZE := 6
@@ -595,6 +598,117 @@ func warden_stones() -> int:
 	return int(flags().get("warden_stones", 0))
 
 
+# ------------------------------------------------------------------ quest log
+
+## A quest's counter for its objective ({count}): name-stones, fen kills, grave-tokens.
+func quest_counter(id: String) -> int:
+	match id:
+		"wardens": return warden_stones()
+		"southwatch": return int(flags().get("fen_kills", 0))
+		"kin": return inventory().filter(func(i): return i.get("uid", "") == "grave_token").size()
+	return 0
+
+
+func _quest_need(id: String) -> int:
+	match id:
+		"wardens": return WARDEN_STONES
+		"southwatch": return Quests.SOUTHWATCH_KILLS
+		"kin": return Quests.KIN_TOKENS
+	return 0
+
+
+func quest_objective(id: String) -> String:
+	var q := Quests.get_quest(id)
+	var st := quest(id)
+	if id == "act_end" and st == 0 and quest("lamps") >= 3:
+		st = 1
+	var text := str(q.get("steps", {}).get(st, ""))
+	return text.replace("{count}", str(mini(quest_counter(id), _quest_need(id)))).replace("{need}", str(_quest_need(id)))
+
+
+## The quests the log shows: everything started, plus the main quest the story is waiting on.
+## Each entry: {id, title, kind, giver, state, objective, description, reward, done}.
+func quest_log() -> Array:
+	var out := []
+	for id in Quests.ids():
+		var q := Quests.get_quest(id)
+		var st := quest(id)
+		var shown := st > 0
+		if not shown and q["kind"] == "main":
+			var after := str(q.get("after", ""))
+			shown = after == "" or quest(after) >= int(Quests.get_quest(after)["last"])
+		if not shown:
+			continue
+		out.append({
+			"id": id, "title": q["title"], "kind": q["kind"], "giver": q["giver"], "state": st,
+			"objective": quest_objective(id), "description": q["description"], "reward": q["reward"],
+			"done": st >= int(q["last"]),
+		})
+	return out
+
+
+## The tracker under the minimap: up to three unfinished quests, the main story first.
+func tracked_quests() -> Array:
+	return quest_log().filter(func(e): return not e["done"]).slice(0, 3)
+
+
+## A monster died in `where` ("fen" or "crypt"); counts it for quests that want it.
+func on_monster_killed(where: String, elite: bool) -> void:
+	if where == "fen" and quest("southwatch") == 1:
+		flags()["fen_kills"] = int(flags().get("fen_kills", 0)) + 1
+		if int(flags()["fen_kills"]) >= Quests.SOUTHWATCH_KILLS:
+			set_quest("southwatch", 2)
+			message.emit("The fen is quiet. Relight the Southwatch Beacon.", Color(0.89, 0.71, 0.49))
+		else:
+			quest_changed.emit()
+
+
+func beacon_lit() -> bool:
+	return flags().get("beacon_lit", false) or quest("southwatch") == 0
+
+
+## The Southwatch Beacon, cold while its quest is under way; true if it was lit just now.
+func relight_beacon() -> bool:
+	if quest("southwatch") != 2:
+		return false
+	flags()["beacon_lit"] = true
+	set_quest("southwatch", 3)
+	message.emit("The Southwatch Beacon burns again. Tell Edda.", Color(0.97, 0.75, 0.4))
+	return true
+
+
+## Restless Kin: elites drop grave-tokens while more are wanted.
+func wants_grave_token() -> bool:
+	return quest("kin") == 1 and quest_counter("kin") < Quests.KIN_TOKENS
+
+
+## Moves Restless Kin on once enough grave-tokens are in the bag.
+func refresh_kin() -> void:
+	if quest("kin") == 1 and quest_counter("kin") >= Quests.KIN_TOKENS:
+		set_quest("kin", 2)
+		message.emit("Enough grave-tokens. Bring them to Old Corwin.", Color(0.89, 0.71, 0.49))
+	else:
+		quest_changed.emit()
+
+
+# ------------------------------------------------------------------ XP balance
+
+## XP for a kill: the monster's base XP grows with its level, elites give 2.5 times, and the gap to
+## the hero's level scales it (10% per level, from a quarter to one and a half times).
+func kill_xp(base: int, monster_lv: int, elite: bool) -> int:
+	var xp := float(base) * (1.0 + 0.2 * (monster_lv - 1)) * (2.5 if elite else 1.0)
+	xp *= clampf(1.0 + 0.1 * (monster_lv - level()), 0.25, 1.5)
+	return maxi(1, int(round(xp)))
+
+
+## Dying: lose DEATH_XP_LOSS of this level's XP, never below the start of the level. Returns the loss.
+func death_penalty() -> int:
+	var lost := mini(int(progress["xp"]), int(xp_to_next() * DEATH_XP_LOSS))
+	progress["xp"] = int(progress["xp"]) - lost
+	xp_changed.emit()
+	return lost
+
+
 ## The main quest shown in the quest log: [title, text].
 func main_quest() -> Array:
 	if quest("silent_bell") < 3:
@@ -645,7 +759,9 @@ func npc_has_news(npc_id: String) -> bool:
 		"corwin":
 			if quest("silent_bell") >= 1 and not flags().get("corwin_gift", false):
 				return true
-			return check_condition("wardens_offer")
+			return check_condition("wardens_offer") or check_condition("kin_offer") or quest("kin") == 2
+		"edda":
+			return check_condition("southwatch_offer") or quest("southwatch") == 3
 		"lamplighter":
 			return quest("silent_bell") >= 3 and quest("lamps") == 0
 	return false
@@ -662,6 +778,11 @@ func check_condition(cond: String) -> bool:
 		"gold_25": return int(progress["gold"]) >= POTION_PRICE
 		"no_corwin_gift": return not flags().get("corwin_gift", false)
 		"wardens_offer": return quest("silent_bell") >= 1 and quest("wardens") == 0
+		"southwatch_offer": return quest("silent_bell") >= 1 and quest("southwatch") == 0
+		"southwatch_progress": return quest("southwatch") in [1, 2]
+		"southwatch_done": return quest("southwatch") == 4
+		"kin_offer": return quest("silent_bell") >= 1 and quest("kin") == 0
+		"kin_progress": return quest("kin") == 1
 	return true
 
 
@@ -704,6 +825,32 @@ func run_action(action: String) -> void:
 				message.emit("Quest complete: Lamps Without Oil (+200 XP). Received: The Lamplighter's Wick", Color(0.97, 0.89, 0.64))
 				set_quest("act_end", 1)
 				story_event.emit("wells_toll")
+		"accept_southwatch":
+			if quest("southwatch") == 0:
+				set_quest("southwatch", 1)
+				message.emit("Quest accepted: The Southwatch Fire", Color(0.89, 0.71, 0.49))
+		"complete_southwatch":
+			if quest("southwatch") == 3:
+				var reward := roll_loot(monster_level() + 2, 1.05, "weapon")
+				reward["name"] = "Edda's " + str(reward["name"])
+				add_item(reward)
+				add_gold(80)
+				add_xp(150)
+				set_quest("southwatch", 4)
+				message.emit("Quest complete: The Southwatch Fire", Color(0.97, 0.89, 0.64))
+		"accept_kin":
+			if quest("kin") == 0:
+				set_quest("kin", 1)
+				message.emit("Quest accepted: Restless Kin", Color(0.89, 0.71, 0.49))
+				refresh_kin()
+		"complete_kin":
+			if quest("kin") == 2:
+				_remove_quest_item("grave_token")
+				add_item(roll_loot(monster_level() + 2, 1.05, "amulet"))
+				add_gold(60)
+				add_xp(120)
+				set_quest("kin", 3)
+				message.emit("Quest complete: Restless Kin", Color(0.97, 0.89, 0.64))
 		"accept_wardens":
 			if quest("wardens") == 0:
 				set_quest("wardens", 1)
