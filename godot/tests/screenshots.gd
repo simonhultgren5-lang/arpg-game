@@ -71,7 +71,26 @@ func _run() -> void:
 	w.player.cast_skill(0)
 	await _frames(8)
 	await _shot("4_boss")
-	w.hud._inventory.visible = true
+	w.player.hp = 99999.0
+	for kind in ["weapon", "head", "chest", "hands", "feet", "ring", "amulet", "offhand", "legs", "belt"]:
+		Game.add_item(Game.roll_loot(5, 0.9, kind))
+	for k in ["head", "chest", "ring"]:
+		for i in Game.inventory().size():
+			if Game.inventory()[i]["slot"] == k:
+				Game.equip_to(i)
+				break
+	Game.progress["level"] = 10
+	Game.leveled_up.emit(10)
+	w.hud.open_panel("character")
+	await _frames(20)
+	await _shot("5_character")
+	w.hud.open_panel("skills")
 	await _frames(5)
-	await _shot("5_pack")
+	await _shot("6_skills")
+	w.hud.open_panel("settings")
+	await _frames(5)
+	await _shot("7_settings")
+	w.hud.close_panels()
+	await _frames(5)
+	await _shot("8_hotbar")
 	get_tree().quit(0)
