@@ -36,7 +36,7 @@ const HOST = setting('HOST', '0.0.0.0');
 const DATA_DIR = path.resolve(here, setting('DATA_DIR', 'data'));
 const SERVER_NAME = String(setting('SERVER_NAME', 'Depths Server')).slice(0, 40);
 const MOTD = String(setting('MOTD', '')).slice(0, 200);
-const SERVER_VERSION = '0.3.3'; // kept equal to package.json by scripts/sync-version.mjs
+const SERVER_VERSION = '0.4.0'; // kept equal to package.json by scripts/sync-version.mjs
 const UPDATE_URL = String(
   setting('UPDATE_URL', 'https://github.com/simonhultgren5-lang/arpg-game/releases/latest/download/server-update.json'),
 );
@@ -487,7 +487,15 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// server.pid tells the admin CLI (admin.mjs) that the server is running, so it won't restore a
+// backup under it.
+const PID_FILE = path.join(DATA_DIR, 'server.pid');
 server.listen(PORT, HOST, () => {
+  try {
+    fs.writeFileSync(PID_FILE, String(process.pid));
+  } catch {
+    // Not fatal: admin restore then can't tell the server is running.
+  }
   console.log(`${SERVER_NAME} v${SERVER_VERSION} listening on http://${HOST}:${PORT}`);
   console.log(`Database: ${path.join(DATA_DIR, 'depths.db')}`);
 });
@@ -495,6 +503,7 @@ server.listen(PORT, HOST, () => {
 const shutdown = () => {
   server.close();
   db.close();
+  fs.rmSync(PID_FILE, { force: true });
   process.exit(0);
 };
 process.on('SIGINT', shutdown);

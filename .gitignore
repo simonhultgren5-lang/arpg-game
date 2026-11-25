@@ -10,6 +10,9 @@ coverage/
 # Desktop builds (electron-builder)
 release/
 
+# Local development data (bun run dev; bun run dev:reset deletes it)
+.dev/
+
 # Game server database (game-server/data) and local server config
 game-server/data/
 game-server/config.json

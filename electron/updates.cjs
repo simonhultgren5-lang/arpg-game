@@ -17,9 +17,12 @@ const { spawn } = require('node:child_process');
 const pkg = require('../package.json');
 
 const isDev = !app.isPackaged;
-const enabled = !isDev || process.env.DOD_UPDATES === '1';
+const enabledByDefault = !isDev || process.env.DOD_UPDATES === '1';
+let enabled = enabledByDefault;
 const repo = pkg.desktop?.githubRepo;
-const BASE = (process.env.DOD_UPDATE_URL || `https://github.com/${repo}/releases/latest/download/`).replace(/\/?$/, '/');
+const DEFAULT_BASE = (process.env.DOD_UPDATE_URL || `https://github.com/${repo}/releases/latest/download/`).replace(/\/?$/, '/');
+// The dev tools can point checks at another update folder for this session (see setBase).
+let BASE = DEFAULT_BASE;
 const RELEASES_PAGE = `https://github.com/${repo}/releases/latest`;
 const isPortable = Boolean(process.env.PORTABLE_EXECUTABLE_FILE);
 const launcherVersion = app.getVersion();
@@ -206,6 +209,7 @@ function cleanNotes(raw) {
     .slice(0, 100)
     .map((v) => ({
       version: v.version,
+      title: typeof v.title === 'string' && v.title.trim() ? v.title.trim().slice(0, 80) : null,
       date: typeof v.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : null,
       body: v.body.slice(0, 20000),
     }))
@@ -237,8 +241,35 @@ async function getPatchNotes() {
   return { versions: pick.versions, latest: pick.latest, source: pick === remoteNotes ? 'online' : 'bundled' };
 }
 
+// Dev tools: use another update source until the launcher closes. '' goes back to the default.
+// A custom source also turns update checks on when running from source.
+function setBase(url) {
+  const text = String(url || '').trim();
+  if (!text) {
+    BASE = DEFAULT_BASE;
+    enabled = enabledByDefault;
+  } else {
+    let parsed;
+    try {
+      parsed = new URL(text);
+    } catch {
+      return { error: 'Enter a full address, like http://127.0.0.1:4310/' };
+    }
+    if (!/^https?:$/.test(parsed.protocol)) return { error: 'Use an http:// or https:// address.' };
+    BASE = parsed.href.replace(/\/?$/, '/');
+    enabled = true;
+  }
+  status.enabled = enabled;
+  lastCheck = 0;
+  remoteNotes = null;
+  return { ok: true, base: BASE };
+}
+
 module.exports = {
   getPatchNotes,
+  setBase,
+  getBase: () => BASE,
+  defaultBase: DEFAULT_BASE,
   removeOldGamePatches,
   check,
   POLL_MS,

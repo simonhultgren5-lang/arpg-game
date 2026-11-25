@@ -20,6 +20,10 @@ var from_launcher := false
 var server_url := ""
 var token := ""
 var boot_error := ""
+## Developer tools (the Dev console, F1): on in debug builds (editor runs) and with --dev.
+var dev_mode := false
+## --dev-start crypt|boss: go straight there after entering the world (dev mode only).
+var dev_start := ""
 
 
 func _ready() -> void:
@@ -58,6 +62,9 @@ func _read_boot() -> void:
 		elif a.begins_with("--"):
 			opts[a.substr(2)] = ""
 		i += 1
+
+	dev_mode = OS.is_debug_build() or opts.has("dev")
+	dev_start = str(opts.get("dev-start", "")) if dev_mode else ""
 
 	var data := {}
 	if opts.has("character-json"):

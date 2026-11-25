@@ -16,6 +16,7 @@ const { spawn } = require('node:child_process');
 const servers = require('./servers.cjs');
 const characters = require('./characters.cjs');
 const updates = require('./updates.cjs');
+const devTools = require('./dev-tools.cjs');
 
 const LAUNCHER_ROOT = path.join(__dirname, '..', 'launcher');
 const SCHEME = 'app';
@@ -81,10 +82,10 @@ function openLauncher() {
   }
   launcherWindow = new BrowserWindow({
     title: 'Depths of Darkness — Launcher',
-    width: 1080,
-    height: 700,
-    minWidth: 900,
-    minHeight: 640,
+    width: 1240,
+    height: 760,
+    minWidth: 1040,
+    minHeight: 680,
     frame: false,
     resizable: true,
     maximizable: false,
@@ -191,6 +192,23 @@ const GAME_EXE = app.isPackaged
   : path.join(__dirname, '..', 'godot', 'build', 'DepthsOfDarkness.exe');
 let game = null; // the running game process
 
+// ---- dev tools (electron/dev-tools.cjs); every handler is a no-op unless they're enabled
+const devCtx = () => ({ gameExe: GAME_EXE, updates });
+ipcMain.handle('launcher:dev-info', () => (devTools.enabled ? devTools.info(devCtx()) : { enabled: false }));
+ipcMain.handle('launcher:dev-set-flags', (_e, flags) => {
+  if (!devTools.enabled) return { enabled: false };
+  devTools.setFlags(flags);
+  return devTools.info(devCtx());
+});
+ipcMain.handle('launcher:dev-open', (_e, which) => (devTools.enabled ? devTools.open(String(which), devCtx()) : { error: 'Dev tools are off.' }));
+ipcMain.handle('launcher:dev-update-url', (_e, url) => {
+  if (!devTools.enabled) return { error: 'Dev tools are off.' };
+  const result = updates.setBase(url);
+  if (!result.error) updates.check({ force: true });
+  return result;
+});
+ipcMain.handle('launcher:dev-clear-updates', () => (devTools.enabled ? devTools.clearDownloadedUpdates() : { error: 'Dev tools are off.' }));
+
 ipcMain.handle('launcher:game-status', () => ({ installed: fs.existsSync(GAME_EXE), running: Boolean(game) }));
 
 // Starts the game with a boot file. The token goes in the file rather than on the command line,
@@ -198,7 +216,11 @@ ipcMain.handle('launcher:game-status', () => ({ installed: fs.existsSync(GAME_EX
 function launchGame(boot) {
   const bootFile = path.join(app.getPath('userData'), 'boot-character.json');
   fs.writeFileSync(bootFile, JSON.stringify(boot), { mode: 0o600 });
-  const child = spawn(GAME_EXE, ['--', '--character-json', bootFile], {
+  // Dev tools (dev builds or --dev) can add engine and game options, like the in-game console.
+  const extra = devTools.gameArgs();
+  const args = [...extra.engine, '--', '--character-json', bootFile, ...extra.game];
+  devTools.rememberBoot(boot, args);
+  const child = spawn(GAME_EXE, args, {
     cwd: path.dirname(GAME_EXE),
     stdio: 'ignore',
     windowsHide: false,

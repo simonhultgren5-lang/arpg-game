@@ -23,6 +23,7 @@ const platform = process.env.PLATFORM || 'linux/arm64';
 
 const FILES = [
   'server.mjs',
+  'admin.mjs',
   'Dockerfile',
   'docker-compose.yml',
   '.dockerignore',

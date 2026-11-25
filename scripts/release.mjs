@@ -50,6 +50,13 @@ const changelog = fs.existsSync(path.join(root, 'CHANGELOG.md')) ? fs.readFileSy
 const section = changelog.split(/^## /m).find((part) => part.match(/^([\d.]+)/)?.[1] === version);
 if (!section) fail(`CHANGELOG.md has no "## ${version}" section. Add patch notes for players first.`);
 const notes = section.split('\n').slice(1).join('\n').trim();
+// "## 0.4.0 — Act I: The Tolling of Hollowmere (date)" names the release.
+const patchName = section
+  .split('\n')[0]
+  .replace(/^[\d.]+\s*/, '')
+  .replace(/\(\d{4}-\d{2}-\d{2}\)\s*$/, '')
+  .replace(/^[—–:-]\s*/, '')
+  .trim();
 if (!notes) fail(`The "## ${version}" section in CHANGELOG.md is empty.`);
 
 if (!dryRun) {
@@ -136,7 +143,7 @@ console.log('Publishing to GitHub…');
 const head = sh('git', ['rev-parse', 'HEAD']).out;
 const create = sh(
   'gh',
-  ['release', 'create', tag, ...uploads, '-R', repo, '--target', head, '--title', `Depths of Darkness ${tag}`, '--notes-file', notesFile, '--latest'],
+  ['release', 'create', tag, ...uploads, '-R', repo, '--target', head, '--title', patchName ? `Depths of Darkness ${tag} — ${patchName}` : `Depths of Darkness ${tag}`, '--notes-file', notesFile, '--latest'],
   { stdio: 'inherit' },
 );
 if (!create.ok) fail('gh release create failed.');

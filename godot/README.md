@@ -17,6 +17,28 @@ From a terminal:
 godot --path godot
 ```
 
+### Dev console
+
+Press **F1** or **`** (backtick) to open the developer console. It works in builds run from the Godot editor, and in exported builds started with `--dev` (the launcher's **Dev tools** page passes it). Players' builds don't have it. The game pauses while the console is open; **↑** and **↓** step through earlier commands.
+
+| Command | What it does |
+| --- | --- |
+| `help` | List every command |
+| `god [on\|off]` | Monsters can't hurt you |
+| `heal` | Full health and mana |
+| `level <1-20>`, `xp <n>` | Set the level, or add experience |
+| `gold <n>`, `potions <n>` | Add gold, set the number of draughts |
+| `give <weapon\|armor\|charm> [rarity 0-3]` | Put a rolled item in the pack |
+| `loot [n]` | Drop items at your feet |
+| `spawn <hollow\|archer\|crawler\|boss> [n] [elite]` | Spawn monsters near you |
+| `kill` | Kill every monster in the area |
+| `tp <town\|crypt\|boss>` | Go to an area (`boss`: next to Hask) |
+| `quest <0-3>` | Set the Act I quest step |
+| `speed <0.1-5>`, `fps` | Game speed, FPS counter |
+| `stats`, `save`, `clear` | Print the hero's stats, save now, clear the log |
+
+`--dev-start crypt` or `--dev-start boss` (with `--dev`) goes there right after **Enter Hollowmere**. The console's code is `scripts/autoload/dev_console.gd`; `res://tests/dev_console_test.tscn` tests it headless.
+
 ### Smoke test
 
 Plays the slice headless for all three classes (walk, talk, crypt, fight, boss, loot, portal, quest hand-in, death, save) and exits with code 0 when every check passes:

@@ -18,6 +18,12 @@ contextBridge.exposeInMainWorld('launcher', {
   createCharacter: call('launcher:create-character'),
   deleteCharacter: call('launcher:delete-character'),
   getGameStatus: call('launcher:game-status'),
+  // Dev tools (only answer when running from source or with --dev; see electron/dev-tools.cjs)
+  getDevInfo: call('launcher:dev-info'),
+  setDevFlags: call('launcher:dev-set-flags'),
+  devOpen: call('launcher:dev-open'),
+  devSetUpdateUrl: call('launcher:dev-update-url'),
+  devClearUpdates: call('launcher:dev-clear-updates'),
   onGameClosed: (callback) => {
     if (typeof callback !== 'function') return;
     ipcRenderer.on('launcher:game-closed', () => callback());

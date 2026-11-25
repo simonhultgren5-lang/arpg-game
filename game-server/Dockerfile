@@ -8,7 +8,7 @@ ENV NODE_ENV=production \
     DATA_DIR=/data
 
 WORKDIR /app
-COPY server.mjs ./
+COPY server.mjs admin.mjs ./
 
 # Accounts and saves live in /data (a Docker volume), owned by the unprivileged "node" user.
 RUN mkdir -p /data && chown node:node /data

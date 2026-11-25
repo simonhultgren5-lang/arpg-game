@@ -449,7 +449,7 @@ func drink_potion() -> void:
 
 
 func take_damage(amount: float) -> void:
-	if dead:
+	if dead or Dev.god_mode:
 		return
 	var dealt: float = Game.mitigate(amount)
 	hp -= dealt

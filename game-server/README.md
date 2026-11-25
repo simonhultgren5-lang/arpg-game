@@ -102,6 +102,28 @@ cd ~/arpg-game && git pull
 bash game-server/update.sh --auto
 ```
 
+### Manage accounts (admin commands)
+
+`admin.mjs` manages accounts and characters directly in the server's database. It works while the server runs, and changes apply right away. With Docker, run it inside the container:
+
+```bash
+docker exec -it depths-server node admin.mjs                      # list of commands
+docker exec -it depths-server node admin.mjs accounts             # accounts, characters, last login
+docker exec -it depths-server node admin.mjs characters edda      # one account's characters (or everyone's)
+docker exec -it depths-server node admin.mjs reset-password edda  # new random password, signs out everywhere
+docker exec -it depths-server node admin.mjs reset-password edda hunter22
+docker exec -it depths-server node admin.mjs rename-character edda "Old Name" "New Name"
+docker exec -it depths-server node admin.mjs delete-character edda "Old Name" --yes
+docker exec -it depths-server node admin.mjs delete-account edda --yes
+docker exec -it depths-server node admin.mjs sign-out edda        # end all logins of an account
+docker exec -it depths-server node admin.mjs stats                # counts and database size
+docker exec -it depths-server node admin.mjs backup               # copy to /data/backups/depths-<date>.db
+```
+
+Without Docker, run `node admin.mjs <command>` in the server folder. From a clone of the repo, `bun run admin <command>` uses `game-server/data`. Commands that delete something ask for `--yes` first.
+
+To restore a backup made with `admin.mjs backup`, stop the server first: the command refuses while the server runs. Then `node admin.mjs restore <file> --yes` replaces the database and keeps the old one next to it as `depths.db.before-restore-<time>`.
+
 ### Back up the data
 
 ```bash

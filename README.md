@@ -25,6 +25,9 @@ Then pick what you want to do:
 
 | Goal | Command | Result |
 | --- | --- | --- |
+| Everything for local development | `bun run dev` | A local game server with a test account and three heroes, then the launcher with the dev tools on |
+| Run every check | `bun run test` | Syntax, game server and admin CLI tests, and the Godot smoke and dev console tests (`bun run test:quick` skips Godot) |
+| Start the dev setup from scratch | `bun run dev:reset` | Deletes the dev server's data, the dev launcher's data and the saves of dev and test heroes |
 | Work on the game | Open `godot/project.godot` in Godot and press F5 | The title screen offers a test hero of each class |
 | Export the game | `bun run godot:export` | `godot/build/DepthsOfDarkness.exe` |
 | Run the launcher from source | `bun run launcher` | The launcher; **Play** starts the exported game |
@@ -38,13 +41,16 @@ Then pick what you want to do:
 
 ## The launcher and accounts
 
-- **Server list** with a live online/offline dot, ping and server version for each server. **+** adds a server by address (`192.168.1.50` or `my-pi.local:4100`; port 4100 is assumed). Hover a server and press ✕ to remove it. When a newer server is released, the server shows **Server update available**.
-- **Log in / Register** for the selected server. Accounts live on that server, so each server has its own accounts.
-- **Characters:** each account has up to **5 characters**. Create one in the launcher (name, class, armor color), select it, and press **Play**. Delete a character by hovering it and pressing ✕, then typing its name to confirm. Double-click a character to play it straight away.
-- **Play** hides the launcher and starts the game with that character. The game loads and saves the hero's progress on the server (see [godot/README.md](godot/README.md), "Launcher contract"). When the game closes, the launcher comes back with the character list refreshed.
-- **Play offline** switches to characters stored on this PC only (also up to 5).
-- **The Act I film** loops behind the launcher; **Watch the Act I film** plays it full size with sound.
-- **What's new** shows the highlights of the newest version, with a NEW badge until the player opens the notes. **Patch notes** (on the card or in the footer) opens every version's notes.
+The launcher has four pages in its top bar: **Play**, **News**, **Settings** and, in dev builds, **Dev tools**.
+
+- **Play:** the selected hero stands in the chapel niche in the middle. Your characters line up along the bottom, and **Play** is on the right. Before you can play, the niche shows what's needed: choose a server, sign in (log in or create an account), or create your first character.
+  - **Characters:** each account has up to **5 characters**. **New character** creates one (class, name, armor color). Click a character to select it, or double-click to play straight away. Hover a character and press ✕ to delete it, then type its name to confirm.
+  - **Online / Offline** (top right) switches between your characters on the selected server and characters stored on this PC only (also up to 5).
+  - **Play** hides the launcher and starts the game with that character. The game loads and saves the hero's progress on the server (see [godot/README.md](godot/README.md), "Launcher contract"). When the game closes, the launcher comes back with the character list refreshed.
+  - The left side shows the newest patch (its name, with a **New** badge until you've read it), update progress and the server's message. The right side shows the server you play on and the **Act I film**, which also loops behind the launcher.
+- **News:** every version's patch notes.
+- **Settings:** the server list, with a live online/offline dot, ping and server version for each. **+** adds a server by address (`192.168.1.50` or `my-pi.local:4100`; port 4100 is assumed). Hover a server and press ✕ to remove it. When a newer server is released, it shows **Server update available**. Also your account (log out) and updates (version, check now).
+- **Dev tools** (see [Developing](#developing)).
 
 The app icon and logo come from `launcher/assets/emblem.svg` (the game has its own copy in `godot/art/`). After changing it, run `bun run icons` to regenerate `launcher/assets/icon.ico` and `icon.png`.
 
@@ -107,7 +113,22 @@ release/                Builds (created by `bun run dist` and `bun run release`,
 ## Developing
 
 - **The game:** open `godot/project.godot` in Godot. Started from the editor, the title screen offers a test hero of each class and saves offline. `godot/README.md` covers the controls, the headless smoke test and the model galleries.
-- **The launcher:** `bun run launcher`. `F5` or `Ctrl+R` reloads it after editing `launcher/`, and `F12` opens DevTools. Changes to `electron/` need a restart. **Play** needs an exported game (`bun run godot:export`).
+- **The launcher:** `bun run launcher` (or `bun run dev`, which also starts a local server). `F5` or `Ctrl+R` reloads it after editing `launcher/`, and `F12` opens DevTools. Changes to `electron/` need a restart. **Play** needs an exported game (`bun run godot:export`).
+- **`bun run dev`** starts a game server on <http://localhost:4100> with its data in `.dev/server-data`, creates the test account **dev / devpass1** with three heroes (Aldric, Morwen and Edda), and opens the launcher with the dev tools on. In the launcher, pick **This PC** and log in. Closing the launcher stops the server. `bun run dev:reset` deletes the dev data again (it asks first; installed-game data is never touched).
+- **`bun run test`** runs every automated check: syntax, the game server and admin CLI tests (`game-server/tests/`), and the Godot smoke test and dev console test, headless. Run it before every release.
+
+### Dev tools in the launcher
+
+Builds run from source show a **Dev tools** page. An installed launcher shows it when started with `--dev` (or with `DOD_DEV=1`). Players never see it.
+
+- **Game launch:** turn the in-game dev console on, start the game windowed at 1280 × 720, turn on Godot's verbose log, and choose where to start (town, the crypt, or next to the boss). The choices apply every time you press **Play**, and are saved in `dev-tools.json` in the launcher's data folder.
+- **Folders:** open the game's saves and logs, the launcher's data folder and the game build. Also shows the last boot file sent to the game, with the login token hidden.
+- **Update source:** check for updates against another address (like a local folder server) until the launcher closes. This also turns update checks on when running from source.
+- **Reset:** forget the launcher's remembered choices, delete downloaded launcher updates, reload the launcher, and see the launcher, Electron and Node versions.
+
+### In-game dev console
+
+**F1** or **`** opens the console in builds run from the Godot editor, and in exported builds started with `--dev` (which the launcher's dev tools pass). The game pauses while it's open. Type `help` for every command; the main ones are `god`, `heal`, `level 10`, `gold 500`, `give armor 3`, `loot 5`, `spawn hollow 5 elite`, `kill`, `tp town|crypt|boss`, `quest 0-3`, `speed 2`, `fps` and `stats`. See [godot/README.md](godot/README.md).
 
 ## Releasing an update
 
@@ -115,9 +136,10 @@ Players don't download anything by hand. When the launcher starts (and every few
 
 1. Bump the version: `bun run bump:patch` (or `minor` / `major`).
 2. Make and test your changes.
-3. Add a `## <version> (<date>)` section to [CHANGELOG.md](CHANGELOG.md), with optional `### New` / `### Changes` / `### Fixes` subheadings and one `- ` line per change. This is what players read in the launcher's **What's new** card and **Patch Notes** panel.
-4. Commit and push.
-5. Run `bun run release`. It exports the game, builds the installer, packs the game server, writes the update files and creates the GitHub release `v<version>`. Add `-- --dry-run` to build into `release/upload/` without publishing.
+3. Add a `## <version> (<date>)` section to [CHANGELOG.md](CHANGELOG.md), with optional `### New` / `### Changes` / `### Fixes` subheadings and one `- ` line per change. This is what players read on the launcher's Play page and **News** page. A big update can have a name: `## 0.4.0 — Act I: The Tolling of Hollowmere (<date>)`. The launcher shows it as the patch's title, and the GitHub release is called "Depths of Darkness v0.4.0 — Act I: The Tolling of Hollowmere".
+4. Run `bun run test`.
+5. Commit and push.
+6. Run `bun run release`. It exports the game, builds the installer, packs the game server, writes the update files and creates the GitHub release `v<version>`. Add `-- --dry-run` to build into `release/upload/` without publishing.
 
 The release script needs the GitHub CLI logged in (`gh auth login`), and it refuses to publish if the version already has a release, the changelog section is missing, or your changes aren't committed and pushed.
 
@@ -125,7 +147,7 @@ The release script needs the GitHub CLI logged in (`gh auth login`), and it refu
 
 **Patch notes:** `CHANGELOG.md` is the only place you write them. The launcher bundles a copy (`launcher/patch-notes.json`, generated by `bun run launcher` and `bun run dist`, not committed) so the notes work offline, and downloads the newest copy from the latest release.
 
-**Testing updates locally:** the launcher never updates itself when run from source. To try the flow, serve a folder with a `launcher-update.json` whose `version` is higher than the current one, and start the launcher with `$env:DOD_UPDATES="1"; $env:DOD_UPDATE_URL="http://127.0.0.1:5555/"; bun run launcher`.
+**Testing updates locally:** the launcher never updates itself when run from source. To try the flow, serve a folder with a `launcher-update.json` whose `version` is higher than the current one, and either enter its address under **Dev tools → Update source**, or start the launcher with `$env:DOD_UPDATES="1"; $env:DOD_UPDATE_URL="http://127.0.0.1:5555/"; bun run launcher`.
 
 ## Troubleshooting
 

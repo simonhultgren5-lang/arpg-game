@@ -3,7 +3,8 @@
 //   node scripts/patch-notes.mjs                 writes launcher/patch-notes.json (bundled, works offline)
 //   node scripts/patch-notes.mjs <output.json>   writes somewhere else (the release script uploads one)
 //
-// Format: { format: 1, generatedAt, latest, versions: [{ version, date, body }] }, newest first.
+// Format: { format: 1, generatedAt, latest, versions: [{ version, title, date, body }] }, newest first.
+// A section heading can name the patch: "## 0.4.0 — Act I: The Tolling of Hollowmere (2026-11-25)".
 // "body" is the section's text (### subheadings, "- " bullets, **bold**); the launcher renders it as text.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,10 +25,10 @@ export function readPatchNotes() {
   const versions = [];
   for (const part of text.split(/^## /m).slice(1)) {
     const [heading, ...rest] = part.split('\n');
-    const match = heading.match(/^(\d+\.\d+\.\d+)\b(?:.*?\((\d{4}-\d{2}-\d{2})\))?/);
+    const match = heading.trim().match(/^(\d+\.\d+\.\d+)\b\s*(?:[—–:-]\s*(.*?))?\s*(?:\((\d{4}-\d{2}-\d{2})\))?$/);
     if (!match) continue; // not a version section
     const body = rest.join('\n').trim();
-    if (body) versions.push({ version: match[1], date: match[2] || null, body });
+    if (body) versions.push({ version: match[1], title: match[2]?.trim() || null, date: match[3] || null, body });
   }
   versions.sort((a, b) => compare(a.version, b.version));
   return { format: 1, generatedAt: new Date().toISOString(), latest: versions[0]?.version || null, versions };
