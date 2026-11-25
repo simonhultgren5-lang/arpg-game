@@ -10,6 +10,20 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.6 — Tolling Heard (2026-11-25)
+
+### New
+- **Hollowmere has its own sound.** Every skill of every class has its own sound, with three takes so repeated casts never sound the same.
+- **Monsters sound like what they are.** Each one has its own hits, death and a warning sound before it attacks, so you can hear a blow coming.
+- **Footsteps change underfoot**: stone in the crypt, cobble and earth in town.
+- **New music:** for the title, the town, the crypt and combat, and a two-phase score for Hask that turns as the fight does.
+- **The world around you is heard:** wind, dripping water, the cave, the forest and rain, with thunder in storms.
+- **Loot, the inventory, quests, level-ups and uniques all have their own sounds.**
+- **The Second Cup**, a short opening scene: Edda the smith remembers the night her brother came back. It plays once, when a new hero first walks into Hollowmere.
+
+### Changes
+- Music and ambience dip under big moments, and every sound follows the volume sliders in Settings.
+
 ## 0.5.0-beta.5 — The Hero's Ledger (2026-11-25)
 
 ### New
