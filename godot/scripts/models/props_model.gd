@@ -2,6 +2,7 @@ extends RefCounted
 
 const K = preload("res://scripts/models/mesh_kit.gd")
 const B = preload("res://scripts/world/build.gd")
+const AssetModels = preload("res://scripts/models/asset_models.gd")
 
 
 static func _root(parent: Node, pos: Vector3) -> Node3D:
@@ -12,6 +13,16 @@ static func _root(parent: Node, pos: Vector3) -> Node3D:
 
 
 static var _flame_mat: ShaderMaterial
+
+
+## The Blender model of a prop (assets/models/props/<id>.gltf) placed at `pos`, or null if missing.
+static func asset(parent: Node, id: String, pos: Vector3) -> Node3D:
+	var m := AssetModels.prop(id)
+	if m == null:
+		return null
+	m.position = pos
+	parent.add_child(m)
+	return m
 
 
 static func sconce(parent: Node, pos: Vector3) -> Node3D:
@@ -38,6 +49,9 @@ static func sconce(parent: Node, pos: Vector3) -> Node3D:
 
 
 static func barrel(parent: Node, pos: Vector3) -> Node3D:
+	var modelled := asset(parent, "barrel", pos)
+	if modelled:
+		return modelled
 	var root := _root(parent, pos)
 	var wood := B.mat(Color("#68452e"))
 	var iron := B.mat(Color("#39393c"), 0.52, Color.BLACK, 1, 0.3)
@@ -65,6 +79,9 @@ static func barrel(parent: Node, pos: Vector3) -> Node3D:
 
 
 static func sarcophagus(parent: Node, pos: Vector3) -> Node3D:
+	var modelled := asset(parent, "sarcophagus", pos)
+	if modelled:
+		return modelled
 	var root := _root(parent, pos)
 	var basalt := B.mat(Color("#45404a"))
 	var marble := B.mat(Color("#807880"))

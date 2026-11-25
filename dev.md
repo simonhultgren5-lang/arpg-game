@@ -1,6 +1,6 @@
 # Developing Depths of Darkness
 
-How to set up, build, test and release the project, and how to use the dev tools. For what the game and launcher do, see [README.md](README.md). Deeper reference lives next to the code: [godot/README.md](godot/README.md) for the game, [game-server/README.md](game-server/README.md) for the server, and [source-assets/README.md](source-assets/README.md) for art.
+How to set up, build, test and release the project, and how to use the dev tools. For what the game and launcher do, see [README.md](README.md). Deeper reference lives next to the code: [godot/README.md](godot/README.md) for the game, [game-server/README.md](game-server/README.md) for the server, and [assets.md](assets.md) for making models and textures (the Blender pipeline).
 
 ## Contents
 
@@ -211,8 +211,8 @@ For channels, put pre-release manifests in `beta/launcher-update.json` and `dev/
 
 ```
 godot/assets/            game-ready (what the game loads)
-├── textures/            UI art, portraits, branding
-├── models/              imported 3D models (.glb preferred)
+├── textures/            UI art, portraits, branding; materials/ holds the PBR texture sets
+├── models/              characters/ and props/ (.gltf + .bin, made by scripts/assets/)
 ├── animations/
 ├── audio/               spells/, voice/, music/, ambience/, sfx/
 └── cinematics/
@@ -230,6 +230,7 @@ source-assets/           editable originals, never loaded by the game
   git lfs locks                                         # who has what
   ```
 
+- **Models and textures are made by Blender scripts:** `bun run assets:build` (needs Blender 4.5 LTS). The full guide is [assets.md](assets.md).
 - Export from `source-assets/<Group>/` into `godot/assets/<group>/`, lowercase file names with underscores.
 - The launcher's own art (emblem, icons, the Act I film) is in `launcher/assets/`. After changing the emblem run `bun run icons`.
 

@@ -22,3 +22,7 @@ game-server/config.json
 
 # Generated from CHANGELOG.md by scripts/patch-notes.mjs
 launcher/patch-notes.json
+
+# Python caches from the Blender asset scripts
+__pycache__/
+*.pyc

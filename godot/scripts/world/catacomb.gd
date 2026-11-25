@@ -217,8 +217,12 @@ func _decorate(level: Node3D, room: Dictionary, rng: RandomNumberGenerator) -> v
 			var p := grid.center(c)
 			match room["template"]:
 				"pillars":
-					B.cylinder(0.55, 0.65, 2.6, stone, p + Vector3(0, 1.3, 0), level, 8)
-					B.box(Vector3(1.5, 0.3, 1.5), stone, p + Vector3(0, 0.15, 0), level)
+					var pillar := preload("res://scripts/models/props_model.gd").asset(level, "crypt_pillar", p)
+					if pillar:
+						pillar.rotation.y = rng.randi_range(0, 3) * PI * 0.5
+					else:
+						B.cylinder(0.55, 0.65, 2.6, stone, p + Vector3(0, 1.3, 0), level, 8)
+						B.box(Vector3(1.5, 0.3, 1.5), stone, p + Vector3(0, 0.15, 0), level)
 				"ossuary":
 					var sarc := preload("res://scripts/models/props_model.gd").sarcophagus(level, p)
 					sarc.rotation.y = rng.randi_range(0, 1) * PI * 0.5

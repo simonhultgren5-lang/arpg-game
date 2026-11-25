@@ -35,8 +35,11 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 	fmi.multimesh = fm
 	var floor_mat := ShaderMaterial.new()
 	floor_mat.shader = preload("res://shaders/flagstone.gdshader")
-	if is_paved.is_valid():
-		floor_mat.set_shader_parameter("course_size", Vector2(0.76, 0.48))
+	# Town streets are cobbled, the crypt is flagged; bare ground is earth (see /assets.md).
+	var town := is_paved.is_valid()
+	_set_textures(floor_mat, "paved", "cobble" if town else "flagstone")
+	_set_textures(floor_mat, "earth", "earth")
+	floor_mat.set_shader_parameter("paved_size", 3.0 if town else 4.0)
 	fmi.material_override = floor_mat
 	fmi.name = "Floor"
 	parent.add_child(fmi)
@@ -84,6 +87,8 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 	var wall_mat := ShaderMaterial.new()
 	wall_mat.shader = WALL_SHADER
 	wall_mat.set_shader_parameter("albedo", wall_color)
+	if _set_textures(wall_mat, "stone", "stone_wall"):
+		wall_mat.set_shader_parameter("use_texture", 1.0)
 	wmi.material_override = wall_mat
 	wmi.name = "Walls"
 	parent.add_child(wmi)
@@ -113,3 +118,15 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 			else:
 				x += 1
 	return wall_mat
+
+
+## Binds <name>_albedo/_normal/_roughness.png from assets/textures/materials/ to <prefix>_* uniforms.
+## Returns false (and leaves the shader's fallback) when the textures aren't there.
+static func _set_textures(mat: ShaderMaterial, prefix: String, name: String) -> bool:
+	var base := "res://assets/textures/materials/%s_%s.png"
+	for part in ["albedo", "normal", "roughness"]:
+		var path := base % [name, part]
+		if not ResourceLoader.exists(path):
+			return false
+		mat.set_shader_parameter("%s_%s" % [prefix, part], load(path))
+	return true

@@ -6,6 +6,7 @@ const Fx = preload("res://scripts/world/fx.gd")
 const Projectile = preload("res://scripts/actors/projectile.gd")
 const HollowModel = preload("res://scripts/models/hollow_model.gd")
 const BoneArcherModel = preload("res://scripts/models/bone_archer_model.gd")
+const AssetModels = preload("res://scripts/models/asset_models.gd")
 const CrawlerModel = preload("res://scripts/models/crawler_model.gd")
 const BossModel = preload("res://scripts/models/boss_model.gd")
 
@@ -102,10 +103,20 @@ func _m(color: Color) -> StandardMaterial3D:
 	return m
 
 
+## The Blender model's animator (assets/models/characters/<kind>.gltf), or null for code models.
+var _anim: Node = null
+
+
 func _build_model(s: float) -> void:
 	var col: Color = data["color"]
 	var eye := B.mat(Color(0.6, 0.9, 1.0), 1.0, Color(0.5, 0.9, 1.0), 4.0)
-	match kind:
+	var asset := AssetModels.character(kind)
+	if asset:
+		asset.scale = Vector3.ONE * s
+		_model.add_child(asset)
+		_mats.append_array(AssetModels.prepare(asset))
+		_anim = AssetModels.animate(asset)
+	match "" if asset else kind:
 		"hollow":
 			HollowModel.build(_model, s, col, _m)
 		"crawler":
@@ -138,6 +149,8 @@ func _physics_process(delta: float) -> void:
 	for m in _mats:
 		m.emission = Color(0.9, 0.75, 0.6) * (_flash * 0.45) if _windup <= 0.0 else Color(1.0, 0.25, 0.1) * 0.6
 	_knock = _knock.move_toward(Vector3.ZERO, delta * 18.0)
+	if _anim:
+		_anim.update(delta, clampf(get_position_delta().length() / maxf(delta * float(data["speed"]), 0.001), 0.0, 1.0))
 	if _stun > 0.0:
 		_stun -= delta
 		_windup = 0.0
@@ -180,6 +193,8 @@ func _physics_process(delta: float) -> void:
 			move = -to_p.normalized() * 0.8  # back off
 		if _cd <= 0.0:
 			_windup = data["windup"]
+			if _anim:
+				_anim.one_shot("attack", _anim.player.get_animation("attack").length / maxf(float(data["windup"]) + 0.25, 0.1) if _anim.player.has_animation("attack") else 1.0)
 			_cd = data["cd"] * (0.75 if _enraged else 1.0)
 	else:
 		move = _chase(delta, p, can_see)
@@ -291,6 +306,8 @@ func _boss_logic(delta: float, p: Node3D, dist: float) -> void:
 	if _toll_cd <= 0.0 and _windup <= 0.0:
 		_toll_cd = 7.0 if not _enraged else 5.0
 		_toll_pending = 1.2
+		if _anim:
+			_anim.one_shot("cast", 0.6)
 		Fx.telegraph(world, global_position, 7.0, Color(1.0, 0.35, 0.1), 1.2)
 		world.message("THE BELL TOLLS", Color(1.0, 0.5, 0.25))
 		ActAudio.toll(self)
@@ -313,6 +330,8 @@ func take_damage(amount: float, crit := false, push := Vector3.ZERO) -> void:
 	if dead:
 		return
 	hp -= amount
+	if _anim and _windup <= 0.0 and hp > 0.0:
+		_anim.one_shot("hit")
 	_flash = 1.0
 	set_aggro()
 	world.damage_number(global_position, amount, crit)
@@ -350,8 +369,12 @@ func _die() -> void:
 	died.emit(self)
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(_model, "rotation:x", -PI * 0.5, 0.35).set_trans(Tween.TRANS_BACK)
-	tw.tween_property(_model, "position:y", -0.3, 0.35)
+	if _anim:
+		_anim.die()
+		tw.tween_interval(0.9)
+	else:
+		tw.tween_property(_model, "rotation:x", -PI * 0.5, 0.35).set_trans(Tween.TRANS_BACK)
+		tw.tween_property(_model, "position:y", -0.3, 0.35)
 	tw.chain().tween_interval(2.0)
 	tw.chain().tween_property(_model, "position:y", -2.0, 1.2)
 	tw.chain().tween_callback(queue_free)
