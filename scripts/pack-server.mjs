@@ -28,6 +28,9 @@ const FILES = [
   '.dockerignore',
   'config.example.json',
   'install.sh',
+  'update.sh',
+  'depths-server-update.service',
+  'depths-server-update.timer',
   'depths-server.service',
   'README.md',
 ];

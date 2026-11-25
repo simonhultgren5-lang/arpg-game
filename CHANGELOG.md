@@ -9,6 +9,17 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.3.3
+
+### New
+- **The Act I film plays behind the launcher.** It loops quietly behind the title. **Watch the Act I film** plays it full size with sound and captions, and Esc brings you back.
+- **Sister Maud, Edda and Old Corwin have 3D models** that match their Field guide portraits: Maud's lantern and red habit, Edda's apron and hammer, Corwin's hat, staff and lantern.
+- **Server updates:** the launcher shows the server's version, and tells you when a newer server is out. On the Pi, `bash game-server/update.sh` installs it (or `--auto` for nightly updates). Accounts and saves are kept.
+
+### Fixes
+- The 3D game now saves to servers with a `.local` name (like `raspberrypi.local`). Before, it couldn't reach them and only saved on your PC.
+- The game server reports its real version instead of 0.1.0.
+
 ## 0.3.2 (2026-11-25)
 
 ### New

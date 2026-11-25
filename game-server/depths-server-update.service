@@ -1,0 +1,11 @@
+# Installed by `bash update.sh --auto`. @DIR@ and @USER@ are filled in by update.sh.
+[Unit]
+Description=Depths of Darkness game server update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@DIR@
+ExecStart=/bin/bash @DIR@/update.sh --quiet

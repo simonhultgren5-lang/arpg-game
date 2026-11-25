@@ -11,6 +11,8 @@
 //   DATA_DIR     folder for the database file       (default game-server/data)
 //   SERVER_NAME  name shown in the launcher         (default "Depths Server")
 //   MOTD         message of the day in the launcher (default empty)
+//   UPDATE_URL   where to look for new server versions (default: the GitHub release's
+//                server-update.json); set to "off" to turn the check off
 
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
@@ -34,7 +36,10 @@ const HOST = setting('HOST', '0.0.0.0');
 const DATA_DIR = path.resolve(here, setting('DATA_DIR', 'data'));
 const SERVER_NAME = String(setting('SERVER_NAME', 'Depths Server')).slice(0, 40);
 const MOTD = String(setting('MOTD', '')).slice(0, 200);
-const SERVER_VERSION = '0.1.0'; // set to the game version by scripts/pack-server.mjs
+const SERVER_VERSION = '0.3.2'; // kept equal to package.json by scripts/sync-version.mjs
+const UPDATE_URL = String(
+  setting('UPDATE_URL', 'https://github.com/simonhultgren5-lang/arpg-game/releases/latest/download/server-update.json'),
+);
 const SESSION_DAYS = 30;
 const MAX_BODY = 4 * 1024 * 1024; // a full save snapshot is well under this
 const MAX_CHARACTERS = 5; // characters per account
@@ -297,6 +302,36 @@ function legacySaveMeta(accountId) {
     : null;
 }
 
+// ---------------------------------------------------------------- update check
+// Looks for a newer server release every 6 hours. The server never updates itself (inside Docker it
+// can't); it reports the new version in /api/status and the log, and update.sh installs it.
+let latestRelease = null;
+const versionParts = (v) => String(v).replace(/^v/, '').split(/[.-]/).map((n) => parseInt(n, 10) || 0);
+function newerThan(a, b) {
+  const x = versionParts(a);
+  const y = versionParts(b);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+}
+async function checkForUpdate() {
+  if (!/^https?:\/\//.test(UPDATE_URL)) return;
+  try {
+    const res = await fetch(UPDATE_URL, { signal: AbortSignal.timeout(15000), headers: { accept: 'application/json' } });
+    if (!res.ok) return;
+    const info = await res.json();
+    if (typeof info?.version !== 'string') return;
+    const wasKnown = latestRelease?.version === info.version;
+    latestRelease = { version: info.version, notes: typeof info.notes === 'string' ? info.notes.slice(0, 2000) : '' };
+    if (!wasKnown && newerThan(info.version, SERVER_VERSION)) {
+      console.log(`[update] Server ${info.version} is available (running ${SERVER_VERSION}). On the Pi run: bash update.sh`);
+    }
+  } catch {
+    // Offline or GitHub unreachable: try again at the next check.
+  }
+}
+checkForUpdate();
+setInterval(checkForUpdate, 6 * 3600 * 1000).unref();
+
 // ---------------------------------------------------------------- routes
 const routes = {
   'GET /api/status': () => ({
@@ -306,6 +341,10 @@ const routes = {
     name: SERVER_NAME,
     motd: MOTD,
     version: SERVER_VERSION,
+    // A newer server release on GitHub, if any. Install it on the Pi with game-server/update.sh.
+    update: latestRelease && newerThan(latestRelease.version, SERVER_VERSION)
+      ? { version: latestRelease.version, notes: latestRelease.notes || '' }
+      : null,
     accounts: q.countAccounts.get().n,
     uptimeSeconds: Math.round((Date.now() - STARTED_AT) / 1000),
   }),

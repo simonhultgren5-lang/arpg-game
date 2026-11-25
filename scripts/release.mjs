@@ -115,6 +115,24 @@ if (withLauncher) {
   console.log(launcherManifest ? `✓ Launcher stays at ${launcherManifest.version}` : '! No launcher-update.json found on GitHub yet (run release:launcher once)');
 }
 
+// The game server: the package for the Pi and a manifest the server checks (see game-server/update.sh).
+const packed = sh('node', ['scripts/pack-server.mjs'], { stdio: 'inherit' });
+if (!packed.ok) fail('Packing the game server failed (see above).');
+const serverName = `depths-server-${version}.tar.gz`;
+const serverFile = path.join(uploadDir, serverName);
+fs.copyFileSync(path.join(root, 'release', serverName), serverFile);
+uploads.push(serverFile);
+fs.writeFileSync(
+  path.join(uploadDir, 'server-update.json'),
+  JSON.stringify(
+    { version, url: download(serverName), size: fs.statSync(serverFile).size, sha256: sha256(serverFile), notes, date: new Date().toISOString() },
+    null,
+    2,
+  ),
+);
+uploads.push(path.join(uploadDir, 'server-update.json'));
+console.log(`✓ Game server ${serverName}`);
+
 const gameManifest = {
   version,
   url: download(pak.name),
