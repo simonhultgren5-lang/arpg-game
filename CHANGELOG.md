@@ -18,6 +18,17 @@ How to write a section:
 - **The Wardens' mausoleum** has a columned porch, a pediment, bronze doors and stone urns at its corners. One has been knocked off.
 - **The mausoleum gate** is an iron gate between stone piers, one leaf forced open, a broken chain hanging, and worn steps going down into the dark with the ember glow below.
 - Roofs, walls and stone are textured at their real size, so slates and stone courses read at a glance from the camera.
+- **A quest log (J).** Every quest you've met, grouped Main story, Side quests and Completed, with its story, who gave it, what to do next (with counters) and the reward. The three you're on stay tracked under the minimap.
+- **Two new side quests.** *The Southwatch Fire*: Edda's beacon in the fen has gone dark; clear the risen and relight it. *Restless Kin*: Old Corwin wants back the grave-tokens the strongest risen still hold.
+- **The Southwatch Fen is dangerous now.** Packs of the risen, each led by an elite, roam south of the town wall. They're back every time you return, and they never follow you inside the wall.
+- **A new launch.** The game opens on the emblem forged out of the dark, rising embers, the bell's toll and a gold light across the title. Any key skips it.
+- **The launcher shows Hollowmere at night** behind every page, real footage of the game: the square, the chapel, the crypt gate and a fight in the fen.
+- Active buffs and wards show above the skill bar with the seconds left, the menu buttons sit in the corner, and the zone name changes when you cross into the fen.
+
+### Changes
+- Kills give more experience from monsters above your level and less from those far below it.
+- Dying now also costs 10% of the experience your current level needs. You never lose a level.
+- Monsters give up the chase and recover if you lead them far from where they were.
 
 ## 0.5.0-beta.8 — The Long Lens (2026-11-25)
 
