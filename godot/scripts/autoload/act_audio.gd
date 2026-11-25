@@ -37,7 +37,7 @@ func spell(owner_node: Node, id: String) -> void:
 
 func _play(owner_node: Node, folder: String, id: String, volume: float) -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
-	player.stream = load("res://audio/%s/%s.wav" % [folder, id])
+	player.stream = load("res://assets/audio/%s/%s.wav" % [folder, id])
 	player.volume_db = volume
 	owner_node.add_child(player)
 	player.finished.connect(player.queue_free)

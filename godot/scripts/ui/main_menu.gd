@@ -62,7 +62,7 @@ func _ready() -> void:
 	add_child(col)
 
 	var emblem := TextureRect.new()
-	emblem.texture = load("res://art/emblem.svg")
+	emblem.texture = load("res://assets/textures/branding/emblem.svg")
 	emblem.custom_minimum_size = Vector2(260, 260)
 	emblem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	emblem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -133,7 +133,7 @@ func _show_buttons() -> void:
 func _show_portrait(id: String) -> void:
 	if id not in ["warrior", "rogue", "pyromancer"]:
 		id = "warrior"
-	_portrait.texture = load("res://art/field_guide/previews/%s.jpg" % id)
+	_portrait.texture = load("res://assets/textures/field_guide/previews/%s.jpg" % id)
 
 
 func _add_button(text: String, cb: Callable) -> Button:

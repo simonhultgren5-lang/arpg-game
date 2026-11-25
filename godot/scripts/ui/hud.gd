@@ -509,7 +509,7 @@ func show_death() -> void:
 
 func open_dialogue(npc_id: String) -> void:
 	_dlg_npc = npc_id
-	_dlg_art.texture = load("res://art/field_guide/previews/%s.jpg" % npc_id)
+	_dlg_art.texture = load("res://assets/textures/field_guide/previews/%s.jpg" % npc_id)
 	_show_node(Game.dialogue_entry(npc_id))
 
 

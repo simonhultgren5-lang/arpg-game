@@ -2,7 +2,7 @@
 
 Depths of Darkness is a three-quarter 3D action RPG made with Godot 4 (GDScript). This folder is the whole game. **Act I** is playable: the cursed town of Hollowmere, a procedurally assembled crypt beneath it, and the first boss. The launcher (`launcher/` + `electron/`, see the root README) starts it with the player's character.
 
-The Warrior, Hollow, Bone Archer, the townsfolk (Sister Maud, Edda, Old Corwin), torch sconces, barrels and sarcophagi use original procedural meshes from `scripts/models/`. The rest of the world uses runtime-built primitives, lights and fog. Open **Field guide** on the title screen to browse 13 original Act I illustrations. The portrait-format 4K editions in `art/field_guide/` were resampled from 941 × 1672 generated paintings. Hero selection and dialogue use smaller portrait textures.
+The Warrior, Hollow, Bone Archer, the townsfolk (Sister Maud, Edda, Old Corwin), torch sconces, barrels and sarcophagi use original procedural meshes from `scripts/models/`. The rest of the world uses runtime-built primitives, lights and fog. Open **Field guide** on the title screen to browse 13 original Act I illustrations. The portrait-format 4K editions in `assets/textures/field_guide/` were resampled from 941 × 1672 generated paintings. Hero selection and dialogue use smaller portrait textures.
 
 ## Run it
 

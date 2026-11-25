@@ -1,6 +1,6 @@
 extends RefCounted
 ## The people of Hollowmere: Sister Maud, Edda the smith and Old Corwin. Original designs that
-## follow their Field guide portraits (art/field_guide/maud.jpg, edda.jpg, corwin.jpg).
+## follow their Field guide portraits (assets/textures/field_guide/maud.jpg, edda.jpg, corwin.jpg).
 ## Built with the same mesh kit and stylized rim-light materials as the hero and monsters.
 ## Each model stands with its feet at y = 0, about 1.75 units tall, facing +Z.
 

@@ -1,4 +1,8 @@
-# Depths of Darkness
+<p align="center">
+  <img src="launcher/assets/icon.png" alt="Depths of Darkness logo" width="160">
+</p>
+
+<h1 align="center">Depths of Darkness</h1>
 
 A grim gothic action RPG in 3D. Pick a Warrior, Pyromancer or Rogue, walk out of the fog into the cursed town of Hollowmere, and descend into the crypt beneath it.
 
@@ -14,6 +18,7 @@ The story is planned in four acts ([godot/story/ACTS.md](godot/story/ACTS.md)). 
 - **Bun** (recommended, the repo uses `bun.lock`) or npm, which comes with Node
 - **Godot 4.7+** with its Windows export templates (in Godot: Editor → Manage Export Templates), to build the game
 - **Windows** to build the `.exe`
+- **Git LFS** for the art, audio and video (included with Git for Windows). Run `git lfs install` once per PC, before cloning
 
 ## Quick start
 
@@ -56,7 +61,7 @@ The launcher has four pages in its top bar: **Play**, **News**, **Settings** and
   - **Privacy:** crash reports and usage statistics, each off until the player turns it on. The launcher asks once on first launch.
 - **Dev tools** (see [Developing](#developing)).
 
-The app icon and logo come from `launcher/assets/emblem.svg` (the game has its own copy in `godot/art/`). After changing it, run `bun run icons` to regenerate `launcher/assets/icon.ico` and `icon.png`.
+The app icon and logo come from `launcher/assets/emblem.svg` (the game has its own copy in `godot/assets/textures/branding/`). After changing it, run `bun run icons` to regenerate `launcher/assets/icon.ico` and `icon.png`.
 
 ### Release channels
 
@@ -114,7 +119,16 @@ Each command updates `package.json`, then copies the version into `godot/project
 
 ```
 godot/                  The game (Godot 4, GDScript); see godot/README.md
+  scripts/              Source code: actors, world, UI, autoloads (Boot, Game, SaveSystem, Dev)
+  assets/               Game-ready assets (Git LFS); see godot/assets/README.md
+    textures/           UI art, Field guide portraits, branding (emblem, boot splash)
+    models/             Imported 3D models (Act I builds its models in code today)
+    animations/         Animation libraries
+    audio/              Spell and weapon sounds, spoken lines
+    cinematics/         In-game cutscenes
   story/ACTS.md         The four-act story outline
+source-assets/          Editable originals (Blender, Photoshop, audio masters, film projects), Git LFS
+                        with Perforce-style locks; see source-assets/README.md
 launcher/               Launcher window: film, servers, login, characters, Play (HTML, CSS, JS)
   assets/               Emblem, icons, fonts, the Act I film and its captions
 electron/               Desktop app
@@ -134,6 +148,15 @@ scripts/
 CHANGELOG.md            Patch notes; the launcher shows them to players
 release/                Builds (created by `bun run dist` and `bun run release`, not committed)
 ```
+
+## Assets and Git LFS
+
+The repo is laid out like an AAA depot: source code in its own folders, game-ready assets in `godot/assets/{textures,models,animations,audio,cinematics}`, and the editable originals in `source-assets/{Textures,Models,Animations,Audio,Cinematics}`.
+
+- **Large binaries are stored with Git LFS** (images, audio, video, models, fonts; the full list is in `.gitattributes`). After `git lfs install`, cloning and pulling download them like normal files. Without Git LFS you get small pointer files instead, which is fine for running the game server, but not for the game.
+- **Source files lock like a Perforce checkout.** `.blend`, `.psd`, `.ma`, `.max`, `.prproj` and everything in `source-assets/` arrive read-only. Run `git lfs lock <file>` before editing, push, then `git lfs unlock <file>`. GitHub refuses a push to a file someone else has locked. `git lfs locks` lists who has what.
+- **The build pipeline** downloads LFS files once and caches them, so builds don't use up the free LFS bandwidth (GitHub gives 10 GB of storage and bandwidth a month).
+- Earlier commits still hold the old copies of the assets, about 480 MB of history. `git lfs migrate import --everything` would move them into LFS too, but it rewrites every commit and needs a force push, so everyone would have to clone again. It's not done.
 
 ## Developing
 
