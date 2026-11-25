@@ -267,19 +267,24 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			var base_stone := BK.weathered("stone_wall", Color(0.95, 0.92, 0.98), 0.35, 0.7, 1.0, 0.0, 1.0, 1.5)
 			var slate := BK.weathered("roof_slate", Color(1.0, 0.95, 1.05), 0.55, 0.4, 0.0, 0.1, 0.9, 1.6)
 			var seed_h := int(c.x * 7.0 + c.z * 13.0)
-			B.box(Vector3(s.x - 0.4, wall_h, s.z - 0.4), plaster, Vector3(0, wall_h * 0.5, 0), node)
-			BK.plinth(node, Vector2(s.x - 0.35, s.z - 0.35), 0.6, base_stone, seed_h)
-			# Half-timbering on the back and both sides (the front keeps its door and window).
-			BK.timber_frame(node, Vector3(0, wall_h * 0.5 + 0.3, -(s.z * 0.5 - 0.2)), Vector3(0, 0, -1), s.x - 0.9, wall_h - 0.7, timber, seed_h)
-			for side in [-1, 1]:
-				BK.timber_frame(node, Vector3(side * (s.x * 0.5 - 0.2), wall_h * 0.5 + 0.3, 0), Vector3(side, 0, 0), s.z - 0.9, wall_h - 0.7, timber, seed_h + side)
-			for corner in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1)]:
-				B.box(Vector3(0.3, wall_h + 0.1, 0.3), timber, Vector3(corner.x * (s.x * 0.5 - 0.25), wall_h * 0.5, corner.z * (s.z * 0.5 - 0.25)), node)
-			B.box(Vector3(s.x - 0.3, 0.25, 0.3), timber, Vector3(0, wall_h * 0.55, s.z * 0.5 - 0.2), node)
-			var ridge_x := not (s.z > s.x)
-			var roof := BK.gable_roof(node, Vector3(0, wall_h, 0), (s.x if ridge_x else s.z) + 0.7, (s.z if ridge_x else s.x) - 0.4, 1.8, 0.5, slate, plaster, timber, seed_h)
-			if not ridge_x:
-				roof.rotation.y = PI * 0.5
+			var variant: String = {Vector2i(3, 2): "house_small", Vector2i(4, 3): "house_medium", Vector2i(5, 3): "house_large"}.get(rect.size, "")
+			var shell: Node3D = preload("res://scripts/models/props_model.gd").asset(node, variant, Vector3.ZERO) if variant != "" else null
+			if shell:
+				shell.scale.y = wall_h / 3.2
+			else:
+				B.box(Vector3(s.x - 0.4, wall_h, s.z - 0.4), plaster, Vector3(0, wall_h * 0.5, 0), node)
+				BK.plinth(node, Vector2(s.x - 0.35, s.z - 0.35), 0.6, base_stone, seed_h)
+				# Half-timbering on the back and both sides (the front keeps its door and window).
+				BK.timber_frame(node, Vector3(0, wall_h * 0.5 + 0.3, -(s.z * 0.5 - 0.2)), Vector3(0, 0, -1), s.x - 0.9, wall_h - 0.7, timber, seed_h)
+				for side in [-1, 1]:
+					BK.timber_frame(node, Vector3(side * (s.x * 0.5 - 0.2), wall_h * 0.5 + 0.3, 0), Vector3(side, 0, 0), s.z - 0.9, wall_h - 0.7, timber, seed_h + side)
+				for corner in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1)]:
+					B.box(Vector3(0.3, wall_h + 0.1, 0.3), timber, Vector3(corner.x * (s.x * 0.5 - 0.25), wall_h * 0.5, corner.z * (s.z * 0.5 - 0.25)), node)
+				B.box(Vector3(s.x - 0.3, 0.25, 0.3), timber, Vector3(0, wall_h * 0.55, s.z * 0.5 - 0.2), node)
+				var ridge_x := not (s.z > s.x)
+				var roof := BK.gable_roof(node, Vector3(0, wall_h, 0), (s.x if ridge_x else s.z) + 0.7, (s.z if ridge_x else s.x) - 0.4, 1.8, 0.5, slate, plaster, timber, seed_h)
+				if not ridge_x:
+					roof.rotation.y = PI * 0.5
 			# door and windows on the south face
 			var front := s.z * 0.5 - 0.2  # the plaster's south face
 			if not _kit(node, "house_door", Vector3(-s.x * 0.2, 0, front)):
@@ -300,6 +305,14 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			if lit:
 				B.omni(Color(1.0, 0.55, 0.25), 0.7, 4.5, Vector3(s.x * 0.22, 2.0, s.z * 0.5 + 0.6), node)
 		"C":
+			if _kit(node, "chapel", Vector3.ZERO):
+				var rose_on := _kit(node, "rose_window", Vector3(0, 6.0, s.z * 0.5 + 0.03))
+				if rose_on:
+					node.get_child(node.get_child_count() - 1).scale = Vector3.ONE * 1.5
+				B.omni(Color(0.75, 0.35, 0.6), 1.2, 7.0, Vector3(0, 3.5, s.z * 0.5 + 1.5), node)
+				B.torch(node, Vector3(-1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
+				B.torch(node, Vector3(1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
+				return
 			var stone := BK.weathered("stone_wall", Color(1.05, 1.0, 1.08), 0.3, 0.7, 1.7, 0.1, 1.0, 1.6)
 			var dark := BK.weathered("roof_slate", Color(0.8, 0.76, 0.85), 0.5, 0.45, 0.0, 0.12, 0.9, 1.7)
 			B.box(Vector3(s.x - 0.6, 6.0, s.z - 0.6), stone, Vector3(0, 3.0, 0), node)
@@ -334,6 +347,9 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			B.torch(node, Vector3(-1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
 			B.torch(node, Vector3(1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
 		"B":
+			if _kit(node, "mausoleum", Vector3.ZERO):
+				B.label("Mausoleum of the Wardens", B.GOLD, Vector3(0, 5.4, 0), node, 36)
+				return
 			var stone := BK.weathered("stone_wall", Color(0.88, 0.86, 0.92), 0.3, 0.7, 1.4, 0.1, 1.0, 1.6)
 			B.box(Vector3(s.x - 0.6, 3.4, s.z - 0.4), stone, Vector3(0, 1.7, 0), node)
 			BK.plinth(node, Vector2(s.x - 0.5, s.z - 0.3), 0.7, stone, 33, 0.16)
@@ -355,6 +371,22 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			pass  # built by _gate
 
 
+
+## The code-built house body and roof (used when the Blender shell is missing).
+func _house_body(node: Node3D, s: Vector3, wall_h: float, plaster: Material, timber: Material, has_shell: bool) -> void:
+	if has_shell:
+		return
+	B.box(Vector3(s.x - 0.4, wall_h, s.z - 0.4), plaster, Vector3(0, wall_h * 0.5, 0), node)
+	for corner in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1)]:
+		B.box(Vector3(0.3, wall_h + 0.1, 0.3), timber, Vector3(corner.x * (s.x * 0.5 - 0.25), wall_h * 0.5, corner.z * (s.z * 0.5 - 0.25)), node)
+	B.box(Vector3(s.x - 0.3, 0.25, 0.3), timber, Vector3(0, wall_h * 0.55, s.z * 0.5 - 0.2), node)
+	var roof := B.prism(Vector3(s.z + 0.8, 2.2, s.x + 0.6), B.pbr("roof_slate", Color(0.42, 0.38, 0.44), 0.6, 1.0, 0.05, 1.5), Vector3(0, wall_h + 1.1, 0), node)
+	roof.rotation.y = PI * 0.5
+	if s.z > s.x:
+		roof.rotation.y = 0.0
+		(roof.mesh as PrismMesh).size = Vector3(s.x + 0.8, 2.2, s.z + 0.6)
+
+
 ## Hangs a Blender kit piece (assets/models/props/<id>.gltf) on a building; false if it's missing.
 func _kit(parent: Node3D, id: String, pos: Vector3) -> bool:
 	return preload("res://scripts/models/props_model.gd").asset(parent, id, pos) != null
@@ -370,6 +402,13 @@ func _gate(world: Node3D, level: Node3D, rect: Rect2i) -> void:
 	node.radius = 2.6
 	node.position = c + Vector3(0, 0, -0.6)
 	level.add_child(node)
+	var gate_model := preload("res://scripts/models/props_model.gd").asset(level, "crypt_gate", c)
+	if gate_model:
+		# The Blender gate (piers, iron leaves, the stair into the dark); the glow and the name stay here.
+		B.omni(B.EMBER, 2.0, 5.0, Vector3(0, 0.4, 1.0), node)
+		B.label("Mausoleum Gate", B.GOLD, Vector3(0, 3.8, 0.6), node, 40)
+		world.call("register_interactable", node)
+		return
 	var iron := B.mat(Color(0.08, 0.07, 0.08), 0.5, Color.BLACK, 1.0, 0.7)
 	for i in 9:
 		B.cylinder(0.05, 0.05, 2.8, iron, Vector3(-s.x * 0.4 + i * s.x * 0.1, 1.4, 0), node, 6)

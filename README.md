@@ -242,6 +242,7 @@ Developer commit → Build server (GitHub Actions)
 | `E` | Talk to or use the nearest NPC, gate or stairs |
 | `C` or `I` | Character and bag: drag gear onto your hero, compare in the tooltip |
 | `K` | Skills: choose your bar, each skill's variant and your passives |
+| `J` | Quest log: every quest, its story, objective and reward |
 | `M` | Area map |
 | Mouse wheel | Zoom |
 | `Esc` | Close a panel, or the menu (with Settings: graphics, audio, gameplay, keys) |

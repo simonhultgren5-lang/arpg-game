@@ -183,6 +183,8 @@ A looping clip repeats its first key at the end automatically. Clips are exporte
 
 ## 7. Props
 
+Buildings are props too: `props/town_buildings.py` makes the town's house shells, chapel, mausoleum and crypt gate to fit their map footprints, with UVs in metres (`world_uv`) so big walls and roofs tile at real size. Their design sheet is [docs/art/town-architecture-kit.md](docs/art/town-architecture-kit.md).
+
 A prop is any static model: no skeleton, origin on the floor at its centre (a wall fixture like the torch sconce has its origin on the wall, facing -Y). Several props can share one script; call `ddk.reset()` before each and `ddk.export("props", name)` after. See `props/act1_props.py`.
 
 ## 8. Icons and interface frames

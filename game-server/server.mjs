@@ -29,7 +29,7 @@ const PORT = Number(setting('PORT', 4100));
 const HOST = setting('HOST', '0.0.0.0');
 const SERVER_NAME = String(setting('SERVER_NAME', 'Depths Server')).slice(0, 40);
 const MOTD = String(setting('MOTD', '')).slice(0, 200);
-const SERVER_VERSION = '1.0.0'; // kept equal to package.json by scripts/sync-version.mjs
+const SERVER_VERSION = '1.0.1'; // kept equal to package.json by scripts/sync-version.mjs
 const UPDATE_URL = String(
   setting('UPDATE_URL', 'https://github.com/simonhultgren5-lang/arpg-game/releases/latest/download/server-update.json'),
 );

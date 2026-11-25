@@ -4,7 +4,7 @@
   "description": "Dark fantasy action RPG",
   "author": "afiniel",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "electron/main.cjs",
   "desktop": {
@@ -32,6 +32,7 @@
     "patch-notes": "node scripts/patch-notes.mjs",
     "godot:export": "node scripts/export-godot.mjs",
     "assets:build": "node scripts/assets/build.mjs",
+    "launcher:film": "node scripts/render-launcher-film.mjs",
     "audio:act1": "node scripts/audio/act1-audio.mjs",
     "audio:hollowmere": "node scripts/audio/hollowmere-bank.mjs",
     "dev": "node scripts/dev.mjs",

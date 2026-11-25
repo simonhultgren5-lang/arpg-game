@@ -34,6 +34,9 @@ var _toll_count := 0
 var _vigil_cd := 0.0
 var potion_cd := 0.0
 var crit_buff := 0.0
+## The skills behind the current buff and ward (for the HUD's buff row).
+var buff_id := ""
+var ward_id := ""
 
 var _path := PackedVector3Array()
 var _path_i := 0
@@ -617,6 +620,7 @@ func cast_slot(slot_i: int, loud := true) -> void:
 			crit_buff = maxf(crit_buff, float(sk["crit_window"]))
 		"buff":
 			buff_t = sk["duration"]
+			buff_id = sk["id"]
 			_buff = {"damage": sk["damage"], "guard": sk["guard"], "speed_bonus": sk.get("speed_bonus", 0.0), "dodge": sk.get("dodge", 0.0)}
 			if sk.has("radius"):
 				world.hit_radius(global_position, sk["radius"], sk.get("mult", 0.0), self, fx)
@@ -630,6 +634,7 @@ func cast_slot(slot_i: int, loud := true) -> void:
 		"ward":
 			ward = maxf(ward, Game.max_hp() * float(sk["absorb"]))
 			ward_t = sk["duration"]
+			ward_id = sk["id"]
 			if sk.has("radius"):
 				world.hit_radius(global_position, sk["radius"], sk.get("mult", 0.0), self, fx)
 				Fx.ring(world, global_position, sk["radius"], color, 0.4)

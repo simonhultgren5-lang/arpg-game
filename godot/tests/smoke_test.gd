@@ -68,7 +68,11 @@ func _run() -> void:
 		await _frames(90)
 		_check(w.player.global_position.distance_to(start) > 3.0, "click-to-move path walks the hero")
 		if hero_class == "warrior":
-			# Walk a circuit through both crossings before reaching Maud.
+			# Walk a circuit through both crossings before reaching Maud. This checks navigation only, so
+			# the fen's monster packs are cleared first (quest_test covers fighting them).
+			for e in w.enemies():
+				e.queue_free()
+			await _frames(2)
 			for cell in [Vector2i(7, 41), Vector2i(8, 34), Vector2i(18, 30), Vector2i(18, 36), Vector2i(18, 30), Vector2i(16, 8)]:
 				var stop_at: Vector3 = w.grid.center(cell)
 				w.player._path_to(stop_at)
