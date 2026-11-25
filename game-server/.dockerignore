@@ -5,3 +5,4 @@ config.json
 *.service
 *.tar
 *.tar.gz
+node_modules

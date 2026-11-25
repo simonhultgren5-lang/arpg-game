@@ -4,7 +4,8 @@
 //   bun run dev:reset --yes    deletes without asking
 //
 // Deletes only development data:
-//   .dev/                                          the dev game server's accounts and saves
+//   .dev/                                          the dev game server's data folder
+//   the PostgreSQL database depths_dev             the dev game server's accounts and saves
 //   %APPDATA%/Depths of Darkness (dev)/            the launcher's data when running from source
 //                                                  (servers, logins, offline characters, dev tool settings)
 //   Godot saves of dev and test heroes             offline characters made in the dev launcher, heroes
@@ -17,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
+import { DEV_DB, devDatabaseExists, dropDevDatabase } from './lib/dev-db.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
@@ -46,6 +48,10 @@ if (fs.existsSync(godotSaves)) {
   }
 }
 
+const devDb = await devDatabaseExists();
+const dbTarget = `PostgreSQL database ${DEV_DB} (the dev server's accounts and saves)`;
+if (devDb) targets.push(dbTarget);
+
 if (!targets.length) {
   console.log('Nothing to delete: no development data found.');
   process.exit(0);
@@ -64,7 +70,8 @@ if (!process.argv.includes('--yes')) {
 let failed = 0;
 for (const t of targets) {
   try {
-    fs.rmSync(t, { recursive: true, force: true });
+    if (t === dbTarget) await dropDevDatabase();
+    else fs.rmSync(t, { recursive: true, force: true });
   } catch (error) {
     failed++;
     console.error(`✗ ${t}: ${error.message} (is the launcher or dev server still running?)`);

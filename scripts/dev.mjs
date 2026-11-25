@@ -4,8 +4,8 @@
 //   bun run dev -- --no-launcher  only the server and test account (for working in the Godot editor);
 //                                 Ctrl+C stops it
 //
-//   1. A game server on http://localhost:4100 with its own data in .dev/server-data
-//      (skipped if a server already answers there)
+//   1. A game server on http://localhost:4100 with its own PostgreSQL database "depths_dev"
+//      (on the database from `bun run server:db`; skipped if a server already answers there)
 //   2. A test account with three characters, one of each class (created once)
 //   3. The launcher from source with the dev tools on (the "Dev tools" page, the in-game F1 console)
 //
@@ -15,6 +15,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { ensureDevDatabase } from './lib/dev-db.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -46,12 +47,20 @@ if (await serverUp()) {
 } else {
   const dataDir = path.join(root, '.dev', 'server-data');
   fs.mkdirSync(dataDir, { recursive: true });
+  let databaseUrl;
+  try {
+    databaseUrl = await ensureDevDatabase();
+  } catch (error) {
+    console.error(`✗ ${error.message}`);
+    process.exit(1);
+  }
   server = spawn(process.execPath, ['--no-warnings', path.join(root, 'game-server', 'server.mjs')], {
     env: {
       ...process.env,
       PORT: String(PORT),
       HOST: '127.0.0.1',
       DATA_DIR: dataDir,
+      DATABASE_URL: databaseUrl,
       SERVER_NAME: 'Dev server',
       MOTD: `Local dev server. Log in as ${DEV_ACCOUNT.username} / ${DEV_ACCOUNT.password}.`,
       UPDATE_URL: 'off',
@@ -66,7 +75,7 @@ if (await serverUp()) {
     server.kill();
     process.exit(1);
   }
-  console.log(`✓ Game server on ${BASE} (data in .dev/server-data)`);
+  console.log(`✓ Game server on ${BASE} (database depths_dev)`);
 }
 
 // ---- 2. test account and characters

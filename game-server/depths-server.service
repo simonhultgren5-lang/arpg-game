@@ -5,7 +5,7 @@
 
 [Unit]
 Description=Depths of Darkness game server
-After=network-online.target
+After=network-online.target postgresql.service
 Wants=network-online.target
 
 [Service]

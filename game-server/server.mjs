@@ -1,42 +1,35 @@
 #!/usr/bin/env node
 // Depths of Darkness — game server (accounts, cloud saves, status).
-// No npm packages needed: runs on Node.js 22.13+ using the built-in SQLite and crypto modules.
+// Runs on Node.js 22.13+ with its data in PostgreSQL (one npm package: pg; `npm ci` in game-server/).
 // Designed to run on a Raspberry Pi on your home network. See game-server/README.md.
 //
 //   node game-server/server.mjs
 //
 // Settings (environment variables or game-server/config.json):
+//   DATABASE_URL PostgreSQL address  (default postgres://depths:depths@127.0.0.1:5432/depths,
+//                the database from docker-compose.yml)
 //   PORT         port to listen on                  (default 4100)
 //   HOST         address to listen on               (default 0.0.0.0 = whole network)
-//   DATA_DIR     folder for the database file       (default game-server/data)
+//   DATA_DIR     folder for server.pid, backups and an old SQLite database to import (default game-server/data)
 //   SERVER_NAME  name shown in the launcher         (default "Depths Server")
 //   MOTD         message of the day in the launcher (default empty)
 //   UPDATE_URL   where to look for new server versions (default: the GitHub release's
 //                server-update.json); set to "off" to turn the check off
+//
+// On its first start it imports data/depths.db (the SQLite database of servers before 1.0.0)
+// into PostgreSQL and renames the file to depths.db.imported-<date>. See db.mjs.
 
-import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const fileConfig = (() => {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(here, 'config.json'), 'utf8'));
-  } catch {
-    return {};
-  }
-})();
-const setting = (key, fallback) => process.env[key] ?? fileConfig[key] ?? fallback;
+import { DATA_DIR, DATABASE_URL, createPool, importSqlite, migrate, redactUrl, setting, tx, waitForDatabase } from './db.mjs';
 
 const PORT = Number(setting('PORT', 4100));
 const HOST = setting('HOST', '0.0.0.0');
-const DATA_DIR = path.resolve(here, setting('DATA_DIR', 'data'));
 const SERVER_NAME = String(setting('SERVER_NAME', 'Depths Server')).slice(0, 40);
 const MOTD = String(setting('MOTD', '')).slice(0, 200);
-const SERVER_VERSION = '0.5.0-beta.8'; // kept equal to package.json by scripts/sync-version.mjs
+const SERVER_VERSION = '1.0.0'; // kept equal to package.json by scripts/sync-version.mjs
 const UPDATE_URL = String(
   setting('UPDATE_URL', 'https://github.com/simonhultgren5-lang/arpg-game/releases/latest/download/server-update.json'),
 );
@@ -44,101 +37,47 @@ const SESSION_DAYS = 30;
 const MAX_BODY = 4 * 1024 * 1024; // a full save snapshot is well under this
 const MAX_CHARACTERS = 5; // characters per account
 const HERO_CLASSES = ['warrior', 'pyromancer', 'rogue'];
+const CHANNELS = ['stable', 'beta', 'dev'];
+const TELEMETRY_DAYS = 90;
 const STARTED_AT = Date.now();
 
 // ---------------------------------------------------------------- database
+// Connect (waiting for the database container to start), bring the schema up to date, and import an
+// old SQLite database once. A failed import stops the server: players must not start over in an
+// empty database while their old accounts sit in the file.
 fs.mkdirSync(DATA_DIR, { recursive: true });
-const db = new DatabaseSync(path.join(DATA_DIR, 'depths.db'));
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA foreign_keys = ON;
-  CREATE TABLE IF NOT EXISTS accounts (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT NOT NULL,
-    created_at    INTEGER NOT NULL,
-    last_login_at INTEGER
-  );
-  CREATE TABLE IF NOT EXISTS sessions (
-    token_hash TEXT PRIMARY KEY,
-    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS saves (
-    account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
-    data       TEXT NOT NULL,
-    hero_name  TEXT,
-    hero_class TEXT,
-    hero_level INTEGER,
-    depth      INTEGER,
-    updated_at INTEGER NOT NULL
-  );
-  -- Up to MAX_CHARACTERS heroes per account, each with its own save.
-  -- legacy = 1 marks the hero moved over from the old one-save-per-account table, so the
-  -- desktop app keeps using the storage that hero already had on the PC.
-  CREATE TABLE IF NOT EXISTS characters (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    name       TEXT NOT NULL,
-    hero_class TEXT NOT NULL,
-    color      TEXT NOT NULL,
-    hero_level INTEGER NOT NULL DEFAULT 1,
-    depth      INTEGER NOT NULL DEFAULT 1,
-    data       TEXT,
-    legacy     INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER
-  );
-  CREATE INDEX IF NOT EXISTS characters_account ON characters(account_id);
-`);
-
-// Move heroes from the old one-save-per-account table into characters (once per account).
-db.exec(`
-  INSERT INTO characters (account_id, name, hero_class, color, hero_level, depth, data, legacy, created_at, updated_at)
-  SELECT s.account_id, COALESCE(NULLIF(TRIM(s.hero_name), ''), 'Hero'), COALESCE(s.hero_class, 'warrior'), '#8d3430',
-         COALESCE(s.hero_level, 1), COALESCE(s.depth, 1), s.data, 1, s.updated_at, s.updated_at
-  FROM saves s
-  WHERE NOT EXISTS (SELECT 1 FROM characters c WHERE c.account_id = s.account_id);
-  -- The hero now lives in characters, so a character deleted later stays deleted.
-  DELETE FROM saves WHERE account_id IN (SELECT account_id FROM characters);
-`);
-
-// 0.4.0: the game is the 3D game. A character's level and depth in the launcher used to follow the
-// old 2D game; take them from the 3D save instead (level 1, depth 1 for heroes not played in 3D yet).
-if (db.prepare('PRAGMA user_version').get().user_version < 1) {
-  db.exec(`
-    UPDATE characters SET
-      hero_level = COALESCE(CAST(json_extract(json_extract(data, '$.dod3d'), '$.level') AS INTEGER), 1),
-      depth = COALESCE(CAST(json_extract(json_extract(data, '$.dod3d'), '$.depth') AS INTEGER), 1)
-    WHERE data IS NULL OR json_valid(data);
-    PRAGMA user_version = 1;
-  `);
+let db;
+try {
+  db = await createPool();
+  await waitForDatabase(db, { seconds: Number(setting('DB_WAIT_SECONDS', 60)) });
+  await migrate(db);
+  await importSqlite(db);
+} catch (error) {
+  console.error(`[db] ${error.message}`);
+  if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === '28P01' || error.code === '3D000') {
+    console.error(`[db] Could not use PostgreSQL at ${redactUrl(DATABASE_URL)}. Set DATABASE_URL (environment or config.json);`);
+    console.error('[db] see game-server/README.md. With Docker: docker compose up -d starts the database too.');
+    if (fs.existsSync('/.dockerenv') && !process.env.DATABASE_URL) {
+      // Updated by update.sh from a release before 1.0.0, which kept the old docker-compose.yml.
+      console.error('[db] This docker-compose.yml has no database. On the Pi run once:  bash update.sh --force');
+    }
+  }
+  await db?.end().catch(() => {});
+  process.exit(1);
 }
 
-const q = {
-  accountByName: db.prepare('SELECT * FROM accounts WHERE username = ?'),
-  createAccount: db.prepare('INSERT INTO accounts (username, password_hash, created_at) VALUES (?, ?, ?)'),
-  touchLogin: db.prepare('UPDATE accounts SET last_login_at = ? WHERE id = ?'),
-  countAccounts: db.prepare('SELECT COUNT(*) AS n FROM accounts'),
-  createSession: db.prepare('INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)'),
-  sessionAccount: db.prepare(`SELECT a.id, a.username FROM sessions s JOIN accounts a ON a.id = s.account_id
-                              WHERE s.token_hash = ? AND s.expires_at > ?`),
-  deleteSession: db.prepare('DELETE FROM sessions WHERE token_hash = ?'),
-  purgeSessions: db.prepare('DELETE FROM sessions WHERE expires_at <= ?'),
-  listCharacters: db.prepare(`SELECT id, name, hero_class, color, hero_level, depth, legacy, created_at, updated_at
-                               FROM characters WHERE account_id = ? ORDER BY created_at, id`),
-  countCharacters: db.prepare('SELECT COUNT(*) AS n FROM characters WHERE account_id = ?'),
-  characterByName: db.prepare('SELECT id FROM characters WHERE account_id = ? AND name = ? COLLATE NOCASE'),
-  getCharacter: db.prepare('SELECT * FROM characters WHERE id = ? AND account_id = ?'),
-  firstCharacter: db.prepare('SELECT * FROM characters WHERE account_id = ? ORDER BY created_at, id LIMIT 1'),
-  createCharacter: db.prepare(`INSERT INTO characters (account_id, name, hero_class, color, legacy, created_at)
-                                VALUES (?, ?, ?, ?, ?, ?)`),
-  deleteCharacter: db.prepare('DELETE FROM characters WHERE id = ? AND account_id = ?'),
-  putCharacterSave: db.prepare(`UPDATE characters SET data = ?, hero_level = COALESCE(?, hero_level),
-                                  depth = COALESCE(?, depth), updated_at = ? WHERE id = ? AND account_id = ?`),
-};
-q.purgeSessions.run(Date.now());
+const one = async (sql, params) => (await db.query(sql, params)).rows[0] ?? null;
+const all = async (sql, params) => (await db.query(sql, params)).rows;
+const ACCOUNT_BY_NAME = 'SELECT * FROM accounts WHERE lower(username) = lower($1)';
+const CHARACTER = 'SELECT * FROM characters WHERE id = $1 AND account_id = $2';
+const FIRST_CHARACTER = 'SELECT * FROM characters WHERE account_id = $1 ORDER BY created_at, id LIMIT 1';
+const CREATE_CHARACTER = `INSERT INTO characters (account_id, name, hero_class, color, legacy, created_at)
+                          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`;
+// Serialises the writes of one account (character limit, first character) across connections.
+const lockAccount = (client, accountId) => client.query('SELECT id FROM accounts WHERE id = $1 FOR UPDATE', [accountId]);
+
+await db.query('DELETE FROM sessions WHERE expires_at <= $1', [Date.now()]);
+await db.query('DELETE FROM telemetry WHERE at < $1', [Date.now() - TELEMETRY_DAYS * 864e5]);
 
 // ---------------------------------------------------------------- passwords & tokens
 const scrypt = (password, salt) =>
@@ -158,10 +97,12 @@ async function verifyPassword(password, stored) {
   return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
-function newSession(accountId) {
+async function newSession(client, accountId) {
   const token = crypto.randomBytes(32).toString('base64url');
   const now = Date.now();
-  q.createSession.run(hashToken(token), accountId, now, now + SESSION_DAYS * 864e5);
+  await client.query('INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES ($1, $2, $3, $4)', [
+    hashToken(token), accountId, now, now + SESSION_DAYS * 864e5,
+  ]);
   return token;
 }
 
@@ -215,10 +156,13 @@ function readJson(req) {
     req.on('error', reject);
   });
 }
-function requireAccount(req) {
+async function requireAccount(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  const account = token ? q.sessionAccount.get(hashToken(token), Date.now()) : null;
+  const account = token
+    ? await one(`SELECT a.id, a.username FROM sessions s JOIN accounts a ON a.id = s.account_id
+                 WHERE s.token_hash = $1 AND s.expires_at > $2`, [hashToken(token), Date.now()])
+    : null;
   if (!account) throw new HttpError(401, 'Please log in again.');
   return { account, token };
 }
@@ -256,8 +200,11 @@ const publicCharacter = (row) => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
-const characterList = (accountId) => ({
-  characters: q.listCharacters.all(accountId).map(publicCharacter),
+const characterList = async (accountId, client = db) => ({
+  characters: (
+    await client.query(`SELECT id, name, hero_class, color, hero_level, depth, legacy, created_at, updated_at
+                        FROM characters WHERE account_id = $1 ORDER BY created_at, id`, [accountId])
+  ).rows.map(publicCharacter),
   maxCharacters: MAX_CHARACTERS,
 });
 function cleanSaveData(data) {
@@ -268,16 +215,20 @@ function cleanSaveData(data) {
   }
   return clean;
 }
-const intOrNull = (v) => (v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
+const INT_MAX = 2 ** 31 - 1; // hero_level and depth are INTEGER columns
+const intOrNull = (v) =>
+  v !== null && v !== '' && Number.isFinite(Number(v)) ? Math.max(-INT_MAX, Math.min(INT_MAX, Math.trunc(Number(v)))) : null;
 // The game (godot/) writes its progress under the "dod3d" key. Saves from the old 2D game (other
 // "dod…" keys, from launchers before 0.4.0) are kept beside it, and each write replaces only its own
 // side, so an old launcher can never erase the game's progress.
 const is3dKey = (key) => key.startsWith('dod3d');
-function writeCharacterSave(accountId, characterId, body) {
+// Read, merge and write in one transaction with the character row locked, so two saves arriving at
+// once (the game and an old launcher, or two PCs) are applied one after the other, never interleaved.
+async function writeCharacterSave(client, accountId, characterId, body) {
   const incoming = cleanSaveData(body.data);
   const keys = Object.keys(incoming);
   const from3d = keys.length > 0 && keys.every(is3dKey);
-  const row = q.getCharacter.get(characterId, accountId);
+  const row = (await client.query(`${CHARACTER} FOR UPDATE`, [characterId, accountId])).rows[0];
   if (!row) throw new HttpError(404, 'That character no longer exists.');
   let existing = {};
   try {
@@ -291,15 +242,12 @@ function writeCharacterSave(accountId, characterId, body) {
   // The launcher's level and depth follow the game; old 2D saves don't change them.
   const meta = from3d && body.meta && typeof body.meta === 'object' ? body.meta : {};
   const updatedAt = Date.now();
-  const { changes } = q.putCharacterSave.run(
-    JSON.stringify(merged),
-    intOrNull(meta.heroLevel),
-    intOrNull(meta.depth),
-    updatedAt,
-    characterId,
-    accountId,
+  const { rowCount } = await client.query(
+    `UPDATE characters SET data = $1, hero_level = COALESCE($2, hero_level), depth = COALESCE($3, depth), updated_at = $4
+     WHERE id = $5 AND account_id = $6`,
+    [JSON.stringify(merged), intOrNull(meta.heroLevel), intOrNull(meta.depth), updatedAt, characterId, accountId],
   );
-  if (!changes) throw new HttpError(404, 'That character no longer exists.');
+  if (!rowCount) throw new HttpError(404, 'That character no longer exists.');
   return { updatedAt };
 }
 const characterSave = (row) =>
@@ -307,8 +255,8 @@ const characterSave = (row) =>
     ? { ...publicCharacter(row), heroName: row.name, heroLevel: row.hero_level, data: JSON.parse(row.data) }
     : null;
 // Launchers before 0.3 know one hero per account: show them the account's first character.
-function legacySaveMeta(accountId) {
-  const row = q.firstCharacter.get(accountId);
+async function legacySaveMeta(accountId) {
+  const row = await one(FIRST_CHARACTER, [accountId]);
   return row?.data
     ? { heroName: row.name, heroClass: row.hero_class, heroLevel: row.hero_level, depth: row.depth, updatedAt: row.updated_at }
     : null;
@@ -352,58 +300,9 @@ setInterval(checkForUpdate, 6 * 3600 * 1000).unref();
 // News posts and feature flags are set by the server owner with admin.mjs. Crash reports and telemetry
 // come from launchers whose players said yes to sending them (see electron/studio.cjs); nothing is
 // tied to an account, only to a random install id.
-const CHANNELS = ['stable', 'beta', 'dev'];
-const TELEMETRY_DAYS = 90;
-db.exec(`
-  CREATE TABLE IF NOT EXISTS news (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    title      TEXT NOT NULL,
-    body       TEXT NOT NULL,
-    channel    TEXT NOT NULL DEFAULT '',  -- '' = everyone, else only launchers on that channel
-    created_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS flags (
-    key        TEXT NOT NULL,
-    channel    TEXT NOT NULL DEFAULT '',  -- '' = everyone; a channel value wins over it
-    value      TEXT NOT NULL,              -- JSON
-    note       TEXT,
-    updated_at INTEGER NOT NULL,
-    PRIMARY KEY (key, channel)
-  );
-  CREATE TABLE IF NOT EXISTS crashes (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    at         INTEGER NOT NULL,
-    source     TEXT NOT NULL,              -- 'launcher' or 'game'
-    version    TEXT,
-    channel    TEXT,
-    platform   TEXT,
-    install_id TEXT,
-    message    TEXT NOT NULL,
-    detail     TEXT                         -- stack trace or the end of the game's log
-  );
-  CREATE TABLE IF NOT EXISTS telemetry (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    at         INTEGER NOT NULL,
-    install_id TEXT,
-    version    TEXT,
-    channel    TEXT,
-    event      TEXT NOT NULL,
-    props      TEXT                         -- JSON
-  );
-  CREATE INDEX IF NOT EXISTS telemetry_at ON telemetry(at);
-  CREATE INDEX IF NOT EXISTS crashes_at ON crashes(at);
-`);
-db.prepare('DELETE FROM telemetry WHERE at < ?').run(Date.now() - TELEMETRY_DAYS * 864e5);
-const studio = {
-  news: db.prepare(`SELECT id, title, body, created_at FROM news WHERE channel = '' OR channel = ?
-                    ORDER BY created_at DESC, id DESC LIMIT 20`),
-  flags: db.prepare(`SELECT key, channel, value FROM flags WHERE channel = '' OR channel = ?`),
-  crash: db.prepare(`INSERT INTO crashes (at, source, version, channel, platform, install_id, message, detail)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
-  event: db.prepare(`INSERT INTO telemetry (at, install_id, version, channel, event, props) VALUES (?, ?, ?, ?, ?, ?)`),
-};
 const channelOf = (url) => (CHANNELS.includes(url.searchParams.get('channel')) ? url.searchParams.get('channel') : 'stable');
-const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : null);
+// PostgreSQL text can't hold NUL characters (a game log tail might).
+const text = (v, max) => (typeof v === 'string' ? v.replaceAll('\0', '').slice(0, max) : null);
 // At most `limit` reports per address and hour, so a crash loop can't fill the database.
 const reportLimits = new Map();
 function rateLimit(req, kind, limit) {
@@ -414,10 +313,11 @@ function rateLimit(req, kind, limit) {
   list.push(now);
   reportLimits.set(key, list);
 }
-function featureFlags(channel) {
+async function featureFlags(channel) {
   const out = {};
   // Channel-specific values win over the ones for everyone.
-  const rows = studio.flags.all(channel).sort((a, b) => (a.channel ? 1 : 0) - (b.channel ? 1 : 0));
+  const rows = (await all(`SELECT key, channel, value FROM flags WHERE channel = '' OR channel = $1`, [channel]))
+    .sort((a, b) => (a.channel ? 1 : 0) - (b.channel ? 1 : 0));
   for (const row of rows) {
     try {
       out[row.key] = JSON.parse(row.value);
@@ -430,7 +330,7 @@ function featureFlags(channel) {
 
 // ---------------------------------------------------------------- routes
 const routes = {
-  'GET /api/status': () => ({
+  'GET /api/status': async () => ({
     online: true,
     // What this server supports; the launcher checks it before offering features that need it.
     features: ['characters', 'save-merge', 'news', 'flags', 'crash-reports', 'telemetry', 'change-password'],
@@ -441,15 +341,18 @@ const routes = {
     update: latestRelease && newerThan(latestRelease.version, SERVER_VERSION)
       ? { version: latestRelease.version, notes: latestRelease.notes || '' }
       : null,
-    accounts: q.countAccounts.get().n,
+    accounts: (await one('SELECT COUNT(*) AS n FROM accounts')).n,
     uptimeSeconds: Math.round((Date.now() - STARTED_AT) / 1000),
   }),
 
   // ---- news and feature flags (public; ?channel=stable|beta|dev)
-  'GET /api/news': (req, url) => ({
-    news: studio.news.all(channelOf(url)).map((n) => ({ id: n.id, title: n.title, body: n.body, date: n.created_at })),
+  'GET /api/news': async (req, url) => ({
+    news: (
+      await all(`SELECT id, title, body, created_at FROM news WHERE channel = '' OR channel = $1
+                 ORDER BY created_at DESC, id DESC LIMIT 20`, [channelOf(url)])
+    ).map((n) => ({ id: n.id, title: n.title, body: n.body, date: n.created_at })),
   }),
-  'GET /api/flags': (req, url) => ({ flags: featureFlags(channelOf(url)) }),
+  'GET /api/flags': async (req, url) => ({ flags: await featureFlags(channelOf(url)) }),
 
   // ---- crash reports and telemetry from launchers whose players opted in
   'POST /api/crash': async (req) => {
@@ -457,15 +360,19 @@ const routes = {
     const b = await readJson(req);
     const message = text(b.message, 500);
     if (!message) throw new HttpError(400, 'A crash report needs a message.');
-    studio.crash.run(
-      Date.now(),
-      b.source === 'game' ? 'game' : 'launcher',
-      text(b.version, 40),
-      CHANNELS.includes(b.channel) ? b.channel : null,
-      text(b.platform, 60),
-      text(b.installId, 64),
-      message,
-      text(b.detail, 64 * 1024),
+    await db.query(
+      `INSERT INTO crashes (at, source, version, channel, platform, install_id, message, detail)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        Date.now(),
+        b.source === 'game' ? 'game' : 'launcher',
+        text(b.version, 40),
+        CHANNELS.includes(b.channel) ? b.channel : null,
+        text(b.platform, 60),
+        text(b.installId, 64),
+        message,
+        text(b.detail, 64 * 1024),
+      ],
     );
     console.log(`[crash] ${b.source === 'game' ? 'game' : 'launcher'} ${text(b.version, 40) || '?'}: ${message.slice(0, 120)}`);
     return { ok: true };
@@ -474,27 +381,37 @@ const routes = {
     rateLimit(req, 'telemetry', 120);
     const b = await readJson(req);
     const events = Array.isArray(b.events) ? b.events.slice(0, 50) : [];
+    const params = [];
+    const values = [];
     for (const e of events) {
       const name = text(e?.event, 40);
       if (!name || !/^[a-z][a-z0-9_.]*$/.test(name)) continue;
-      const props = e.props && typeof e.props === 'object' && !Array.isArray(e.props) ? JSON.stringify(e.props).slice(0, 2000) : null;
-      studio.event.run(Number(e.at) > 0 ? Math.min(Number(e.at), Date.now()) : Date.now(), text(b.installId, 64), text(b.version, 40),
-        CHANNELS.includes(b.channel) ? b.channel : null, name, props);
+      const props = e.props && typeof e.props === 'object' && !Array.isArray(e.props) ? text(JSON.stringify(e.props), 2000) : null;
+      const row = [Number(e.at) > 0 ? Math.min(Math.trunc(Number(e.at)), Date.now()) : Date.now(), text(b.installId, 64), text(b.version, 40),
+        CHANNELS.includes(b.channel) ? b.channel : null, name, props];
+      values.push(`(${row.map((v) => `$${params.push(v)}`).join(', ')})`);
+    }
+    // One statement for the whole batch: stored together or not at all.
+    if (values.length) {
+      await db.query(`INSERT INTO telemetry (at, install_id, version, channel, event, props) VALUES ${values.join(', ')}`, params);
     }
     return { ok: true, stored: events.length };
   },
 
   // ---- change your own password (signs out every other session)
   'POST /api/auth/password': async (req) => {
-    const { account, token } = requireAccount(req);
+    const { account, token } = await requireAccount(req);
     const b = await readJson(req);
     const current = typeof b.current === 'string' ? b.current : '';
     const next = typeof b.password === 'string' ? b.password : '';
-    const row = q.accountByName.get(account.username);
+    const row = await one(ACCOUNT_BY_NAME, [account.username]);
     if (!row || !(await verifyPassword(current, row.password_hash))) throw new HttpError(401, 'Your current password is wrong.');
     if (next.length < 6 || next.length > 128) throw new HttpError(400, 'The new password must be at least 6 characters.');
-    db.prepare('UPDATE accounts SET password_hash = ? WHERE id = ?').run(await hashPassword(next), account.id);
-    db.prepare('DELETE FROM sessions WHERE account_id = ? AND token_hash != ?').run(account.id, hashToken(token));
+    const hash = await hashPassword(next);
+    await tx(db, async (client) => {
+      await client.query('UPDATE accounts SET password_hash = $1 WHERE id = $2', [hash, account.id]);
+      await client.query('DELETE FROM sessions WHERE account_id = $1 AND token_hash != $2', [account.id, hashToken(token)]);
+    });
     return { ok: true };
   },
 
@@ -502,16 +419,29 @@ const routes = {
     const ip = req.socket.remoteAddress;
     if (tooManyAttempts(ip)) throw new HttpError(429, 'Too many attempts. Try again in a few minutes.');
     const { username, password } = validateCredentials(await readJson(req));
-    if (q.accountByName.get(username)) {
+    const taken = () => {
       recordFailure(ip);
-      throw new HttpError(409, 'That username is taken.');
-    }
+      return new HttpError(409, 'That username is taken.');
+    };
+    if (await one(ACCOUNT_BY_NAME, [username])) throw taken();
+    const hash = await hashPassword(password);
     const now = Date.now();
-    const { lastInsertRowid } = q.createAccount.run(username, await hashPassword(password), now);
-    const id = Number(lastInsertRowid);
-    q.touchLogin.run(now, id);
+    let result;
+    try {
+      result = await tx(db, async (client) => {
+        const { id } = (
+          await client.query('INSERT INTO accounts (username, password_hash, created_at, last_login_at) VALUES ($1, $2, $3, $3) RETURNING id', [
+            username, hash, now,
+          ])
+        ).rows[0];
+        return { token: await newSession(client, id), user: { username }, save: null, ...(await characterList(id, client)) };
+      });
+    } catch (error) {
+      if (error.code === '23505') throw taken(); // registered by someone else a moment ago
+      throw error;
+    }
     console.log(`[account] registered ${username}`);
-    return { token: newSession(id), user: { username }, save: null, ...characterList(id) };
+    return result;
   },
 
   'POST /api/auth/login': async (req) => {
@@ -520,65 +450,76 @@ const routes = {
     const body = await readJson(req);
     const username = typeof body.username === 'string' ? body.username.trim() : '';
     const password = typeof body.password === 'string' ? body.password : '';
-    const account = username ? q.accountByName.get(username) : null;
+    const account = username ? await one(ACCOUNT_BY_NAME, [username]) : null;
     if (!account || !(await verifyPassword(password, account.password_hash))) {
       recordFailure(ip);
       throw new HttpError(401, 'Wrong username or password.');
     }
-    q.touchLogin.run(Date.now(), account.id);
+    const token = await tx(db, async (client) => {
+      await client.query('UPDATE accounts SET last_login_at = $1 WHERE id = $2', [Date.now(), account.id]);
+      return newSession(client, account.id);
+    });
     return {
-      token: newSession(account.id),
+      token,
       user: { username: account.username },
-      save: legacySaveMeta(account.id),
-      ...characterList(account.id),
+      save: await legacySaveMeta(account.id),
+      ...(await characterList(account.id)),
     };
   },
 
-  'POST /api/auth/logout': (req) => {
-    const { token } = requireAccount(req);
-    q.deleteSession.run(hashToken(token));
+  'POST /api/auth/logout': async (req) => {
+    const { token } = await requireAccount(req);
+    await db.query('DELETE FROM sessions WHERE token_hash = $1', [hashToken(token)]);
     return { ok: true };
   },
 
-  'GET /api/auth/me': (req) => {
-    const { account } = requireAccount(req);
-    return { user: { username: account.username }, save: legacySaveMeta(account.id), ...characterList(account.id) };
+  'GET /api/auth/me': async (req) => {
+    const { account } = await requireAccount(req);
+    return { user: { username: account.username }, save: await legacySaveMeta(account.id), ...(await characterList(account.id)) };
   },
 
   // ---- one save per account (launchers before 0.3): the account's first character
-  'GET /api/save': (req) => {
-    const { account } = requireAccount(req);
-    return { save: characterSave(q.firstCharacter.get(account.id)) };
+  'GET /api/save': async (req) => {
+    const { account } = await requireAccount(req);
+    return { save: characterSave(await one(FIRST_CHARACTER, [account.id])) };
   },
 
   'PUT /api/save': async (req) => {
-    const { account } = requireAccount(req);
+    const { account } = await requireAccount(req);
     const body = await readJson(req);
-    let row = q.firstCharacter.get(account.id);
-    if (!row) {
-      const meta = body.meta && typeof body.meta === 'object' ? body.meta : {};
-      const wanted = typeof meta.heroName === 'string' ? meta.heroName.trim() : '';
-      const name = NAME_RE.test(wanted) ? wanted : 'Hero';
-      const heroClass = HERO_CLASSES.includes(meta.heroClass) ? meta.heroClass : 'warrior';
-      const { lastInsertRowid } = q.createCharacter.run(account.id, name, heroClass, '#8d3430', 1, Date.now());
-      row = { id: Number(lastInsertRowid) };
-    }
-    return writeCharacterSave(account.id, row.id, body);
+    return tx(db, async (client) => {
+      await lockAccount(client, account.id); // two first saves at once must not make two heroes
+      let row = (await client.query(FIRST_CHARACTER, [account.id])).rows[0];
+      if (!row) {
+        const meta = body.meta && typeof body.meta === 'object' ? body.meta : {};
+        const wanted = typeof meta.heroName === 'string' ? meta.heroName.trim() : '';
+        const name = NAME_RE.test(wanted) ? wanted : 'Hero';
+        const heroClass = HERO_CLASSES.includes(meta.heroClass) ? meta.heroClass : 'warrior';
+        row = (await client.query(CREATE_CHARACTER, [account.id, name, heroClass, '#8d3430', true, Date.now()])).rows[0];
+      }
+      return writeCharacterSave(client, account.id, row.id, body);
+    });
   },
 
   // ---- characters (launcher 0.3+)
-  'GET /api/characters': (req) => characterList(requireAccount(req).account.id),
+  'GET /api/characters': async (req) => characterList((await requireAccount(req)).account.id),
 
   'POST /api/characters': async (req) => {
-    const { account } = requireAccount(req);
+    const { account } = await requireAccount(req);
     const { name, heroClass, color } = validateNewCharacter(await readJson(req));
-    if (q.countCharacters.get(account.id).n >= MAX_CHARACTERS) {
-      throw new HttpError(409, `You already have ${MAX_CHARACTERS} characters. Delete one to make room.`);
-    }
-    if (q.characterByName.get(account.id, name)) throw new HttpError(409, 'You already have a character with that name.');
-    const { lastInsertRowid } = q.createCharacter.run(account.id, name, heroClass, color, 0, Date.now());
+    const created = await tx(db, async (client) => {
+      // With the account row locked, the count and the name check stay true until the insert.
+      await lockAccount(client, account.id);
+      const { n } = (await client.query('SELECT COUNT(*) AS n FROM characters WHERE account_id = $1', [account.id])).rows[0];
+      if (n >= MAX_CHARACTERS) {
+        throw new HttpError(409, `You already have ${MAX_CHARACTERS} characters. Delete one to make room.`);
+      }
+      const clash = await client.query('SELECT id FROM characters WHERE account_id = $1 AND lower(name) = lower($2)', [account.id, name]);
+      if (clash.rowCount) throw new HttpError(409, 'You already have a character with that name.');
+      return (await client.query(CREATE_CHARACTER, [account.id, name, heroClass, color, false, Date.now()])).rows[0];
+    });
     console.log(`[character] ${account.username} created ${name} (${heroClass})`);
-    return { character: publicCharacter(q.getCharacter.get(Number(lastInsertRowid), account.id)), ...characterList(account.id) };
+    return { character: publicCharacter(created), ...(await characterList(account.id)) };
   },
 };
 
@@ -587,25 +528,26 @@ function paramRoute(method, pathname) {
   const m = /^\/api\/characters\/(\d{1,12})(\/save)?$/.exec(pathname);
   if (!m) return null;
   const id = Number(m[1]);
-  const owned = (req) => {
-    const { account } = requireAccount(req);
-    const row = q.getCharacter.get(id, account.id);
+  const owned = async (req) => {
+    const { account } = await requireAccount(req);
+    const row = await one(CHARACTER, [id, account.id]);
     if (!row) throw new HttpError(404, 'That character no longer exists.');
     return { account, row };
   };
-  if (m[2] && method === 'GET') return (req) => ({ save: characterSave(owned(req).row) });
+  if (m[2] && method === 'GET') return async (req) => ({ save: characterSave((await owned(req)).row) });
   if (m[2] && method === 'PUT') {
     return async (req) => {
-      const { account } = owned(req);
-      return writeCharacterSave(account.id, id, await readJson(req));
+      const { account } = await owned(req);
+      const body = await readJson(req);
+      return tx(db, (client) => writeCharacterSave(client, account.id, id, body));
     };
   }
   if (!m[2] && method === 'DELETE') {
-    return (req) => {
-      const { account, row } = owned(req);
-      q.deleteCharacter.run(id, account.id);
+    return async (req) => {
+      const { account, row } = await owned(req);
+      await db.query('DELETE FROM characters WHERE id = $1 AND account_id = $2', [id, account.id]);
       console.log(`[character] ${account.username} deleted ${row.name}`);
-      return { ok: true, ...characterList(account.id) };
+      return { ok: true, ...(await characterList(account.id)) };
     };
   }
   return null;
@@ -634,13 +576,16 @@ server.listen(PORT, HOST, () => {
     // Not fatal: admin restore then can't tell the server is running.
   }
   console.log(`${SERVER_NAME} v${SERVER_VERSION} listening on http://${HOST}:${PORT}`);
-  console.log(`Database: ${path.join(DATA_DIR, 'depths.db')}`);
+  console.log(`Database: ${redactUrl(DATABASE_URL)}`);
 });
 
-const shutdown = () => {
+let stopping = false;
+const shutdown = async () => {
+  if (stopping) return;
+  stopping = true;
   server.close();
-  db.close();
   fs.rmSync(PID_FILE, { force: true });
+  await db.end().catch(() => {});
   process.exit(0);
 };
 process.on('SIGINT', shutdown);

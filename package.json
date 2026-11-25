@@ -4,7 +4,7 @@
   "description": "Dark fantasy action RPG",
   "author": "afiniel",
   "private": true,
-  "version": "0.5.0-beta.8",
+  "version": "1.0.0",
   "type": "module",
   "main": "electron/main.cjs",
   "desktop": {
@@ -25,6 +25,8 @@
     "release:launcher": "node scripts/release.mjs",
     "clean": "rm -rf release godot/build",
     "server": "node --no-warnings game-server/server.mjs",
+    "server:install": "npm ci --prefix game-server --no-audit --no-fund",
+    "server:db": "docker compose -f game-server/docker-compose.yml up -d db",
     "server:pack": "node scripts/pack-server.mjs",
     "server:image": "node scripts/pack-server.mjs --image",
     "patch-notes": "node scripts/patch-notes.mjs",

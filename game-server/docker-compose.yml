@@ -1,24 +1,57 @@
-# Depths of Darkness game server
+# Depths of Darkness game server + its PostgreSQL database
 #
-#   docker compose up -d --build     start (or update) the server
+#   docker compose up -d --build     start (or update) the server and the database
 #   docker compose logs -f           live log
-#   docker compose down              stop it (accounts and saves are kept in the volume)
+#   docker compose down              stop both (accounts and saves are kept in the volumes)
 #
 # Change the name and message below, then run `docker compose up -d` again.
+# The database password: set POSTGRES_PASSWORD in a file called .env next to this one
+# (POSTGRES_PASSWORD=something-long) before the FIRST start. The default is fine on a home network,
+# because the database only listens inside Docker and on this machine (127.0.0.1).
+#
+# On a PC for development, `bun run server:db` starts only the database, and `bun run server`
+# then runs the server from source against it.
 services:
   depths-server:
     build: .
     image: depths-server:latest
     container_name: depths-server
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "4100:4100"
     environment:
       SERVER_NAME: "Raspberry Pi"
       MOTD: "Welcome to the Depths. Dev server, progress may be reset."
+      DATABASE_URL: "postgres://depths:${POSTGRES_PASSWORD:-depths}@db:5432/depths"
     volumes:
+      # Backups (data/backups) and, from servers before 1.0.0, the old SQLite database that is
+      # imported into PostgreSQL on the first start and then kept as depths.db.imported-<date>.
       - depths-data:/data
 
+  db:
+    image: postgres:17-alpine
+    container_name: depths-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: depths
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-depths}"
+      POSTGRES_DB: depths
+    ports:
+      # Only this machine can reach it (for `bun run server` and the tests on a PC).
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - depths-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U depths -d depths"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
 volumes:
-  # All accounts and saves (the SQLite database). Survives updates and `docker compose down`.
+  # Backups and the old SQLite file. Survives updates and `docker compose down`.
   depths-data:
+  # All accounts and saves (the PostgreSQL database). Survives updates and `docker compose down`.
+  depths-db:

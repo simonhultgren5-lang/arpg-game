@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -38,8 +39,23 @@ fs.mkdirSync(outDir, { recursive: true });
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dod-qa-'));
 const dataDir = path.join(tmp, 'server');
 const profile = path.join(tmp, 'profile');
+// The server stores its data in PostgreSQL: a throwaway database on the server in QA_DATABASE_URL
+// (or DATABASE_URL, or the one from `bun run server:db`), dropped again at the end.
+const pg = createRequire(path.join(root, 'game-server', 'package.json'))('pg');
+const pgAdminUrl = process.env.QA_DATABASE_URL || process.env.DATABASE_URL || 'postgres://depths:depths@127.0.0.1:5432/depths';
+const qaDb = `dod_qa_${process.pid}`;
+const pgAdmin = new pg.Client({ connectionString: pgAdminUrl });
+try {
+  await pgAdmin.connect();
+  await pgAdmin.query(`CREATE DATABASE ${qaDb}`);
+} catch (error) {
+  console.error(`✗ No PostgreSQL for the QA game server at ${pgAdminUrl.replace(/:[^:@/]*@/, ':***@')} (${error.code || error.message}).`);
+  console.error('  Start one with `bun run server:db`, or set QA_DATABASE_URL.');
+  process.exit(1);
+}
+const databaseUrl = Object.assign(new URL(pgAdminUrl), { pathname: `/${qaDb}` }).toString();
 const admin = (...a) =>
-  spawnSync(process.execPath, ['--no-warnings', path.join(root, 'game-server', 'admin.mjs'), ...a], { env: { ...process.env, DATA_DIR: dataDir }, encoding: 'utf8' });
+  spawnSync(process.execPath, ['--no-warnings', path.join(root, 'game-server', 'admin.mjs'), ...a], { env: { ...process.env, DATA_DIR: dataDir, DATABASE_URL: databaseUrl }, encoding: 'utf8' });
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -52,10 +68,16 @@ const serverPort = await freePort();
 const serverUrl = `http://127.0.0.1:${serverPort}`;
 fs.mkdirSync(dataDir, { recursive: true });
 const server = spawn(process.execPath, ['--no-warnings', path.join(root, 'game-server', 'server.mjs')], {
-  env: { ...process.env, PORT: String(serverPort), HOST: '127.0.0.1', DATA_DIR: dataDir, UPDATE_URL: 'off', SERVER_NAME: 'QA server' },
+  env: { ...process.env, PORT: String(serverPort), HOST: '127.0.0.1', DATA_DIR: dataDir, DATABASE_URL: databaseUrl, UPDATE_URL: 'off', SERVER_NAME: 'QA server' },
   stdio: ['ignore', 'pipe', 'inherit'],
 });
-await new Promise((resolve) => server.stdout.on('data', (d) => String(d).includes('listening') && resolve()));
+await new Promise((resolve) => {
+  server.stdout.on('data', (d) => String(d).includes('listening') && resolve());
+  server.once('exit', (code) => {
+    console.error(`✗ The QA game server exited with code ${code}.`);
+    process.exit(1);
+  });
+});
 admin('news-post', 'QA news', 'Posted by the pipeline.');
 admin('flag-set', 'launcher.banner', 'QA banner');
 admin('flag-set', 'game.xp_multiplier', '2');
@@ -175,8 +197,11 @@ try {
 } finally {
   for (const p of startedGames()) stopGame(p);
   app.kill();
+  server.removeAllListeners('exit');
   server.kill();
   await sleep(1000);
+  await pgAdmin.query(`DROP DATABASE IF EXISTS ${qaDb} WITH (FORCE)`).catch(() => {});
+  await pgAdmin.end().catch(() => {});
   fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 3 });
 }
 

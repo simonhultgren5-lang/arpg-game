@@ -7,7 +7,9 @@
 #   bash update.sh --no-auto  turn the automatic updates off again
 #   bash update.sh --force    reinstall the newest release even if it isn't newer
 #
-# Accounts and saves are never touched: they live in the Docker volume (or data/ without Docker).
+# Accounts and saves are never touched: they live in PostgreSQL (its Docker volume, or the PostgreSQL
+# installed by install.sh). A first update from a server before 1.0.0 moves them from the old
+# SQLite file into PostgreSQL (the file is kept as a backup).
 # Your settings are kept: docker-compose.yml (SERVER_NAME, MOTD, ports) and config.json.
 #
 # Works for every way of installing the server:
@@ -32,7 +34,7 @@ for arg in "$@"; do
     --no-auto) MODE=no-auto ;;
     --quiet) QUIET=1 ;;
     --force) FORCE=1 ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     *) echo "Unknown option: $arg (try --help)" >&2; exit 2 ;;
   esac
 done
@@ -154,6 +156,32 @@ else
   ok "Files updated to $latest"
 fi
 
+# ---------------------------------------------------------------- 1.0.0: PostgreSQL
+# Servers before 1.0.0 kept everything in one SQLite file. The new docker-compose.yml adds a
+# PostgreSQL container; an old one (kept above because it has your settings) doesn't have it, so
+# switch to the new file once and carry SERVER_NAME and MOTD over. The server imports the old
+# SQLite file into PostgreSQL by itself on its first start and keeps the file as a backup.
+if [ -f "$DIR/docker-compose.yml" ] && ! grep -q 'postgres' "$DIR/docker-compose.yml"; then
+  new_compose=""
+  [ -f "$DIR/docker-compose.yml.new" ] && grep -q 'postgres' "$DIR/docker-compose.yml.new" && new_compose="$DIR/docker-compose.yml.new"
+  if [ -n "$new_compose" ]; then
+    old_compose="$DIR/docker-compose.yml.before-postgres"
+    cp "$DIR/docker-compose.yml" "$old_compose"
+    name_line="$(grep -m1 -E '^[[:space:]]+SERVER_NAME:' "$old_compose" || true)"
+    motd_line="$(grep -m1 -E '^[[:space:]]+MOTD:' "$old_compose" || true)"
+    cp "$new_compose" "$DIR/docker-compose.yml"
+    rm -f "$new_compose"
+    # Replace the default lines with yours (| as the sed separator; escape \, & and |).
+    esc() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
+    [ -n "$name_line" ] && sed -i "s|^[[:space:]]*SERVER_NAME:.*|$(esc "$name_line")|" "$DIR/docker-compose.yml"
+    [ -n "$motd_line" ] && sed -i "s|^[[:space:]]*MOTD:.*|$(esc "$motd_line")|" "$DIR/docker-compose.yml"
+    ok "docker-compose.yml now also runs the PostgreSQL database (your old file: docker-compose.yml.before-postgres)"
+    warn "If you changed ports or volumes in the old file, copy those changes over by hand."
+  else
+    warn "docker-compose.yml has no PostgreSQL database. This server version needs one: run  bash update.sh --force"
+  fi
+fi
+
 # ---------------------------------------------------------------- restart
 bold "Restarting the server"
 if [ -f "$DIR/docker-compose.yml" ] && command -v docker >/dev/null 2>&1; then
@@ -163,7 +191,15 @@ if [ -f "$DIR/docker-compose.yml" ] && command -v docker >/dev/null 2>&1; then
   ok "Rebuilt and restarted the container"
 elif command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files depths-server.service >/dev/null 2>&1 \
      && systemctl cat depths-server.service >/dev/null 2>&1; then
-  as_root systemctl restart depths-server
+  if ! grep -q 'DATABASE_URL' "$DIR/config.json" 2>/dev/null; then
+    # First update to the PostgreSQL server: install.sh sets up PostgreSQL, the packages and the service.
+    info "This version stores its data in PostgreSQL; setting it up with install.sh"
+    bash "$DIR/install.sh" || fail "install.sh failed. Run it yourself to see why: bash $DIR/install.sh"
+  else
+    (cd "$DIR" && npm ci --omit=dev --no-audit --no-fund --loglevel=error >/dev/null) \
+      || fail "npm ci failed (no internet?). The old version keeps running until you try again."
+    as_root systemctl restart depths-server
+  fi
   ok "Restarted the depths-server service"
 else
   warn "Couldn't tell how this server runs. Restart it yourself to finish the update."
