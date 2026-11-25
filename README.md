@@ -159,14 +159,36 @@ Builds run from source show a **Dev tools** page. An installed launcher shows it
 
 Players don't download anything by hand. When the launcher starts (and every few minutes while it's open), it checks your latest GitHub release, downloads the new installer in the background and offers **Restart to update**. The game ships inside the installer, so every release updates both.
 
-1. Bump the version: `bun run bump:patch` (or `minor` / `major`).
+Releases go through the build pipeline (below): bump the version in a pull request, merge it, and the pipeline builds, tests, checks and publishes it. Releasing by hand still works for emergencies:
+
+1. Bump the version: `bun run bump:patch` (or `minor` / `major`, or `bump:beta` / `bump:dev` for a pre-release).
 2. Make and test your changes.
 3. Add a `## <version> (<date>)` section to [CHANGELOG.md](CHANGELOG.md), with optional `### New` / `### Changes` / `### Fixes` subheadings and one `- ` line per change. This is what players read on the launcher's Play page and **News** page. A big update can have a name: `## 0.4.0 — Act I: The Tolling of Hollowmere (<date>)`. The launcher shows it as the patch's title, and the GitHub release is called "Depths of Darkness v0.4.0 — Act I: The Tolling of Hollowmere".
 4. Run `bun run test`.
 5. Commit and push.
 6. Run `bun run release`. It exports the game, builds the installer, packs the game server, writes the update files and creates the GitHub release `v<version>`. Add `-- --dry-run` to build into `release/upload/` without publishing.
 
+`bun run release -- --publish-only` publishes what an earlier `--dry-run` built, without rebuilding (the pipeline uses this). The channel comes from the version: `0.4.1-beta.1` is published as a beta pre-release.
+
 The release script needs the GitHub CLI logged in (`gh auth login`), and it refuses to publish if the version already has a release, the changelog section is missing, or your changes aren't committed and pushed.
+
+### Build pipeline
+
+`.github/workflows/pipeline.yml` runs on GitHub Actions (Windows) for every push and pull request:
+
+```
+Developer commit → Build server (GitHub Actions)
+                     ├─ Compile   JavaScript syntax, JSON, every GDScript file (bun run ci:compile)
+                     ├─ Test      server and admin CLI tests, Godot smoke and dev console tests (bun run test)
+                     └─ Package   game export, installer, portable .exe, server package (release --dry-run)
+                   → Automated QA  plays the packaged app (bun run ci:qa)
+                   → Deployment    main only, when the version isn't released yet
+```
+
+- **Compile** runs first; **Test** and **Package** then run side by side.
+- **Automated QA** starts the packaged app in a throwaway profile against a throwaway game server and drives it through the DevTools protocol. It walks through first-launch consent, patch notes, server news and the flag banner, registering, creating a character, and Play. The game runs headless, because CI machines have no GPU. QA also kills the game to check that the crash reaches the server, checks usage events, and plays offline. The results table appears in the run's summary, and a screenshot of the launcher is saved with the `qa-results` artifact. Run it locally with `bun run dist:dir` and then `bun run ci:qa`.
+- **Deployment** publishes exactly the files Package built and QA tested (`release.mjs --publish-only`). It runs on `main` when `package.json` has a version without a release yet, so **merging a version bump publishes it**. Pushes to `main` that don't bump the version skip it. To approve each release by hand first, add a required reviewer to the `release` environment: GitHub → Settings → Environments → release.
+- Godot 4.7.2 and its export templates are downloaded from the official release (checked against its SHA-512 sums) and cached between runs.
 
 **How it works:** every release carries `launcher-update.json` (the installer's URL, size and SHA-256), `patch-notes.json` (all of `CHANGELOG.md`), and `server-update.json` with `depths-server-<version>.tar.gz` for game servers. Launchers and servers read them from `https://github.com/<repo>/releases/latest/download/`, so the newest release is always the one players get. Installers are checked against their SHA-256 before they run.
 

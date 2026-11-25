@@ -13,6 +13,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { findGodot, GODOT_HELP } from './lib/godot.mjs';
+import { checkSyntax } from './ci/compile.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const quick = process.argv.includes('--quick');
@@ -22,15 +23,8 @@ const step = (name, ok, detail = '') => {
   console.log(`${ok === null ? '–' : ok ? '✓' : '✗'} ${name}${detail ? `  ${detail}` : ''}`);
 };
 
-// ---- 1. syntax
-const files = [
-  ...['electron', 'launcher', 'game-server', 'scripts', 'scripts/lib'].flatMap((dir) =>
-    fs.existsSync(path.join(root, dir))
-      ? fs.readdirSync(path.join(root, dir)).filter((f) => /\.(c|m)?js$/.test(f)).map((f) => path.join(dir, f))
-      : [],
-  ),
-];
-const broken = files.filter((f) => spawnSync(process.execPath, ['--check', path.join(root, f)]).status !== 0);
+// ---- 1. syntax (the same check as the pipeline's compile stage)
+const { files, broken } = checkSyntax();
 step(`Syntax of ${files.length} files`, broken.length === 0, broken.join(', '));
 
 // ---- 2. server tests

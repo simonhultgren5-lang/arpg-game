@@ -10,6 +10,9 @@ coverage/
 # Desktop builds (electron-builder)
 release/
 
+# Automated QA output (bun run ci:qa)
+qa-results/
+
 # Local development data (bun run dev; bun run dev:reset deletes it)
 .dev/
 

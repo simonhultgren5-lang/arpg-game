@@ -25,8 +25,11 @@ import { writePatchNotes } from './patch-notes.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
+// --publish-only publishes the files an earlier `--dry-run` built in release/upload/ (the build
+// pipeline publishes exactly what passed its tests and QA).
+const publishOnly = args.includes('--publish-only');
 // --channel beta|dev publishes a GitHub pre-release that only launchers on that channel install.
-const channelArg = args.includes('--channel') ? args[args.indexOf('--channel') + 1] : 'stable';
+let channelArg = args.includes('--channel') ? args[args.indexOf('--channel') + 1] : null;
 
 const sh = (cmd, cmdArgs, opts = {}) => {
   const r = spawnSync(cmd, cmdArgs, { cwd: root, encoding: 'utf8', ...opts });
@@ -46,6 +49,8 @@ const repo = pkg.desktop?.githubRepo;
 if (!repo) fail('package.json is missing desktop.githubRepo');
 const tag = `v${version}`;
 const prerelease = /-/.test(version);
+// Without --channel, the version says it: 0.4.1-beta.2 goes to beta, 0.4.1 to stable.
+channelArg ||= (/-(beta|dev)\.\d+$/.exec(version) || [null, 'stable'])[1];
 if (!['stable', 'beta', 'dev'].includes(channelArg)) fail('--channel must be beta or dev (leave it out for stable).');
 if (channelArg === 'stable' && prerelease) fail(`${version} is a pre-release version. Publish it with --channel beta or --channel dev.`);
 if (channelArg !== 'stable' && !new RegExp(`-${channelArg}\\.\\d+$`).test(version)) {
@@ -78,60 +83,70 @@ if (!dryRun) {
 
 // ---------------------------------------------------------------- build
 const uploadDir = path.join(root, 'release', 'upload');
-fs.rmSync(uploadDir, { recursive: true, force: true });
-fs.mkdirSync(uploadDir, { recursive: true });
 const uploads = [];
+if (publishOnly) {
+  const manifest = path.join(uploadDir, 'launcher-update.json');
+  if (!fs.existsSync(manifest)) fail('Nothing to publish in release/upload/. Build it first: bun run release -- --dry-run');
+  const built = JSON.parse(fs.readFileSync(manifest, 'utf8')).version;
+  if (built !== version) fail(`release/upload/ holds ${built}, but package.json says ${version}.`);
+  for (const name of fs.readdirSync(uploadDir)) if (name !== 'release-notes.md') uploads.push(path.join(uploadDir, name));
+  console.log(`✓ Using the ${uploads.length} files built and tested in release/upload/`);
+} else {
+  fs.rmSync(uploadDir, { recursive: true, force: true });
+  fs.mkdirSync(uploadDir, { recursive: true });
 
-// Patch notes: bundled into the launcher (for offline use) and uploaded so every launcher shows the newest notes.
-writePatchNotes();
-writePatchNotes(path.join(uploadDir, 'patch-notes.json'));
-uploads.push(path.join(uploadDir, 'patch-notes.json'));
-console.log('✓ Patch notes from CHANGELOG.md');
+  // Patch notes: bundled into the launcher (for offline use) and uploaded so every launcher shows the newest notes.
+  writePatchNotes();
+  writePatchNotes(path.join(uploadDir, 'patch-notes.json'));
+  uploads.push(path.join(uploadDir, 'patch-notes.json'));
+  console.log('✓ Patch notes from CHANGELOG.md');
 
-// The installer bundles the game (godot/), so export it first.
-const exported = sh('node', ['scripts/export-godot.mjs'], { stdio: 'inherit' });
-if (!exported.ok) fail('Exporting the game failed (see above).');
-console.log('Building the launcher installer (this takes a few minutes)…');
-const build = sh('npx', ['electron-builder', '--win'], { stdio: 'inherit', shell: process.platform === 'win32' });
-if (!build.ok) fail('electron-builder failed.');
-const setupName = `Depths-of-Darkness-Setup-${version}.exe`;
-const portableName = `Depths-of-Darkness-${version}-portable.exe`;
-for (const name of [setupName, portableName]) {
-  const file = path.join(root, 'release', name);
-  if (!fs.existsSync(file)) fail(`Expected ${name} in release/ after the build.`);
-  fs.copyFileSync(file, path.join(uploadDir, name));
-  uploads.push(path.join(uploadDir, name));
+  // The installer bundles the game (godot/), so export it first.
+  const exported = sh('node', ['scripts/export-godot.mjs'], { stdio: 'inherit' });
+  if (!exported.ok) fail('Exporting the game failed (see above).');
+  console.log('Building the launcher installer (this takes a few minutes)…');
+  const build = sh('npx', ['electron-builder', '--win', '--publish', 'never'], { stdio: 'inherit', shell: process.platform === 'win32' });
+  if (!build.ok) fail('electron-builder failed.');
+  const setupName = `Depths-of-Darkness-Setup-${version}.exe`;
+  const portableName = `Depths-of-Darkness-${version}-portable.exe`;
+  for (const name of [setupName, portableName]) {
+    const file = path.join(root, 'release', name);
+    if (!fs.existsSync(file)) fail(`Expected ${name} in release/ after the build.`);
+    fs.copyFileSync(file, path.join(uploadDir, name));
+    uploads.push(path.join(uploadDir, name));
+  }
+  const setupFile = path.join(uploadDir, setupName);
+  const launcherManifest = {
+    version,
+    url: download(setupName),
+    size: fs.statSync(setupFile).size,
+    sha256: sha256(setupFile),
+    notes,
+    date: new Date().toISOString(),
+  };
+  fs.writeFileSync(path.join(uploadDir, 'launcher-update.json'), JSON.stringify(launcherManifest, null, 2));
+  uploads.push(path.join(uploadDir, 'launcher-update.json'));
+  console.log(`✓ Launcher installer ${setupName}`);
+
+  // The game server: the package for the Pi and a manifest the server checks (see game-server/update.sh).
+  const packed = sh('node', ['scripts/pack-server.mjs'], { stdio: 'inherit' });
+  if (!packed.ok) fail('Packing the game server failed (see above).');
+  const serverName = `depths-server-${version}.tar.gz`;
+  const serverFile = path.join(uploadDir, serverName);
+  fs.copyFileSync(path.join(root, 'release', serverName), serverFile);
+  uploads.push(serverFile);
+  fs.writeFileSync(
+    path.join(uploadDir, 'server-update.json'),
+    JSON.stringify(
+      { version, url: download(serverName), size: fs.statSync(serverFile).size, sha256: sha256(serverFile), notes, date: new Date().toISOString() },
+      null,
+      2,
+    ),
+  );
+  uploads.push(path.join(uploadDir, 'server-update.json'));
+  console.log(`✓ Game server ${serverName}`);
+
 }
-const setupFile = path.join(uploadDir, setupName);
-const launcherManifest = {
-  version,
-  url: download(setupName),
-  size: fs.statSync(setupFile).size,
-  sha256: sha256(setupFile),
-  notes,
-  date: new Date().toISOString(),
-};
-fs.writeFileSync(path.join(uploadDir, 'launcher-update.json'), JSON.stringify(launcherManifest, null, 2));
-uploads.push(path.join(uploadDir, 'launcher-update.json'));
-console.log(`✓ Launcher installer ${setupName}`);
-
-// The game server: the package for the Pi and a manifest the server checks (see game-server/update.sh).
-const packed = sh('node', ['scripts/pack-server.mjs'], { stdio: 'inherit' });
-if (!packed.ok) fail('Packing the game server failed (see above).');
-const serverName = `depths-server-${version}.tar.gz`;
-const serverFile = path.join(uploadDir, serverName);
-fs.copyFileSync(path.join(root, 'release', serverName), serverFile);
-uploads.push(serverFile);
-fs.writeFileSync(
-  path.join(uploadDir, 'server-update.json'),
-  JSON.stringify(
-    { version, url: download(serverName), size: fs.statSync(serverFile).size, sha256: sha256(serverFile), notes, date: new Date().toISOString() },
-    null,
-    2,
-  ),
-);
-uploads.push(path.join(uploadDir, 'server-update.json'));
-console.log(`✓ Game server ${serverName}`);
 
 const notesFile = path.join(uploadDir, 'release-notes.md');
 fs.writeFileSync(

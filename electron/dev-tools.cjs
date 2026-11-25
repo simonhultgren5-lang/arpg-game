@@ -49,6 +49,8 @@ function gameArgs() {
   if (flags.verbose) engine.push('--verbose');
   if (flags.devConsole) game.push('--dev');
   if (flags.devConsole && flags.start) game.push('--dev-start', flags.start);
+  // The build pipeline's QA starts the game headless (CI machines have no GPU): DOD_GAME_ARGS="--headless".
+  if (process.env.DOD_GAME_ARGS) engine.push(...process.env.DOD_GAME_ARGS.split(' ').filter(Boolean));
   return { engine, game };
 }
 

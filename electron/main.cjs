@@ -26,6 +26,8 @@ const isDev = !app.isPackaged;
 
 // Running from source keeps its own logins and offline characters, so testing never touches the installed game.
 if (isDev) app.setPath('userData', `${app.getPath('userData')} (dev)`);
+// The build pipeline's QA (scripts/ci/qa.mjs) runs the packaged app in a throwaway profile.
+if (process.env.DOD_USER_DATA) app.setPath('userData', process.env.DOD_USER_DATA);
 
 protocol.registerSchemesAsPrivileged([
   { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
