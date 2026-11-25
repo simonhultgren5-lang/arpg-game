@@ -281,6 +281,7 @@ func _npc(world: Node3D, level: Node3D, npc_id: String, p: Vector3) -> void:
 			B.omni(Color(0.9, 0.7, 0.45), 0.8, 4.0, Vector3(0.4, 1.5, 0.6), node)
 		"edda":
 			B.box(Vector3(0.8, 0.5, 0.4), B.mat(Color(0.1, 0.1, 0.11), 0.4, Color.BLACK, 1.0, 0.8), Vector3(0.9, 0.45, 0.2), node)  # anvil
+			preload("res://scripts/models/props_model.gd").barrel(node, Vector3(1.25, 0, -0.6))
 			B.box(Vector3(0.6, 0.06, 0.5), B.mat(Color(0.3, 0.18, 0.1)), Vector3(0, 1.0, 0.27), node)  # apron
 			B.omni(B.EMBER, 1.4, 5.0, Vector3(-0.8, 0.6, 0.5), node)
 			B.sphere(0.25, B.mat(B.EMBER, 1.0, B.EMBER, 3.0), Vector3(-0.9, 0.3, 0.3), node, 6)

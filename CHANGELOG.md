@@ -9,6 +9,19 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.3.2 (2026-11-25)
+
+### New
+- **New 3D art in Act I:** the Warrior, the Hollow, the Bone Archer and the crypt props (torch sconces, barrels, sarcophagi) have brand-new hand-built models with warm rim lighting and glowing details.
+- **Sound for Act I:** spell and weapon sounds for every class, and spoken lines for the people of Hollowmere and the monsters of the crypt.
+- **Field guide:** a new menu in the 3D preview with portraits of the heroes, monsters, townsfolk and objects.
+- **Act I trailer:** watch it from the launcher with the new **Watch the Act I trailer** link.
+
+### Changes
+- The 3D title screen shows a portrait of the hero you are about to play, and townsfolk portraits appear in dialogue.
+- Torches now flicker with an animated flame.
+- Models for the Rogue, Mage, Grave Crawler and Hask are unchanged for now.
+
 ## 0.3.1 (2026-11-25)
 
 ### Fixes

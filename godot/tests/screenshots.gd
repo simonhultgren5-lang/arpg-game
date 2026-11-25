@@ -36,7 +36,8 @@ func _run() -> void:
 		if args[i] == "--class" and i + 1 < args.size():
 			_class = args[i + 1]
 	DirAccess.make_dir_recursive_absolute(_out)
-	get_window().size = Vector2i(1600, 900)
+	get_window().size = Vector2i(ProjectSettings.get_setting("display/window/size/viewport_width"),
+		ProjectSettings.get_setting("display/window/size/viewport_height"))
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	await _frames(30)
 	await _shot("0_menu")

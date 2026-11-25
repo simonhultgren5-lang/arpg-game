@@ -33,6 +33,8 @@ static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_colo
 	var floor_mat := StandardMaterial3D.new()
 	floor_mat.vertex_color_use_as_albedo = true
 	floor_mat.roughness = 0.95
+	preload("res://scripts/world/build.gd").surface_grain(floor_mat, Vector3.ONE * 0.55)
+	floor_mat.uv1_world_triplanar = true
 	fmi.material_override = floor_mat
 	fmi.name = "Floor"
 	parent.add_child(fmi)

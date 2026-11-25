@@ -25,6 +25,7 @@ var _banner_sub: Label
 var _messages: VBoxContainer
 var _status: Label
 var _help: PanelContainer
+var _dlg_art := TextureRect.new()
 var _dialogue: PanelContainer
 var _dlg_speaker: Label
 var _dlg_text: Label
@@ -275,12 +276,20 @@ func _build_dialogue() -> void:
 	_dialogue.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
-	_dialogue.add_child(v)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	_dialogue.add_child(row)
+	_dlg_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_dlg_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_dlg_art.custom_minimum_size = Vector2(146, 228)
+	row.add_child(_dlg_art)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(v)
 	_dlg_speaker = UiTheme.label("", 22, UiTheme.GOLD)
 	v.add_child(_dlg_speaker)
 	_dlg_text = UiTheme.label("", 17)
 	_dlg_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_dlg_text.custom_minimum_size = Vector2(720, 0)
+	_dlg_text.custom_minimum_size = Vector2(540, 0)
 	v.add_child(_dlg_text)
 	_dlg_options = VBoxContainer.new()
 	_dlg_options.add_theme_constant_override("separation", 4)
@@ -490,6 +499,7 @@ func boss_defeated() -> void:
 
 
 func show_death() -> void:
+	ActAudio.stop_voice(self)
 	_dialogue.visible = false
 	_inventory.visible = false
 	_death.visible = true
@@ -499,10 +509,12 @@ func show_death() -> void:
 
 func open_dialogue(npc_id: String) -> void:
 	_dlg_npc = npc_id
+	_dlg_art.texture = load("res://art/field_guide/previews/%s.jpg" % npc_id)
 	_show_node(Game.dialogue_entry(npc_id))
 
 
 func close_dialogue() -> void:
+	ActAudio.stop_voice(self)
 	_dialogue.visible = false
 	_dlg_npc = ""
 
@@ -514,6 +526,7 @@ func _show_node(id: String) -> void:
 		return
 	var info: Dictionary = Game.npc_info(node.get("speaker", _dlg_npc))
 	_dlg_speaker.text = "%s  ·  %s" % [info.get("name", ""), info.get("title", "")]
+	ActAudio.voice(self, id, true)
 	_dlg_text.text = node.get("text", "")
 	for c in _dlg_options.get_children():
 		c.queue_free()

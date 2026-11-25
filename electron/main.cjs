@@ -9,6 +9,7 @@
 // (see electron/characters.cjs), so heroes on one PC never overwrite each other.
 const { app, BrowserWindow, Menu, ipcMain, net, protocol, session, shell } = require('electron');
 const fs = require('node:fs');
+const { Readable } = require('node:stream');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
@@ -53,6 +54,9 @@ function serveAppScheme(sess) {
     }
     const file = root && path.normalize(path.join(root, relative));
     if (!file || !file.startsWith(root + path.sep)) return new Response('Not found', { status: 404 });
+    if (host === 'launcher' && relative === 'assets/act-i.mp4') {
+      return serveTrailer(file, request.headers.get('Range'));
+    }
     return net.fetch(pathToFileURL(file).toString()).then((response) => {
       // Never cache: files are local, and after a game patch every file must come from the new version.
       // (Also lets a reload with F5 pick up edits while developing.)
@@ -60,6 +64,29 @@ function serveAppScheme(sess) {
       headers.set('Cache-Control', 'no-store');
       return new Response(response.body, { status: response.status, headers });
     });
+  });
+}
+
+async function serveTrailer(file, range) {
+  const { size } = await fs.promises.stat(file);
+  const headers = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes' };
+  let start = 0;
+  let end = size - 1;
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (!match || (!match[1] && !match[2])) {
+      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+    }
+    start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+    if (match[1] && match[2]) end = Math.min(end, Number(match[2]));
+    if (start > end || start >= size) {
+      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+    }
+    headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
+  }
+  headers['Content-Length'] = String(end - start + 1);
+  return new Response(Readable.toWeb(fs.createReadStream(file, { start, end })), {
+    status: range ? 206 : 200, headers,
   });
 }
 

@@ -4,6 +4,19 @@
   const api = window.launcher;
   const $ = (id) => document.getElementById(id);
   const POLL_MS = 8000;
+  const trailer = $('actTrailer');
+  const trailerDialog = $('trailerDialog');
+  $('btnTrailer').addEventListener('click', () => {
+    trailerDialog.showModal();
+    trailer.play().catch(() => { /* Native controls remain available. */ });
+  });
+  trailerDialog.addEventListener('close', () => {
+    trailer.pause();
+    trailer.currentTime = 0;
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) trailer.pause();
+  });
 
   // ---------------------------------------------------------------- classes & colors
   // Same classes, colors and starting kit as the game (game/js/06-onboarding-sanctuary.js).

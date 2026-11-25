@@ -4,6 +4,8 @@ extends CharacterBody3D
 const B = preload("res://scripts/world/build.gd")
 const Fx = preload("res://scripts/world/fx.gd")
 const Projectile = preload("res://scripts/actors/projectile.gd")
+const HollowModel = preload("res://scripts/models/hollow_model.gd")
+const BoneArcherModel = preload("res://scripts/models/bone_archer_model.gd")
 
 const KINDS := {
 	"hollow": {"name": "Hollow", "hp": 30, "dmg": 6, "speed": 3.3, "range": 1.6, "cd": 1.3, "windup": 0.45,
@@ -97,14 +99,7 @@ func _build_model(s: float) -> void:
 	var eye := B.mat(Color(0.6, 0.9, 1.0), 1.0, Color(0.5, 0.9, 1.0), 4.0)
 	match kind:
 		"hollow":
-			var body := B.capsule(0.32 * s, 1.4 * s, _m(col), Vector3(0, 0.85 * s, 0), _model)
-			body.rotation.x = 0.25
-			B.sphere(0.22 * s, _m(col.lightened(0.1)), Vector3(0, 1.6 * s, 0.22 * s), _model, 8)
-			for side in [-1.0, 1.0]:
-				var arm := B.cylinder(0.06 * s, 0.08 * s, 0.9 * s, _m(col.darkened(0.1)), Vector3(side * 0.35 * s, 1.15 * s, 0.35 * s), _model, 6)
-				arm.rotation.x = 1.2
-				B.sphere(0.04 * s, eye, Vector3(side * 0.08 * s, 1.63 * s, 0.4 * s), _model, 4)
-			B.cylinder(0.3 * s, 0.45 * s, 0.6 * s, _m(Color(0.12, 0.1, 0.1)), Vector3(0, 0.3 * s, 0), _model, 8)
+			HollowModel.build(_model, s, col, _m)
 		"crawler":
 			var body := B.sphere(0.45 * s, _m(col), Vector3(0, 0.45 * s, 0), _model, 10)
 			body.scale = Vector3(1.0, 0.6, 1.4)
@@ -115,17 +110,7 @@ func _build_model(s: float) -> void:
 					var leg := B.cylinder(0.03, 0.05, 0.7 * s, _m(col.darkened(0.2)), Vector3(side * 0.45 * s, 0.25 * s, (j - 0.5) * 0.5 * s), _model, 5)
 					leg.rotation.z = side * 1.0
 		"archer":
-			var bone := _m(col)
-			B.cylinder(0.08, 0.1, 0.9, bone, Vector3(0, 1.05, 0), _model, 6)
-			B.box(Vector3(0.45, 0.35, 0.22), bone, Vector3(0, 1.25, 0), _model)  # ribs
-			B.cylinder(0.25, 0.2, 0.15, bone, Vector3(0, 0.62, 0), _model, 8)  # pelvis
-			B.sphere(0.2, bone, Vector3(0, 1.72, 0), _model, 8)
-			for side in [-1.0, 1.0]:
-				B.cylinder(0.04, 0.05, 0.7, bone, Vector3(side * 0.12, 0.3, 0), _model, 5)
-				B.sphere(0.04, B.mat(Color(1, 0.5, 0.2), 1.0, Color(1, 0.45, 0.15), 4.0), Vector3(side * 0.07, 1.74, 0.17), _model, 4)
-			var bow := B.box(Vector3(0.05, 1.3, 0.08), B.mat(Color(0.25, 0.17, 0.1)), Vector3(0.35, 1.2, 0.35), _model)
-			bow.rotation.z = 0.15
-			B.cylinder(0.32, 0.35, 0.5, _m(Color(0.15, 0.12, 0.14)), Vector3(0, 1.95, -0.05), _model, 8)  # ragged hood
+			BoneArcherModel.build(_model, s, col, _m)
 		"boss":
 			var iron := _m(col)
 			var bell := B.cylinder(0.75, 1.35, 2.3, iron, Vector3(0, 1.4, 0), _model, 14)
@@ -314,6 +299,7 @@ func set_aggro() -> void:
 	if aggro or dead:
 		return
 	aggro = true
+	ActAudio.voice(self, kind)
 	if is_boss:
 		world.boss_engaged(self)
 	# wake the rest of the pack
@@ -329,6 +315,7 @@ func take_damage(amount: float, crit := false, push := Vector3.ZERO) -> void:
 	_flash = 1.0
 	set_aggro()
 	world.damage_number(global_position, amount, crit)
+	Fx.impact(world, global_position + Vector3.UP * (1.1 if elite else 0.9), push, crit)
 	if push.length() > 0.0 and not is_boss:
 		_knock += Vector3(push.x, 0, push.z).normalized() * (5.0 if crit else 2.5)
 	if hp <= 0.0:

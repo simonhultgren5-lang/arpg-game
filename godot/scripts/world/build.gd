@@ -24,12 +24,51 @@ static func mat(color: Color, roughness := 0.9, emission := Color.BLACK, energy 
 	return m
 
 
+## Project the grain in object space on meshes built without texture coordinates.
+static func surface_grain(material: StandardMaterial3D, frequency: Vector3) -> void:
+	material.albedo_texture = preload("res://shaders/surface_grain.tres")
+	material.uv1_triplanar = true
+	material.uv1_scale = frequency
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+
+
 static func unique_mat(color: Color, roughness := 0.8) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = roughness
 	m.emission_enabled = true
 	m.emission = Color.BLACK
+	return m
+
+
+## Like unique_mat (flash / tint friendly) but with a soft rim light for a painterly edge.
+static func styled_unique(color: Color, roughness := 0.8, rim := 0.5) -> StandardMaterial3D:
+	var m := unique_mat(color, roughness)
+	m.rim_enabled = true
+	m.rim = rim
+	m.rim_tint = 0.6
+	return m
+
+
+static var _shader: Shader
+static var _styled_cache := {}
+
+
+## The banded-light, rim-lit shader material for static (never flashing) parts and glows.
+static func stylized_mat(color: Color, rim := Color(1.0, 0.55, 0.25), emission := Color.BLACK, energy := 0.0) -> ShaderMaterial:
+	var key := "%s|%s|%s|%.2f" % [color.to_html(), rim.to_html(), emission.to_html(), energy]
+	if _styled_cache.has(key):
+		return _styled_cache[key]
+	if _shader == null:
+		_shader = load("res://shaders/stylized.gdshader")
+	var m := ShaderMaterial.new()
+	m.shader = _shader
+	m.set_shader_parameter("grain", preload("res://shaders/surface_grain.tres"))
+	m.set_shader_parameter("albedo", color)
+	m.set_shader_parameter("rim_color", rim)
+	m.set_shader_parameter("emission_color", emission)
+	m.set_shader_parameter("emission_energy", energy)
+	_styled_cache[key] = m
 	return m
 
 
@@ -116,9 +155,8 @@ static func label(text: String, color: Color, pos: Vector3, parent: Node, font_s
 static func torch(parent: Node, pos: Vector3, facing := Vector3.ZERO, light_range := 8.0, energy := 1.6) -> Node3D:
 	var t := Node3D.new()
 	t.position = pos
-	cylinder(0.05, 0.08, 0.5, mat(Color(0.15, 0.1, 0.08)), Vector3(0, -0.2, 0), t, 6)
-	sphere(0.14, mat(EMBER, 1.0, EMBER, 4.0), Vector3(0, 0.12, 0), t, 6)
-	sphere(0.08, mat(Color(1, 0.85, 0.5), 1.0, Color(1, 0.8, 0.4), 6.0), Vector3(0, 0.2, 0), t, 6)
+	var fixture := preload("res://scripts/models/props_model.gd").sconce(t, Vector3.DOWN * 0.4)
+	fixture.rotation.y = atan2(facing.x, facing.z)
 	var l := omni(Color(1.0, 0.58, 0.28), energy, light_range, Vector3(0, 0.3, 0) + facing * 0.4, t)
 	t.set_meta("light", l)
 	t.set_script(preload("res://scripts/world/flicker.gd"))
