@@ -178,7 +178,7 @@ Start straight in the crypt or at the boss with `--dev --dev-start crypt|boss` (
 
 | Command | Runs | Time |
 | --- | --- | --- |
-| `bun run test` | Syntax of every script, 17+ server and admin tests, Godot smoke test (Act I with every class), dev console test | ~3–5 min |
+| `bun run test` | Syntax of every script, 17+ server and admin tests, Godot smoke test (Act I with every class), dev console test, asset test, UI test (gear, skills, panels, settings) | ~3–5 min |
 | `bun run test:quick` | The same without Godot | ~5 s |
 | `bun run ci:compile` | JavaScript syntax, JSON, and every GDScript file compiles | ~1 min |
 | `bun run dist:dir` then `bun run ci:qa` | Automated QA on the packaged app (see [section 7](#7-the-build-pipeline)) | ~5 min |

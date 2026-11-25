@@ -113,6 +113,7 @@ func _crossfade(old: AudioStreamPlayer, folder: String, id: String, volume: floa
 		wav.loop_begin = 0
 		wav.loop_end = wav.data.size() / (2 if wav.format == AudioStreamWAV.FORMAT_16_BITS else 1) / (2 if wav.stereo else 1)
 	p.volume_db = -60.0
+	p.bus = _bus(folder)
 	p.process_mode = Node.PROCESS_MODE_ALWAYS  # keeps playing in the pause menu
 	add_child(p)
 	p.play()
@@ -129,7 +130,14 @@ func _play(owner_node: Node, folder: String, id: String, volume: float) -> Audio
 	var player := AudioStreamPlayer.new()
 	player.stream = load("res://assets/audio/%s/%s.wav" % [folder, id])
 	player.volume_db = volume
+	player.bus = _bus(folder)
 	owner_node.add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
 	return player
+
+
+## The audio bus a kind of sound plays on (Settings sets their volumes); Master if it doesn't exist yet.
+func _bus(folder: String) -> String:
+	var bus: String = {"music": "Music", "ambience": "Ambience", "voice": "Voice"}.get(folder, "Effects")
+	return bus if AudioServer.get_bus_index(bus) >= 0 else "Master"

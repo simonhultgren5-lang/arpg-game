@@ -5,6 +5,8 @@ signal stats_changed
 signal xp_changed
 signal leveled_up(level: int)
 signal inventory_changed
+## The skill bar, a variant or a passive changed (Skills panel).
+signal build_changed
 signal quest_changed
 signal message(text: String, color: Color)
 ## Story moments the world reacts to: "wells_toll" (Lamps Without Oil done), "act_complete".
@@ -12,16 +14,26 @@ signal story_event(id: String)
 
 const Classes = preload("res://scripts/data/classes.gd")
 const Items = preload("res://scripts/data/items.gd")
+const Passives = preload("res://scripts/data/passives.gd")
 const Dialogue = preload("res://scripts/data/act1_dialogue.gd")
 
-const SAVE_VERSION := 1
+## 2 (0.5.0-beta.5): 13 gear slots; armor became chest, charm became amulet (see migrate()).
+const SAVE_VERSION := 2
 const MAX_LEVEL := 20
-const INVENTORY_SIZE := 24
+const INVENTORY_SIZE := 60
+## Cooldown reduction from gear never goes past this.
+const MAX_CDR := 0.4
+## A critical strike deals 175% damage before crit-damage bonuses.
+const BASE_CRIT_DAMAGE := 1.75
 const POTION_PRICE := 25
 const QUEST := "silent_bell"
 ## All Act I quests and their last step (see scripts/data/act1_dialogue.gd for what each step means).
 const QUESTS := {"silent_bell": 3, "lamps": 3, "act_end": 2, "wardens": 3}
 const WARDEN_STONES := 3
+## The skill bar: LMB, RMB, then keys 1-4. LMB only takes a primary skill.
+const BAR_SIZE := 6
+## No changing skills with a foe this close (metres).
+const BUILD_LOCK_RANGE := 12.0
 
 var progress: Dictionary = {}
 var hero_class := "warrior"
@@ -58,7 +70,7 @@ func _process(delta: float) -> void:
 func new_progress() -> Dictionary:
 	return {
 		"version": SAVE_VERSION, "level": 1, "xp": 0, "gold": 20, "potions": 3,
-		"inventory": [], "equipped": {"weapon": null, "armor": null, "charm": null},
+		"inventory": [], "equipped": empty_equipped(), "build": default_build(hero_class),
 		"quests": {"silent_bell": 0, "lamps": 0, "act_end": 0, "wardens": 0}, "flags": {}, "depth": 1, "kills": 0, "playtime": 0.0,
 	}
 
@@ -69,10 +81,12 @@ func load_hero() -> void:
 	class_data = Classes.get_class_data(hero_class)
 	var saved: Dictionary = await SaveSystem.load_progress()
 	progress = new_progress()
+	if not saved.is_empty() and int(saved.get("version", 1)) < SAVE_VERSION:
+		saved = migrate(saved, hero_class)
 	for key in saved:
 		progress[key] = saved[key]
 	if not (progress.get("equipped") is Dictionary):
-		progress["equipped"] = {"weapon": null, "armor": null, "charm": null}
+		progress["equipped"] = empty_equipped()
 	if not (progress.get("inventory") is Array):
 		progress["inventory"] = []
 	if not (progress.get("quests") is Dictionary):
@@ -83,6 +97,7 @@ func load_hero() -> void:
 	if not (progress.get("flags") is Dictionary):
 		progress["flags"] = {}
 	progress["level"] = clampi(int(progress["level"]), 1, MAX_LEVEL)
+	sanitize_build()
 	if saved.is_empty():
 		# A new hero starts with a worn weapon of their class.
 		progress["equipped"]["weapon"] = Items.roll_item(1, hero_class, -1.0, "weapon")
@@ -130,6 +145,57 @@ func monster_level() -> int:
 	return clampi(1 + int(progress["level"]) / 2, 1, 6)
 
 
+static func empty_equipped() -> Dictionary:
+	var eq := {}
+	for slot in Items.SLOTS:
+		eq[slot] = null
+	return eq
+
+
+## Brings a saved progress dictionary up to SAVE_VERSION. Pure: returns a new dictionary.
+## Version 1 had three slots (weapon, armor, charm) and a 24-item pack.
+static func migrate(saved: Dictionary, hero_class := "warrior") -> Dictionary:
+	var p := saved.duplicate(true)
+	var old_eq: Dictionary = p.get("equipped", {}) if p.get("equipped") is Dictionary else {}
+	var bag: Array = p.get("inventory", []) if p.get("inventory") is Array else []
+	var eq := empty_equipped()
+	for item in bag:
+		if item is Dictionary:
+			_migrate_item(item, hero_class)
+	for slot in old_eq:
+		var item = old_eq[slot]
+		if not (item is Dictionary):
+			continue
+		_migrate_item(item, hero_class)
+		var kind: String = item["slot"]
+		# An item already in a slot that takes it stays there (a version-2 save is left as it is).
+		var to: String = slot if eq.has(slot) and Items.slot_kind(slot) == kind else ("ring_1" if kind == "ring" else kind)
+		if kind == "ring" and eq.get(to) != null and eq.get("ring_2") == null:
+			to = "ring_2"
+		if eq.has(to) and eq[to] == null:
+			eq[to] = item
+		else:
+			bag.append(item)
+	p["equipped"] = eq
+	p["inventory"] = bag
+	p["version"] = SAVE_VERSION
+	return p
+
+
+static func _migrate_item(item: Dictionary, hero_class: String) -> void:
+	match item.get("slot", ""):
+		"armor":
+			item["slot"] = "chest"
+		"charm":
+			item["slot"] = "amulet"
+	if item.has("unique") and Items.UNIQUES.has(item["unique"]):
+		var u: Dictionary = Items.UNIQUES[item["unique"]]
+		item["slot"] = u["slot"]
+		item["icon"] = u["icon"]
+	if str(item.get("icon", "")) == "" and item.get("slot") != "quest":
+		item["icon"] = Items.guess_icon(item, hero_class)
+
+
 # ------------------------------------------------------------------ stats
 
 func level() -> int:
@@ -152,7 +218,11 @@ func gear_stat(key: String) -> int:
 
 func max_hp() -> float:
 	var lv := level() - 1
-	return float(class_data["hp"]) + class_data["hp_per_level"] * lv + gear_stat("life")
+	return (float(class_data["hp"]) + class_data["hp_per_level"] * lv + gear_stat("life")) * max_hp_bonus()
+
+
+func max_hp_bonus() -> float:
+	return 1.0 + passive_bonus("life")
 
 
 func max_mana() -> float:
@@ -160,7 +230,7 @@ func max_mana() -> float:
 
 
 func armor() -> float:
-	return float(class_data["armor"]) + level() * 1.5 + gear_stat("armor")
+	return (float(class_data["armor"]) + level() * 1.5 + gear_stat("armor")) * (1.0 + passive_bonus("armor"))
 
 
 func damage_range() -> Vector2:
@@ -170,11 +240,31 @@ func damage_range() -> Vector2:
 
 
 func crit_chance() -> float:
-	return 0.05 + gear_stat("crit") / 100.0
+	return 0.05 + gear_stat("crit") / 100.0 + passive_bonus("crit")
+
+
+## Damage multiplier of a critical strike.
+func crit_damage() -> float:
+	return BASE_CRIT_DAMAGE + gear_stat("crit_dmg") / 100.0 + passive_bonus("crit_dmg")
+
+
+## Multiplier on attack rate (divide attack cooldowns by it).
+func attack_speed() -> float:
+	return 1.0 + gear_stat("attack_speed") / 100.0
+
+
+## Multiplier on skill cooldowns; never below 1 - MAX_CDR.
+func cooldown_mult() -> float:
+	return maxf(1.0 - MAX_CDR, 1.0 - gear_stat("cdr") / 100.0 - passive_bonus("cdr"))
+
+
+## Life per second from gear (on top of the hero's own slow recovery).
+func life_regen() -> float:
+	return float(gear_stat("regen"))
 
 
 func move_speed() -> float:
-	return float(class_data["speed"]) * (1.0 + gear_stat("speed") / 100.0)
+	return float(class_data["speed"]) * (1.0 + gear_stat("speed") / 100.0 + passive_bonus("speed"))
 
 
 ## Damage taken after armor.
@@ -194,6 +284,7 @@ func add_xp(amount: int) -> void:
 	while level() < MAX_LEVEL and int(progress["xp"]) >= xp_to_next():
 		progress["xp"] = int(progress["xp"]) - xp_to_next()
 		progress["level"] = level() + 1
+		_autoslot_unlocked()
 		leveled_up.emit(level())
 		stats_changed.emit()
 		save()
@@ -208,6 +299,171 @@ func add_gold(amount: int) -> void:
 func add_potion(n := 1) -> void:
 	progress["potions"] = mini(int(progress["potions"]) + n, 9)
 	stats_changed.emit()
+
+
+# ------------------------------------------------------------------ skills: bar, variants, passives
+# progress["build"] = {"bar": [6 skill ids or ""], "variants": {skill_id: variant_id}, "passives": [3 ids or ""]}
+
+func build() -> Dictionary:
+	return progress["build"]
+
+
+## A new hero's build: their first primary on LMB, then the first skills in unlock order.
+static func default_build(cls_id: String) -> Dictionary:
+	var list: Array = Classes.skills(cls_id)
+	return {"bar": [list[0]["id"], list[2]["id"], list[3]["id"], list[5]["id"], list[6]["id"], ""],
+		"variants": {}, "passives": ["", "", ""]}
+
+
+## Drops anything a save names that this class doesn't have (renamed skills, another class's ids).
+func sanitize_build() -> void:
+	var b = progress.get("build")
+	var fresh := default_build(hero_class)
+	if not (b is Dictionary) or not (b.get("bar") is Array):
+		progress["build"] = fresh
+		return
+	var bar := []
+	var seen := {}
+	for i in BAR_SIZE:
+		var id := str(b["bar"][i]) if i < b["bar"].size() else ""
+		var sk := Classes.skill(hero_class, id)
+		if sk.is_empty() or seen.has(id) or (i == 0 and not sk.get("primary", false)):
+			id = ""
+		if id != "":
+			seen[id] = true
+		bar.append(id)
+	if bar[0] == "" and not seen.has(fresh["bar"][0]):
+		bar[0] = fresh["bar"][0]
+	var variants := {}
+	if b.get("variants") is Dictionary:
+		for sid in b["variants"]:
+			var sk := Classes.skill(hero_class, str(sid))
+			if sk.is_empty():
+				continue
+			for v in sk["variants"]:
+				if v["id"] == str(b["variants"][sid]):
+					variants[str(sid)] = v["id"]
+	var passives := []
+	var pv = b.get("passives")
+	for i in Passives.SLOT_LEVELS.size():
+		var id := str(pv[i]) if pv is Array and i < pv.size() else ""
+		if Passives.find(hero_class, id).is_empty() or passives.has(id):
+			id = ""
+		passives.append(id)
+	progress["build"] = {"bar": bar, "variants": variants, "passives": passives}
+
+
+## "" when the hero may change skills now, else why not.
+func can_change_build() -> String:
+	var w = get_tree().current_scene if is_inside_tree() else null
+	if w and w.has_method("enemies") and w.get("player") != null:
+		var at: Vector3 = w.player.global_position
+		for e in w.enemies():
+			if is_instance_valid(e) and not e.dead and e.global_position.distance_to(at) < BUILD_LOCK_RANGE:
+				return "Not with foes this close."
+	return ""
+
+
+## Puts skill `id` in bar slot `i` (moving it if it's already on the bar). "" clears the slot.
+## Returns "" on success, else the reason it can't.
+func set_bar(i: int, id: String) -> String:
+	if i < 0 or i >= BAR_SIZE:
+		return "No such slot."
+	var why := can_change_build()
+	if why != "":
+		return why
+	var bar: Array = build()["bar"]
+	if id != "":
+		var sk := Classes.skill(hero_class, id)
+		if sk.is_empty():
+			return "Unknown skill."
+		if i == 0 and not sk.get("primary", false):
+			return "The left mouse button takes a primary skill."
+		var at := bar.find(id)
+		if at >= 0:
+			bar[at] = ""
+	bar[i] = id
+	build_changed.emit()
+	return ""
+
+
+## Chooses variant `variant_id` ("" for none) of skill `id`. A locked variant can be chosen; it applies
+## once the hero reaches its level.
+func set_variant(id: String, variant_id: String) -> String:
+	var sk := Classes.skill(hero_class, id)
+	if sk.is_empty():
+		return "Unknown skill."
+	var why := can_change_build()
+	if why != "":
+		return why
+	if variant_id == "":
+		build()["variants"].erase(id)
+		build_changed.emit()
+		return ""
+	for v in sk["variants"]:
+		if v["id"] == variant_id:
+			build()["variants"][id] = variant_id
+			build_changed.emit()
+			return ""
+	return "Unknown variant."
+
+
+## Puts passive `id` ("" clears) in passive slot `i`, which must be open at the hero's level.
+func set_passive(i: int, id: String) -> String:
+	if i < 0 or i >= Passives.SLOT_LEVELS.size():
+		return "No such slot."
+	if level() < int(Passives.SLOT_LEVELS[i]):
+		return "This slot opens at level %d." % int(Passives.SLOT_LEVELS[i])
+	if id != "" and Passives.find(hero_class, id).is_empty():
+		return "Unknown passive."
+	var why := can_change_build()
+	if why != "":
+		return why
+	var ps: Array = build()["passives"]
+	if id != "":
+		var at := ps.find(id)
+		if at >= 0:
+			ps[at] = ""
+	ps[i] = id
+	build_changed.emit()
+	stats_changed.emit()
+	return ""
+
+
+## The sum of `stat` over the passives in open slots.
+func passive_bonus(stat: String) -> float:
+	if not progress.has("build"):
+		return 0.0
+	var total := 0.0
+	var ps: Array = build()["passives"]
+	for i in ps.size():
+		if ps[i] == "" or level() < int(Passives.SLOT_LEVELS[i]):
+			continue
+		total += float(Passives.find(hero_class, ps[i]).get("effect", {}).get(stat, 0.0))
+	return total
+
+
+## Skill `id` as this hero casts it now (with the chosen variant, if unlocked). {} if unknown.
+func resolved(id: String) -> Dictionary:
+	return Classes.resolved(hero_class, id, str(build()["variants"].get(id, "")), level())
+
+
+func skill_unlocked_for(id: String) -> bool:
+	return level() >= int(Classes.skill(hero_class, id).get("unlock", 1))
+
+
+## A skill unlocked at this level that isn't on the bar goes into the first empty slot after LMB.
+func _autoslot_unlocked() -> void:
+	var bar: Array = build()["bar"]
+	for sk in Classes.skills(hero_class):
+		if int(sk.get("unlock", 1)) != level() or sk.get("primary", false) or bar.has(sk["id"]):
+			continue
+		for i in range(1, BAR_SIZE):
+			if bar[i] == "":
+				bar[i] = sk["id"]
+				message.emit("%s joins your skill bar." % sk["name"], Color(0.89, 0.71, 0.49))
+				build_changed.emit()
+				break
 
 
 # ------------------------------------------------------------------ inventory
@@ -226,32 +482,62 @@ func add_item(item: Dictionary) -> bool:
 
 
 func equip(index: int) -> void:
+	equip_to(index)
+
+
+## Wears bag item `index` in `slot` (empty: the slot its kind goes in; a ring takes the free ring slot,
+## else ring_1). Whatever was there goes back into the bag in its place. False if it doesn't fit.
+func equip_to(index: int, slot := "") -> bool:
 	if index < 0 or index >= inventory().size():
-		return
+		return false
 	var item: Dictionary = inventory()[index]
-	var slot: String = item.get("slot", "")
-	if slot == "" or slot == "quest":
-		return
-	var old = progress["equipped"].get(slot)
+	var kind: String = item.get("slot", "")
+	if kind == "" or kind == "quest" or not kind in Items.KINDS:
+		return false
+	var eq: Dictionary = progress["equipped"]
+	if slot == "":
+		slot = kind
+		if kind == "ring":
+			slot = "ring_1" if eq.get("ring_1") == null or eq.get("ring_2") != null else "ring_2"
+	if Items.slot_kind(slot) != kind or not eq.has(slot):
+		return false
+	var old = eq.get(slot)
 	inventory().remove_at(index)
 	if old is Dictionary:
 		inventory().insert(index, old)
-	progress["equipped"][slot] = item
+	eq[slot] = item
 	inventory_changed.emit()
 	stats_changed.emit()
+	return true
 
 
-func unequip(slot: String) -> void:
+## Takes off what `slot` holds into the bag. False if the slot is empty or the bag is full.
+func unequip(slot: String) -> bool:
 	var item = progress["equipped"].get(slot)
 	if not (item is Dictionary):
-		return
+		return false
 	if inventory().size() >= INVENTORY_SIZE:
 		message.emit("Your pack is full.", Color(0.9, 0.4, 0.3))
-		return
+		return false
 	progress["equipped"][slot] = null
 	inventory().append(item)
 	inventory_changed.emit()
 	stats_changed.emit()
+	return true
+
+
+## Moves a bag item: onto another item swaps the two, past the end moves it last.
+func move_item(from: int, to: int) -> void:
+	var bag := inventory()
+	if from < 0 or from >= bag.size() or from == to:
+		return
+	if to >= bag.size():
+		bag.append(bag.pop_at(from))
+	else:
+		var t = bag[to]
+		bag[to] = bag[from]
+		bag[from] = t
+	inventory_changed.emit()
 
 
 func salvage(index: int) -> void:
@@ -412,7 +698,7 @@ func run_action(action: String) -> void:
 			if not flags().get("corwin_gift", false):
 				flags()["corwin_gift"] = true
 				add_item({
-					"uid": "corwin-lantern", "name": "Gravedigger's Lantern", "slot": "charm", "rarity": 1,
+					"uid": "corwin-lantern", "name": "Gravedigger's Lantern", "slot": "amulet", "icon": "locket", "rarity": 1,
 					"ilvl": 2, "stats": {"life": 12, "armor": 4},
 					"lore": "Forty years of graves, and it never once went out.",
 				})

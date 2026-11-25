@@ -50,8 +50,8 @@ if (!blender) {
   process.exit(1);
 }
 
-const scripts = [path.join(kit, 'materials.py')];
-for (const group of ['props', 'characters']) {
+const scripts = [path.join(kit, 'materials.py'), path.join(kit, 'ui_frames.py')];
+for (const group of ['props', 'characters', 'icons']) {
   const dir = path.join(kit, group);
   if (!fs.existsSync(dir)) continue;
   for (const f of fs.readdirSync(dir).sort()) if (f.endsWith('.py')) scripts.push(path.join(dir, f));

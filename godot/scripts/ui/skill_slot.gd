@@ -9,6 +9,8 @@ var cooldown := 0.0  # 0..1 of the cooldown left
 var locked := false
 var usable := true
 var count := -1  # shows a number (potions) when >= 0
+## The skill's icon (assets/textures/icons/skills/); without one the slot draws a glyph.
+var icon: Texture2D
 
 
 func _ready() -> void:
@@ -27,12 +29,15 @@ func _draw() -> void:
 	else:
 		var bg := color.darkened(0.7)
 		draw_rect(inner, bg)
-		draw_circle(inner.get_center(), inner.size.x * 0.32, color.darkened(0.25) if usable else Color(0.2, 0.2, 0.3))
-		var font := get_theme_default_font()
-		var fs := 22
-		var gw := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string_outline(font, inner.get_center() + Vector2(-gw * 0.5, fs * 0.35), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0))
-		draw_string(font, inner.get_center() + Vector2(-gw * 0.5, fs * 0.35), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 0.95, 0.85))
+		if icon:
+			draw_texture_rect(icon, inner.grow(2), false, Color(1, 1, 1) if usable else Color(0.5, 0.5, 0.7))
+		else:
+			draw_circle(inner.get_center(), inner.size.x * 0.32, color.darkened(0.25) if usable else Color(0.2, 0.2, 0.3))
+			var font := get_theme_default_font()
+			var fs := 22
+			var gw := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			draw_string_outline(font, inner.get_center() + Vector2(-gw * 0.5, fs * 0.35), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0))
+			draw_string(font, inner.get_center() + Vector2(-gw * 0.5, fs * 0.35), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 0.95, 0.85))
 		if cooldown > 0.0:
 			var h := inner.size.y * cooldown
 			draw_rect(Rect2(inner.position + Vector2(0, inner.size.y - h), Vector2(inner.size.x, h)), Color(0, 0, 0, 0.65))

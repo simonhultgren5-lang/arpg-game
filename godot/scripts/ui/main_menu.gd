@@ -128,7 +128,24 @@ func _show_buttons() -> void:
 			b.mouse_entered.connect(_show_portrait.bind(c))
 			b.focus_entered.connect(_show_portrait.bind(c))
 	_add_button("Field guide", func(): get_tree().change_scene_to_file("res://scenes/field_guide.tscn"))
+	_add_button("Settings", _open_settings)
 	_add_button("Quit", func(): Game.quit_game())
+
+
+var _settings: Control
+
+
+func _open_settings() -> void:
+	if _settings == null:
+		_settings = preload("res://scripts/ui/settings_panel.gd").new()
+		_settings.theme = preload("res://scripts/ui/ui_theme.gd").make()
+		_settings.set_anchors_preset(Control.PRESET_CENTER)
+		_settings.offset_left = -400
+		_settings.offset_right = 400
+		_settings.offset_top = -320
+		_settings.offset_bottom = 320
+		add_child(_settings)
+	_settings.visible = true
 
 
 func _show_portrait(id: String) -> void:

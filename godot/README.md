@@ -74,22 +74,21 @@ Preview the procedural assets with `godot --path godot res://tests/model_gallery
 | Left click | Move to the point, attack a monster, or talk to / use what you clicked |
 | Hold left click | Keep walking toward the cursor, or keep attacking |
 | Shift + left click | Attack toward the cursor without moving |
-| Right click or 1 | First skill, aimed at the cursor |
-| 2 | Second skill |
-| 3, 4 | Third and fourth skills (they unlock at level 3 and level 5) |
+| Right click, 1, 2, 3, 4 | The skills on your bar, aimed at the cursor; hold to repeat |
 | Q | Drink a grave-moss draught (heals 45%) |
 | W A S D / arrows | Move directly |
 | E | Talk to or use the nearest NPC, gate or stairs |
-| I or C | Hero and pack: click an item to equip, right-click to salvage it for gold |
+| C or I | Character and bag: drag items onto the 13 gear slots, right-click to wear or take off, Shift + right-click to salvage for gold |
+| K | Skills: put any skill on RMB and 1-4 (a primary on LMB), pick each skill's variant, fill three passive slots (levels 3, 6, 10) |
 | Mouse wheel | Zoom |
 | H | Show or hide the controls help |
 | M or click the minimap | Open the area map. M or Esc resumes play. |
-| Esc | Close a panel, or pause (save and return to title, save and quit) |
+| Esc | Close a panel, or pause (Settings, save and return to title, save and quit) |
 | 1Ã¢â‚¬â€œ9 in a dialogue | Pick a reply |
 
 ## Act I
 
-- **Classes:** four skills each, besides the basic attack. Skills 3 and 4 unlock at level 3 and level 5.
+- **Classes:** eight skills each (two primaries), each with four variants, and eight passives (scripts/data/classes.gd, passives.gd). Settings change keys, graphics and sound (scripts/autoload/settings.gd, saved in user://settings.cfg).
   - **Warrior:** Grave Cleave; Earthsplitter (stun slam), Iron Rush (charge), Grave Roar (more damage, less damage taken), Sexton's Whirl (spin).
   - **Pyromancer:** Ember Bolt; Cinder Nova (knockback ring), Pyre (delayed fire pillar, burning ground), Ashen Ward (absorbs damage), Cinder Rain (cinders over an area).
   - **Rogue:** Twin Cuts; Knife Fan, Veilstep (blink, guaranteed critical), Bone Caltrops (slowing, bleeding ground), Death Flurry (strike up to five nearby foes).

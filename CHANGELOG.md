@@ -10,6 +10,21 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.5 — The Hero's Ledger (2026-11-25)
+
+### New
+- **Character and bag (C or I).** Your hero stands turning between **13 gear slots**: head, shoulders, amulet, chest, wrists, hands, belt, legs, feet, two rings, weapon and off-hand. Drag gear on and off, right-click to wear, and see at a glance in the tooltip what is better (green) or worse (red) than what you wear. The bag holds 60.
+- **Loot drops for every slot**, each with its own icon, and gear can roll new stats: critical damage, attack speed, cooldown reduction and life per second.
+- **Skills (K).** Every class now has **eight skills**: two new primaries and two new skills (Shield Bash, Grave Leap and Iron Hide; Cinder Spray, Ember Step and Flame Wave; Barbed Throw, Smoke Veil and Rot Cloud). Put any of them on right click and keys 1–4, and hold a key to keep casting.
+- **Every skill has four variants** that unlock as you level: slow foes with the grave's chill, burn them, stun them longer, widen the blast. Pick the one that suits you, or keep the plain skill.
+- **Passives:** three slots that open at levels 3, 6 and 10, with eight passives per class.
+- **Settings (Esc).** Window mode and resolution, quality, shadows, brightness, sound volumes, damage numbers, screen shake, enemy life bars, loot names, and every key can be changed. Also on the title screen.
+- A new skill bar with icons, and buttons for the character, skills, map and menu.
+
+### Changes
+- Old heroes keep everything: armour moves to the chest slot, charms to the amulet slot, and the Knuckle of the Thirteenth becomes a ring.
+- The skills panel is shut while a foe is close; change your build out of the fight.
+
 ## 0.5.0-beta.4 — Forged in Hollowmere (2026-11-25)
 
 ### New

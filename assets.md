@@ -12,11 +12,12 @@ For the folder layout, Git LFS and file locks, see [dev.md](dev.md#6-assets-git-
 5. [Characters](#5-characters)
 6. [Animation](#6-animation)
 7. [Props](#7-props)
-8. [How the game uses them](#8-how-the-game-uses-them)
-9. [Conventions and budgets](#9-conventions-and-budgets)
-10. [Checking your work](#10-checking-your-work)
-11. [Working by hand in Blender](#11-working-by-hand-in-blender)
-12. [Troubleshooting](#12-troubleshooting)
+8. [Icons and interface frames](#8-icons-and-interface-frames)
+9. [How the game uses them](#9-how-the-game-uses-them)
+10. [Conventions and budgets](#10-conventions-and-budgets)
+11. [Checking your work](#11-checking-your-work)
+12. [Working by hand in Blender](#12-working-by-hand-in-blender)
+13. [Troubleshooting](#13-troubleshooting)
 
 ## 1. The short version
 
@@ -35,6 +36,8 @@ Each run writes:
 | `<name>.gltf` + `<name>.bin` | The game-ready model, with skeleton and animations | `godot/assets/models/<group>/` |
 | `<name>.blend` | The editable source scene | `source-assets/Models/<group>/` |
 | `<set>_albedo/_normal/_roughness.png` | Tileable PBR texture sets | `godot/assets/textures/materials/` |
+| `<icon>.png` (128 px) | Item, skill and passive icons | `godot/assets/textures/icons/{items,skills}/` |
+| `<frame>.png` | Nine-patch interface frames | `godot/assets/textures/ui/` |
 
 Then open Godot (or run `godot --headless --path godot --import`) so it imports the new files, and `bun run test` to check them.
 
@@ -182,7 +185,19 @@ A looping clip repeats its first key at the end automatically. Clips are exporte
 
 A prop is any static model: no skeleton, origin on the floor at its centre (a wall fixture like the torch sconce has its origin on the wall, facing -Y). Several props can share one script; call `ddk.reset()` before each and `ddk.export("props", name)` after. See `props/act1_props.py`.
 
-## 8. How the game uses them
+## 8. Icons and interface frames
+
+The interface art is made the same way, by scripts.
+
+- **Item icons:** `icons/item_icons.py` has one function per icon id. The ids come from `godot/scripts/data/items.gd`: each base in `CLASS_BASES` and `BASES` is `[name, icon]`, and each unique has an `icon`. A function builds a small model standing along +Z, and `iconkit.render()` frames it with an orthographic camera and renders a 128 px PNG with a transparent background. Weapons call `iconkit.diagonal()` to lie across the frame, and worn things set `fn.view = FRONT` for a front-on view.
+- **Skill and passive icons:** `icons/skill_icons.py` draws a stone disc with an iron rim (passives get a gold one) and a glowing glyph. The glyph is picked by the skill's kind in `SKILLS`, or by the passive's effect in `PASSIVES`. Keep those tables in step with `classes.gd` and `passives.gd`.
+- **Frames:** `ui_frames.py` draws nine-patch PNGs with numpy: panel, header, slot well, rarity border, buttons, tabs, tooltip and the skill-bar tray. The margins in its `MARGINS` table must match `FRAME_MARGINS` in `godot/scripts/ui/ui_theme.gd`. Keep the middle of each frame plain, because it gets stretched.
+
+To add an item base, add `["Name", "icon_id"]` in `items.gd` and a function `icon_id(m)` in `item_icons.py` (listed in `ICONS`), then run `bun run assets:build -- item_icons`. Set `DDK_ONLY=icon_id` to render just that one. The asset test fails if any base, skill or passive has no icon.
+
+Glyph glow is kept low (`_glow` strength under 1) on purpose. Brighter glows clip to white and lose the class colour.
+
+## 9. How the game uses them
 
 `godot/scripts/models/asset_models.gd` is the only place that loads them:
 
@@ -200,7 +215,7 @@ var barrel := AssetModels.prop("barrel")
 
 To use a new character, add its id to `AssetModels.character(...)`'s callers (for a monster, a new entry in `enemy.gd`'s `KINDS` whose key matches the file name). For a new prop, call `props_model.asset(parent, "my_prop", position)` where the world builds that spot.
 
-## 9. Conventions and budgets
+## 10. Conventions and budgets
 
 - **Names:** lowercase with underscores: `crypt_pillar`, `gravestone_round`, `steel_dark`. Bones use Blender's `.L`/`.R` convention.
 - **Units:** metres, Z up and -Y forward in Blender (Y up and +Z forward in Godot after export).
@@ -209,13 +224,13 @@ To use a new character, add its id to `AssetModels.character(...)`'s callers (fo
 - **Materials:** a few per model. Base colour × texture, roughness and normal maps, metallic as a number. Emission for glowing eyes, embers and flames only.
 - **Originality:** everything here is made from scratch for Depths of Darkness. Don't import models, textures or animations from other games or stores into this pipeline.
 
-## 10. Checking your work
+## 11. Checking your work
 
 - `bun run assets:build -- <name> --previews C:\temp\previews` renders a 3/4 view of each model in Blender. Add `ddk.preview("name_attack", pose_action="attack", pose_frame=6)` to see a pose.
 - In Godot: `res://tests/act1_lineup.tscn` puts every hero and monster side by side (`godot --path godot res://tests/act1_lineup.tscn -- --out C:\temp\lineup` saves a picture), and `res://tests/screenshots.tscn` shows them in the town and the crypt.
 - `bun run test` includes the **asset test** (`res://tests/asset_test.tscn`): every model loads, characters have a skeleton and all six clips, and every texture set is complete. The smoke test then plays Act I with the models in place.
 
-## 11. Working by hand in Blender
+## 12. Working by hand in Blender
 
 The `.blend` next to each script is the scene the script made: open it to look around, try poses, or sculpt. Two ways to keep hand work:
 
@@ -232,7 +247,7 @@ git lfs unlock "source-assets/Models/characters/warrior.blend"
 
 The build skips saving a read-only `.blend` and tells you to lock it; the game-ready `.gltf` is still written.
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Problem | Fix |
 | --- | --- |
@@ -242,4 +257,4 @@ The build skips saving a read-only `.blend` and tells you to lock it; the game-r
 | A part floats away from its bone, or points the wrong way | Check its position against `humanoid.bone_point(...)` and remember rotations are applied before binding; render a preview |
 | A face is hidden inside a hood or helmet | Use `humanoid.open_face(hood)`, or move the shell back (a shape made with `ddk.lathe` wraps all the way round) |
 | An animation doesn't play in the game | The clip name must be exactly one of the six; `bun run test` (asset test) lists what's missing |
-| `locked ... is read-only` | `git lfs lock` the `.blend` first (see [above](#11-working-by-hand-in-blender)) |
+| `locked ... is read-only` | `git lfs lock` the `.blend` first (see [above](#12-working-by-hand-in-blender)) |

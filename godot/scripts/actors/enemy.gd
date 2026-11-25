@@ -94,7 +94,47 @@ func setup() -> void:
 	_model = Node3D.new()
 	add_child(_model)
 	_build_model(s)
+	_build_life_bar(s)
 	_cd = randf() * 1.0
+
+
+var _bar: Node3D
+var _bar_fill: MeshInstance3D
+
+
+## A small life bar over the head, shown when "Always show enemy life bars" is on (Settings, Gameplay).
+func _build_life_bar(s: float) -> void:
+	_bar = Node3D.new()
+	_bar.position = Vector3(0, 2.1 * s + (0.6 if is_boss else 0.0), 0)
+	add_child(_bar)
+	for part in ["back", "fill"]:
+		var mi := MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(0.9 if part == "back" else 0.86, 0.1 if part == "back" else 0.065)
+		mi.mesh = q
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		m.no_depth_test = true
+		m.render_priority = 1 if part == "fill" else 0
+		m.albedo_color = Color(0.05, 0.03, 0.04) if part == "back" else (Color(0.9, 0.6, 0.2) if elite else Color(0.75, 0.1, 0.08))
+		mi.material_override = m
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_bar.add_child(mi)
+		if part == "fill":
+			_bar_fill = mi
+	_bar.visible = false
+
+
+func _update_life_bar() -> void:
+	if _bar == null:
+		return
+	var show := bool(Settings.get_value("gameplay", "enemy_bars")) and not dead and (aggro or hp < max_hp)
+	_bar.visible = show
+	if show:
+		var f := clampf(hp / max_hp, 0.0, 1.0)
+		_bar_fill.scale.x = maxf(f, 0.001)
+		_bar_fill.position.x = -0.43 * (1.0 - f)
 
 
 func _m(color: Color) -> StandardMaterial3D:
@@ -132,6 +172,7 @@ func _build_model(s: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_life_bar()
 	if dead:
 		return
 	if not _crawler_legs.is_empty():

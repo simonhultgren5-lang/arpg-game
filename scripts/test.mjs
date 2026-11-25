@@ -48,6 +48,7 @@ else {
       ['Godot smoke test (Act I, every class)', 'res://tests/smoke_test.tscn', 'SMOKE TEST PASSED'],
       ['Godot dev console test', 'res://tests/dev_console_test.tscn', 'DEV CONSOLE TEST PASSED'],
       ['Godot asset test (models, clips, textures)', 'res://tests/asset_test.tscn', 'ASSET TEST PASSED'],
+      ['Godot UI test (gear, skills, panels, settings)', 'res://tests/ui_test.tscn', 'UI TEST PASSED'],
     ]) {
       console.log(`\n${name}…`);
       // A script error leaves headless Godot running, so give each test a time limit.
@@ -56,7 +57,8 @@ else {
       const checks = (out.match(/^\s+ok\s/gm) || []).length;
       const failures = out.split('\n').filter((l) => /FAIL|SCRIPT ERROR|Parse Error/.test(l));
       if (failures.length) console.log(failures.slice(0, 20).join('\n'));
-      const ok = r.status === 0 && out.includes(marker);
+      // A script error that the test survives still fails it.
+      const ok = r.status === 0 && out.includes(marker) && !/SCRIPT ERROR/.test(out);
       step(name, ok, r.error ? `timed out or failed to start (${r.error.code})` : `${checks} checks`);
     }
   }

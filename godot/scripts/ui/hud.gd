@@ -37,10 +37,9 @@ var _dlg_text: Label
 var _dlg_options: VBoxContainer
 var _dlg_npc := ""
 var _dlg_buttons: Array = []
-var _inventory: PanelContainer
-var _inv_stats: Label
-var _inv_equipped: VBoxContainer
-var _inv_list: GridContainer
+## The big panels: Character and bag (C / I), Skills (K), Settings (Esc menu). One open at a time.
+var _panels := {}
+var _settings_from_pause := false
 var _pause: PanelContainer
 var _death: PanelContainer
 var _boss: Node3D = null
@@ -58,7 +57,7 @@ func _ready() -> void:
 	_build_bottom()
 	_build_top()
 	_build_dialogue()
-	_build_inventory()
+	_build_panels()
 	_build_pause()
 	_build_death()
 	_build_act_complete()
@@ -67,11 +66,8 @@ func _ready() -> void:
 	_map.toggle_requested.connect(toggle_map)
 	Game.message.connect(_on_message)
 	Game.quest_changed.connect(_refresh_quest)
-	Game.inventory_changed.connect(_refresh_inventory)
-	Game.stats_changed.connect(_refresh_inventory)
 	SaveSystem.status_changed.connect(_on_save_status)
 	_refresh_quest()
-	_refresh_inventory()
 	_on_save_status(SaveSystem.last_status)
 
 
@@ -116,6 +112,7 @@ func _build_bottom() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tray := Panel.new()
 	tray.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tray.add_theme_stylebox_override("panel", UiTheme.frame("bar_tray", 10.0))
 	tray.position = Vector2(128, 22)
 	tray.size = Vector2(584, 100)
 	bar.add_child(tray)
@@ -141,17 +138,32 @@ func _build_bottom() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(row)
-	var cls: Dictionary = Game.class_data
-	_add_slot(row, "LMB", cls["basic"], "basic", 0)
-	_add_slot(row, "RMB/1", cls["skills"][0], "skill", 0)
-	_add_slot(row, "2", cls["skills"][1], "skill", 1)
-	_add_slot(row, "3", cls["skills"][2], "skill", 2)
-	_add_slot(row, "4", cls["skills"][3], "skill", 3)
+	for k in Game.BAR_SIZE:
+		_add_slot(row, ["LMB", "RMB", "1", "2", "3", "4"][k], {}, "bar", k)
+	Game.build_changed.connect(_refresh_bar)
+	Game.leveled_up.connect(func(_lv): _refresh_bar())
+	_refresh_bar.call_deferred()
 	var sep := Control.new()
 	sep.custom_minimum_size = Vector2(10, 10)
 	row.add_child(sep)
 	_add_slot(row, "Q", {"name": "Grave-moss Draught", "color": Color(0.8, 0.15, 0.15),
 		"desc": "Restores 45% of your life. Edda sells more in Hollowmere."}, "potion", 0)
+
+	# Menu buttons above the bar: Character, Skills, Map, Menu.
+	var menu := HBoxContainer.new()
+	menu.position = Vector2(470, -6)
+	menu.add_theme_constant_override("separation", 4)
+	bar.add_child(menu)
+	for spec in [["Character", "inventory", func(): toggle_panel("character")], ["Skills", "skills", func(): toggle_panel("skills")],
+			["Map", "map", func(): toggle_map()], ["Menu", "pause", func(): escape()]]:
+		var b := Button.new()
+		b.text = spec[0]
+		b.focus_mode = Control.FOCUS_NONE
+		b.add_theme_font_size_override("font_size", 13)
+		b.custom_minimum_size = Vector2(0, 26)
+		b.tooltip_text = "%s (%s)" % [spec[0], Settings.key_text(spec[1]) if spec[1] != "pause" else "Esc"]
+		b.pressed.connect(spec[2])
+		menu.add_child(b)
 
 	_status = UiTheme.label("", 13, Color(0.75, 0.6, 0.55))
 	_status.anchor_top = 1.0
@@ -188,6 +200,43 @@ func _add_slot(row: HBoxContainer, key: String, sk: Dictionary, kind: String, in
 		s.tooltip_text = "%s\n%s%s%s%s" % [s.title, sk.get("desc", ""), cost, cd, unlock]
 	row.add_child(s)
 	_slots.append([s, kind, index])
+
+
+## Shows the skills of the current build on the bar slots.
+func _refresh_bar() -> void:
+	for entry in _slots:
+		if entry[1] != "bar":
+			continue
+		var s = entry[0]
+		var id: String = Game.build()["bar"][entry[2]]
+		var sk: Dictionary = Game.resolved(id) if id != "" else {}
+		s.locked = sk.is_empty() or not Game.skill_unlocked_for(id)
+		s.title = sk.get("name", "")
+		s.color = sk.get("color", UiTheme.GOLD)
+		s.icon = UiTheme.skill_icon(id)
+		s.key_text = Settings.key_text("bar_%d" % (entry[2] + 1))
+		s.glyph = ""
+		for w in s.title.split(" "):
+			if w.length() > 0 and s.glyph.length() < 2 and w[0] == w[0].to_upper():
+				s.glyph += w[0]
+		if sk.is_empty():
+			s.tooltip_text = "Empty. Choose a skill for this slot in the Skills panel (K)."
+		else:
+			var cost := ""
+			if int(sk.get("mana", 0)) > 0:
+				cost = "
+Cost: %d %s" % [int(sk["mana"]), Game.class_data.get("resource", "Mana")]
+			var cd := "  ·  Cooldown: %.1fs" % float(sk["cooldown"]) if not sk.get("primary", false) else ""
+			var unlock := "
+Unlocks at level %d." % int(sk.get("unlock", 1)) if s.locked else ""
+			s.tooltip_text = "%s
+%s%s%s%s" % [s.title, sk.get("desc", ""), cost, cd, unlock]
+		s.queue_redraw()
+
+
+## How many skill slots the hotbar shows.
+func hotbar_slots() -> int:
+	return _slots.filter(func(e): return e[1] == "bar").size()
 
 
 func _build_top() -> void:
@@ -275,7 +324,13 @@ func _build_top() -> void:
 	_help.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_help)
 	var hl := UiTheme.label(
-		"Left click  move / attack (hold to keep going)\nShift + left click  attack in place\nRight click or 1  skill · 2  skill\nQ  draught · E  talk / use · WASD  move\nI  pack and hero · Esc  menu · Wheel  zoom\nH  hide this help", 14)
+		"Left click  move / attack (hold to keep going)
+Shift + left click  attack in place
+Right click, 1-4  skills (hold to repeat)
+Q  draught · E  talk / use · WASD  move
+C or I  character and bag · K  skills
+M  map · Esc  menu and settings · Wheel  zoom
+H  hide this help", 14)
 	_help.add_child(hl)
 	_help.hide()
 
@@ -321,28 +376,82 @@ func _build_dialogue() -> void:
 	v.add_child(_dlg_options)
 
 
-func _build_inventory() -> void:
-	_inventory = _panel(440)
-	_inventory.anchor_left = 1.0
-	_inventory.anchor_right = 1.0
-	_inventory.offset_left = -460
-	_inventory.offset_right = -16
-	_inventory.offset_top = 70
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
-	_inventory.add_child(v)
-	v.add_child(UiTheme.label("Hero", 22, UiTheme.GOLD))
-	_inv_stats = UiTheme.label("", 15)
-	v.add_child(_inv_stats)
-	v.add_child(UiTheme.label("Equipped  (click to take off)", 15, UiTheme.GOLD_DIM.lightened(0.2)))
-	_inv_equipped = VBoxContainer.new()
-	v.add_child(_inv_equipped)
-	v.add_child(UiTheme.label("Pack  (click to equip · right-click to salvage)", 15, UiTheme.GOLD_DIM.lightened(0.2)))
-	_inv_list = GridContainer.new()
-	_inv_list.columns = 2
-	_inv_list.add_theme_constant_override("h_separation", 6)
-	_inv_list.add_theme_constant_override("v_separation", 4)
-	v.add_child(_inv_list)
+func _build_panels() -> void:
+	var specs := {
+		"character": [preload("res://scripts/ui/character_panel.gd"), Vector2(1030, 670)],
+		"skills": [preload("res://scripts/ui/skills_panel.gd"), Vector2(960, 690)],
+		"settings": [preload("res://scripts/ui/settings_panel.gd"), Vector2(800, 640)],
+	}
+	for name in specs:
+		var panel: PanelContainer = specs[name][0].new()
+		panel.visible = false
+		panel.set_anchors_preset(Control.PRESET_CENTER)
+		var sz: Vector2 = specs[name][1]
+		panel.offset_left = -sz.x * 0.5
+		panel.offset_right = sz.x * 0.5
+		panel.offset_top = -sz.y * 0.5 - 40
+		panel.offset_bottom = sz.y * 0.5 - 40
+		_root.add_child(panel)
+		_panels[name] = panel
+	_panels["settings"].closed.connect(func():
+		if _settings_from_pause:
+			_settings_from_pause = false
+			_pause.visible = true
+	)
+
+
+## Opens a panel ("character", "skills" or "settings"), closing any other.
+func open_panel(name: String) -> void:
+	if not _panels.has(name) or _death.visible or _act_complete.visible:
+		return
+	if _map.expanded:
+		toggle_map()
+	close_panels()
+	_panels[name].visible = true
+	if world and world.player:
+		world.player.stop()
+
+
+func close_panels() -> void:
+	for n in _panels:
+		_panels[n].visible = false
+
+
+func toggle_panel(name: String) -> void:
+	if panel_open() == name:
+		close_panels()
+	else:
+		open_panel(name)
+
+
+## The open panel's name, or "".
+func panel_open() -> String:
+	for n in _panels:
+		if _panels[n].visible:
+			return n
+	return ""
+
+
+func panel(name: String) -> Control:
+	return _panels.get(name)
+
+
+func is_paused() -> bool:
+	return _pause.visible
+
+
+## Esc: closes the area map, then dialogue, then an open panel; else opens or closes the pause menu.
+func escape() -> void:
+	if _map.expanded:
+		toggle_map()
+	elif _dialogue.visible:
+		close_dialogue()
+	elif panel_open() == "settings":
+		_panels["settings"].close_panel()
+	elif panel_open() != "":
+		close_panels()
+	elif not _death.visible and not _act_complete.visible:
+		_toggle_pause()
 
 
 func _build_pause() -> void:
@@ -359,6 +468,11 @@ func _build_pause() -> void:
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
 	v.add_child(_button("Resume", _toggle_pause))
+	v.add_child(_button("Settings", func():
+		_pause.visible = false
+		_settings_from_pause = true
+		open_panel("settings")
+	))
 	v.add_child(_button("Save and return to title", func():
 		Game.save()
 		get_tree().paused = false
@@ -420,7 +534,7 @@ func _build_act_complete() -> void:
 func show_act_complete() -> void:
 	ActAudio.toll(self)
 	_dialogue.visible = false
-	_inventory.visible = false
+	close_panels()
 	_act_complete.visible = true
 	get_tree().paused = true
 
@@ -445,19 +559,14 @@ func _process(_delta: float) -> void:
 		life_text += "  +%d" % int(ceil(p.ward))
 	_hp_orb.set_values(p.hp / mhp, life_text)
 	_mana_orb.set_values(p.mana / mmana, "%d / %d" % [int(p.mana), int(mmana)])
-	var cls: Dictionary = Game.class_data
 	for entry in _slots:
 		var s = entry[0]
 		match entry[1]:
-			"basic":
-				s.update_state(clampf(p.attack_cd / float(cls["basic"]["cooldown"]), 0.0, 1.0), true)
-			"skill":
-				var sk: Dictionary = cls["skills"][entry[2]]
-				var locked: bool = not p.skill_unlocked(entry[2])
-				if s.locked != locked:
-					s.locked = locked
-					s.queue_redraw()
-				s.update_state(clampf(p.skill_cd[entry[2]] / float(sk["cooldown"]), 0.0, 1.0), p.mana >= float(sk["mana"]))
+			"bar":
+				var id: String = Game.build()["bar"][entry[2]]
+				if id != "" and not s.locked:
+					var sk: Dictionary = Game.resolved(id)
+					s.update_state(p.cooldown_frac(id), p.mana >= p.skill_cost(sk))
 			"potion":
 				var n := int(Game.progress.get("potions", 0))
 				s.update_state(0.0, n > 0, n)
@@ -485,19 +594,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		_help.visible = not _help.visible
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("inventory"):
-		_inventory.visible = not _inventory.visible
+		toggle_panel("character")
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("skills"):
+		toggle_panel("skills")
 		get_viewport().set_input_as_handled()
 
 
 func toggle_map() -> void:
-	if not _map.expanded and (is_blocking() or _inventory.visible or get_tree().paused):
+	if not _map.expanded and (is_blocking() or get_tree().paused):
 		return
 	_map.set_expanded(not _map.expanded)
 	get_tree().paused = _map.expanded
 
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_M:
+	if _panels["settings"].visible and _panels["settings"].is_capturing():
+		return  # the Controls tab is waiting for a key
+	if event.is_action_pressed("map") and panel_open() == "":
 		toggle_map()
 		get_viewport().set_input_as_handled()
 		return
@@ -507,12 +621,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("pause"):
-		if _dialogue.visible:
-			close_dialogue()
-		elif _inventory.visible:
-			_inventory.visible = false
-		elif not _death.visible and not _act_complete.visible:
-			_toggle_pause()
+		escape()
 		get_viewport().set_input_as_handled()
 		return
 	if _dialogue.visible and event is InputEventKey and event.pressed and not event.echo:
@@ -524,8 +633,13 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
+## Like is_blocking(), except that the Character and Skills panels let keys through to the hero.
+func keys_blocked() -> bool:
+	return _map.expanded or _dialogue.visible or _pause.visible or _death.visible or _act_complete.visible or panel_open() == "settings"
+
+
 func is_blocking() -> bool:
-	return _map.expanded or _dialogue.visible or _pause.visible or _death.visible or _act_complete.visible
+	return _map.expanded or _dialogue.visible or _pause.visible or _death.visible or _act_complete.visible or panel_open() != ""
 
 
 func _toggle_pause() -> void:
@@ -593,7 +707,7 @@ func boss_defeated() -> void:
 func show_death() -> void:
 	ActAudio.stop_voice(self)
 	_dialogue.visible = false
-	_inventory.visible = false
+	close_panels()
 	_death.visible = true
 
 
@@ -647,54 +761,3 @@ func _show_node(id: String) -> void:
 		_dlg_options.add_child(b)
 		_dlg_buttons.append(b)
 	_dialogue.visible = true
-
-
-# ------------------------------------------------------------------ inventory
-
-func _refresh_inventory() -> void:
-	if _inv_stats == null:
-		return
-	var r: Vector2 = Game.damage_range()
-	_inv_stats.text = "%s, level %d %s\nLife %d  ·  %s %d\nDamage %d-%d  ·  Armor %d  ·  Crit %d%%\nMove speed %.1f  ·  Gold %d  ·  Kills %d" % [
-		Boot.character.get("name", "Wanderer"), Game.level(), Game.class_data.get("title", ""),
-		int(Game.max_hp()), Game.class_data.get("resource", "Mana"), int(Game.max_mana()),
-		int(r.x), int(r.y), int(Game.armor()), int(Game.crit_chance() * 100.0),
-		Game.move_speed(), int(Game.progress["gold"]), int(Game.progress.get("kills", 0)),
-	]
-	for c in _inv_equipped.get_children():
-		c.queue_free()
-	for slot in Items.SLOTS:
-		var item = Game.progress["equipped"].get(slot)
-		var b := Button.new()
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		if item is Dictionary:
-			b.text = "%s: %s" % [Items.SLOT_NAMES[slot], item.get("name", "?")]
-			b.add_theme_color_override("font_color", Items.RARITY_COLORS[int(item.get("rarity", 0))])
-			b.tooltip_text = Items.describe(item)
-			var s: String = slot
-			b.pressed.connect(func(): Game.unequip(s))
-		else:
-			b.text = "%s: (empty)" % Items.SLOT_NAMES[slot]
-			b.disabled = true
-		_inv_equipped.add_child(b)
-	for c in _inv_list.get_children():
-		c.queue_free()
-	var inv: Array = Game.inventory()
-	for i in inv.size():
-		var item: Dictionary = inv[i]
-		var b := Button.new()
-		b.text = str(item.get("name", "?"))
-		b.custom_minimum_size = Vector2(200, 0)
-		b.clip_text = true
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_color_override("font_color", Items.RARITY_COLORS[int(item.get("rarity", 0))])
-		b.tooltip_text = Items.describe(item) + ("\n\nQuest item" if item.get("slot") == "quest" else "\n\nClick: equip  ·  Right-click: salvage for %d gold" % Items.value(item))
-		var idx := i
-		b.pressed.connect(func(): Game.equip(idx))
-		b.gui_input.connect(func(ev: InputEvent):
-			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
-				Game.salvage(idx)
-		)
-		_inv_list.add_child(b)
-	if inv.is_empty():
-		_inv_list.add_child(UiTheme.label("Empty. The dead carry things worth taking.", 14, Color(0.6, 0.55, 0.55)))
