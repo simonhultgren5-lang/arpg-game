@@ -8,13 +8,13 @@ const WALL_SHADER = preload("res://shaders/wall.gdshader")
 
 ## floor_color(cell) -> Color is called per floor tile. Returns the wall ShaderMaterial (the world
 ## updates its player_pos every frame).
-static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_color: Color, floor_color: Callable, rng: RandomNumberGenerator, is_paved := Callable()) -> ShaderMaterial:
+static func build(grid: LevelGrid, parent: Node3D, wall_height: float, wall_color: Color, floor_color: Callable, rng: RandomNumberGenerator, is_paved := Callable(), terrain_start := -1) -> ShaderMaterial:
 	var cell := LevelGrid.CELL
 	# ---- floor tiles (every non-solid cell, props included)
 	var floor_cells: Array[Vector2i] = []
 	for y in grid.h:
 		for x in grid.w:
-			if grid.get_cell(Vector2i(x, y)) != LevelGrid.SOLID:
+			if (terrain_start < 0 or y < terrain_start) and grid.get_cell(Vector2i(x, y)) != LevelGrid.SOLID:
 				floor_cells.append(Vector2i(x, y))
 	var fm := MultiMesh.new()
 	fm.transform_format = MultiMesh.TRANSFORM_3D

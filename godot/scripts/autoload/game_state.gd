@@ -672,7 +672,7 @@ func run_action(action: String) -> void:
 				set_quest_state(1)
 				message.emit("Quest accepted: The Silent Bell", Color(0.89, 0.71, 0.49))
 		"complete_quest":
-			if quest_state() == 2:
+			if quest_state() == 2 and _reward_room("black_clapper"):
 				_remove_quest_item("black_clapper")
 				set_quest_state(3)
 				add_gold(150)
@@ -695,7 +695,7 @@ func run_action(action: String) -> void:
 				set_quest("lamps", 1)
 				message.emit("Quest accepted: Lamps Without Oil", Color(0.89, 0.71, 0.49))
 		"complete_lamps":
-			if quest("lamps") == 2:
+			if quest("lamps") == 2 and _reward_room("founders_charter"):
 				_remove_quest_item("founders_charter")
 				set_quest("lamps", 3)
 				add_xp(200)
@@ -722,7 +722,7 @@ func run_action(action: String) -> void:
 
 func on_boss_slain() -> void:
 	if quest_state() == 1:
-		add_item({
+		add_quest_item({
 			"uid": "black_clapper", "name": "The Black Clapper", "slot": "quest", "rarity": 3, "ilvl": 3,
 			"stats": {}, "lore": "Iron, warm as a hand. It hums when no one is listening.",
 		})
@@ -734,7 +734,7 @@ func on_boss_slain() -> void:
 func dig_grave() -> String:
 	match quest("lamps"):
 		1:
-			add_item({
+			add_quest_item({
 				"uid": "founders_charter", "name": "The Founders' Charter", "slot": "quest", "rarity": 3, "ilvl": 3,
 				"stats": {}, "lore": "Vellum gone black at the edges. Thirteen names, and thirteen seals beneath them.",
 			})
@@ -762,7 +762,7 @@ func take_warden_stone() -> void:
 
 ## The Wardens' Oath: set the stones on the plinth by the mausoleum.
 func place_warden_stones() -> bool:
-	if quest("wardens") != 2:
+	if quest("wardens") != 2 or not _reward_room():
 		return false
 	set_quest("wardens", 3)
 	add_xp(200)
@@ -797,6 +797,27 @@ func found_unique(id: String) -> bool:
 
 func mark_unique_found(id: String) -> void:
 	flags()["found_" + id] = true
+
+
+## Quest items are never refused for a full pack (the quest would soft-lock); they may overflow the bag.
+func add_quest_item(item: Dictionary) -> void:
+	inventory().append(item)
+	inventory_changed.emit()
+
+
+## Quest rewards include a unique item: hold the hand-in until the pack has room so nothing is lost.
+## (Handing in the quest item itself frees a slot, so that one counts too.)
+func _reward_room(quest_item_uid := "") -> bool:
+	var free := INVENTORY_SIZE - inventory().size()
+	for it in inventory():
+		if quest_item_uid != "" and it.get("uid") == quest_item_uid:
+			free += 1
+			break
+	if free < 1:
+		ActAudio.cue("deny", -18.0)
+		message.emit("Your pack is full. Make room for your reward first.", Color(0.9, 0.4, 0.3))
+		return false
+	return true
 
 
 func _remove_quest_item(uid: String) -> void:

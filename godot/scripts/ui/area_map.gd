@@ -24,6 +24,14 @@ func _ready() -> void:
 				image.set_pixel(x, y, Color("#918879") if edge else Color("#566569"))
 			elif grid.get_cell(cell) == grid.PROP:
 				image.set_pixel(x, y, Color("#364549"))
+	if Game.area == "town":
+		var town = preload("res://scripts/world/town.gd")
+		for y in range(town.Fen.START_ROW, grid.h):
+			for x in grid.w:
+				match town.MAP[y][x]:
+					"~": image.set_pixel(x, y, Color("#315b68"))
+					"^": image.set_pixel(x, y, Color("#424c43"))
+					":", "=", "P": image.set_pixel(x, y, Color("#bea47d"))
 	terrain = ImageTexture.create_from_image(image)
 	set_expanded(false)
 

@@ -122,3 +122,88 @@ static func founders_bell(parent: Node, pos: Vector3) -> Node3D:
 	B.sphere(0.24, bronze, Vector3(0, 0.24, 0), root)
 	B.box(Vector3(0.34, 0.38, 0.28), patina, Vector3(0, 1.99, 0), root)
 	return root
+
+
+## A standing iron brazier: a tripod bowl of embers with a flickering flame and warm light. Code-built
+## stand-in until a Blender model (props/brazier) is made; AssetModels is tried first.
+static func brazier(parent: Node, pos: Vector3, light_range := 9.0, energy := 2.2) -> Node3D:
+	var modelled := asset(parent, "brazier", pos)
+	if modelled == null:
+		var root := _root(parent, pos)
+		modelled = root
+		var iron := B.mat(Color("#2d2b31"), 0.6, Color.BLACK, 1.0, 0.7)
+		for i in 3:
+			var a := i * TAU / 3.0
+			K.link(root, Vector3(0.38 * cos(a), 0.0, 0.38 * sin(a)), Vector3(0.14 * cos(a), 0.92, 0.14 * sin(a)), 0.05, 0.035, iron)
+		K.add(root, K.lathe(PackedVector2Array([Vector2(0, 0.86), Vector2(0.22, 0.88), Vector2(0.44, 1.08),
+			Vector2(0.46, 1.12), Vector2(0.4, 1.12), Vector2(0.2, 0.98), Vector2(0, 0.96)]), 12), iron)
+		K.add(root, K.lathe(PackedVector2Array([Vector2(0, 0), Vector2(0.38, 0), Vector2(0.42, 0.04), Vector2(0, 0.06)]), 12),
+			B.mat(Color("#ff7a2a"), 1.0, Color("#ff5a14"), 2.2), Vector3(0, 1.02, 0))
+		if _flame_mat == null:
+			_flame_mat = ShaderMaterial.new()
+			_flame_mat.shader = preload("res://shaders/torch_flame.gdshader")
+		K.add(root, K.lathe(PackedVector2Array([Vector2(0, 0), Vector2(0.2, 0), Vector2(0.28, 0.25),
+			Vector2(0.14, 0.6), Vector2(0, 0.9)]), 8), _flame_mat, Vector3(0, 1.08, 0))
+	var glow := Node3D.new()
+	glow.position = Vector3(0, 1.5, 0)
+	var light := B.omni(Color(1.0, 0.6, 0.28), energy, light_range, Vector3.ZERO, glow)
+	glow.set_meta("light", light)
+	glow.set_script(preload("res://scripts/world/flicker.gd"))
+	modelled.add_child(glow)
+	return modelled
+
+
+## A heap of bones and a skull, for the crypt floors and the graveyard edge.
+static func bone_pile(parent: Node, pos: Vector3, rng: RandomNumberGenerator) -> Node3D:
+	var modelled := asset(parent, "bone_pile", pos)
+	if modelled:
+		modelled.rotation.y = rng.randf() * TAU
+		return modelled
+	var root := _root(parent, pos)
+	root.rotation.y = rng.randf() * TAU
+	var bone := B.mat(Color("#b9ad94"), 0.85)
+	for i in 5 + rng.randi() % 4:
+		var a := rng.randf() * TAU
+		var r := rng.randf_range(0.05, 0.45)
+		K.link(root, Vector3(r * cos(a), 0.05, r * sin(a)),
+			Vector3(r * cos(a) + rng.randf_range(-0.3, 0.3), 0.07 + rng.randf() * 0.1, r * sin(a) + rng.randf_range(-0.3, 0.3)), 0.035, 0.028, bone)
+	B.sphere(0.13, bone, Vector3(rng.randf_range(-0.15, 0.15), 0.13, rng.randf_range(-0.15, 0.15)), root)
+	return root
+
+
+## A broken handcart: bed, one wheel and shafts on the ground. Town clutter that says "people fled".
+static func cart(parent: Node, pos: Vector3, yaw: float) -> Node3D:
+	var modelled := asset(parent, "handcart", pos)
+	if modelled:
+		modelled.rotation.y = yaw
+		return modelled
+	var root := _root(parent, pos)
+	root.rotation.y = yaw
+	var wood := B.mat(Color("#4a3426"))
+	B.surface_grain(wood, Vector3(1.8, 0.18, 1.8))
+	B.box(Vector3(1.5, 0.12, 0.9), wood, Vector3(0, 0.55, 0), root)
+	for s in [-1.0, 1.0]:
+		B.box(Vector3(1.5, 0.35, 0.08), wood, Vector3(0, 0.75, s * 0.45), root)
+	B.box(Vector3(0.08, 0.35, 0.9), wood, Vector3(0.71, 0.75, 0), root)
+	B.cylinder(0.5, 0.5, 0.08, wood, Vector3(0, 0.5, 0.52), root, 14).rotation = Vector3(PI / 2, 0, 0)
+	for s in [-1.0, 1.0]:
+		var shaft := B.box(Vector3(1.6, 0.07, 0.07), wood, Vector3(-1.1, 0.2, s * 0.3), root)
+		shaft.rotation = Vector3(0, 0, 0.18)
+	return root
+
+
+## A run of broken fence posts and rails from `a` to `b` (world positions).
+static func fence(parent: Node, a: Vector3, b: Vector3, rng: RandomNumberGenerator) -> Node3D:
+	var root := _root(parent, a)
+	var wood := B.mat(Color("#3b2d24"))
+	B.surface_grain(wood, Vector3(1.8, 0.18, 1.8))
+	var d := b - a
+	var n := maxi(2, int(d.length() / 1.6))
+	for i in n + 1:
+		var h := rng.randf_range(0.9, 1.4)
+		B.box(Vector3(0.12, h, 0.12), wood, d * (float(i) / n) + Vector3(0, h * 0.5, 0), root).rotation.z = rng.randf_range(-0.08, 0.08)
+	for y in [0.45, 0.9]:
+		if rng.randf() < 0.85:
+			var rail := B.box(Vector3(d.length(), 0.07, 0.05), wood, d * 0.5 + Vector3(0, y, 0), root)
+			rail.rotation.y = -atan2(d.z, d.x)
+	return root

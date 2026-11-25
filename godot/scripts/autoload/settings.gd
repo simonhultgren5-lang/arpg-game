@@ -253,10 +253,14 @@ func apply_world(env: Environment, lights: Array) -> void:
 		env.set_meta("base_exposure", env.tonemap_exposure)
 		env.set_meta("base_ssao", env.ssao_enabled)
 		env.set_meta("base_volumetric", env.volumetric_fog_enabled)
+		env.set_meta("base_ssil", env.ssil_enabled)
+		env.set_meta("base_ssr", env.ssr_enabled)
 	env.tonemap_exposure = float(env.get_meta("base_exposure")) * float(get_value("graphics", "brightness"))
 	env.ssao_enabled = bool(env.get_meta("base_ssao")) and q != "low"
 	env.volumetric_fog_enabled = bool(env.get_meta("base_volumetric")) and q == "high"
 	env.glow_enabled = q != "low"
+	env.ssil_enabled = bool(env.get_meta("base_ssil", false)) and q == "high"
+	env.ssr_enabled = bool(env.get_meta("base_ssr", false)) and q == "high"
 	var shadows: bool = get_value("graphics", "shadows")
 	for l in lights:
 		if not is_instance_valid(l):

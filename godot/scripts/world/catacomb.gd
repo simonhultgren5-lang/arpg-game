@@ -232,6 +232,16 @@ func _decorate(level: Node3D, room: Dictionary, rng: RandomNumberGenerator) -> v
 		var p := grid.center(c) + Vector3(rng.randf_range(-0.7, 0.7), 0, rng.randf_range(-0.7, 0.7))
 		var bone := B.cylinder(0.04, 0.05, 0.5, B.mat(Color(0.7, 0.66, 0.58)), p + Vector3(0, 0.05, 0), level, 5)
 		bone.rotation = Vector3(PI * 0.5, rng.randf() * TAU, 0)
+	# Dressing on its own RNG so the layout and monster seed never shift.
+	var dress := RandomNumberGenerator.new()
+	dress.seed = int(room["center"].x) * 7919 + int(room["center"].y) * 104729
+	var Props = preload("res://scripts/models/props_model.gd")
+	for i in dress.randi_range(1, 3):
+		var bc := grid.random_floor_near(room["center"], 4, dress)
+		Props.bone_pile(level, grid.center(bc) + Vector3(dress.randf_range(-0.6, 0.6), 0, dress.randf_range(-0.6, 0.6)), dress)
+	if room["kind"] != "boss" and rect.size.x * rect.size.y >= 40:
+		var bc := grid.random_floor_near(room["center"], 2, dress)
+		Props.brazier(level, grid.center(bc), 8.0, 1.8)
 	if room["template"] == "flooded":
 		var r := rect
 		var water_material := ShaderMaterial.new()

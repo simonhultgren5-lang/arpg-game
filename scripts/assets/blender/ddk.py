@@ -675,7 +675,9 @@ def preview(name, distance=4.0, height=1.0, target_z=0.9, size=(900, 900), pose_
     if not PREVIEWS:
         return
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    # Blender 4.2 to 4.5 call it EEVEE_NEXT; 5.x went back to plain EEVEE.
+    engines = [e.identifier for e in scene.render.bl_rna.properties["engine"].enum_items]
+    scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in engines else "BLENDER_EEVEE"
     scene.render.resolution_x, scene.render.resolution_y = size
     scene.render.film_transparent = False
     world = bpy.data.worlds.new("preview")

@@ -10,6 +10,19 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.7 — Embers and Mist (2026-11-25)
+
+### New
+- **Hollowmere looks darker and richer.** A moodier colour grade, softer glow on flames and lamps, low ground mist and, on High quality, light bounce, reflections on wet floors and volumetric fog in the crypt.
+- **New hand-modelled props:** the well, house doors, windows with shutters, chimneys, the chapel's rose window, iron braziers, bone piles, a broken handcart and gnarled dead trees.
+- **The town is dressed:** braziers light the square, barrels and crates stand against the houses, carts lie where people fled, and a broken fence runs along the graveyard.
+- **The crypt has more life:** bone piles on the floors and braziers in the bigger rooms.
+
+### Fixes
+- **Quest rewards are never lost to a full pack.** Handing in The Silent Bell, Lamps Without Oil or The Wardens' Oath now waits until you have room, and tells you so.
+- Quest items (the Black Clapper and the Founders' Charter) can no longer be refused by a full pack.
+- The Wardens' Oath always places all three name-stones in the crypt.
+
 ## 0.5.0-beta.6 — Tolling Heard (2026-11-25)
 
 ### New

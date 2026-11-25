@@ -119,11 +119,39 @@ func _build_environment() -> void:
 	env.fog_light_color = Color(0.19, 0.23, 0.29) if town else Color(0.09, 0.13, 0.15)
 	env.fog_density = 0.014 if town else 0.01
 	env.ssao_enabled = true
-	if town and RenderingServer.get_current_rendering_method() == "forward_plus":
+	env.ssao_radius = 1.6
+	env.ssao_intensity = 2.4
+	env.ssao_power = 1.6
+	# Grade: desaturated, deep blacks and a little punch, so warm torchlight pops against cold stone.
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.1
+	env.adjustment_saturation = 0.9
+	# Glow: a soft wide bloom on flames, lamps and the Maw-blue name-stones rather than a hard halo.
+	var glow_curve := [0.0, 0.4, 0.8, 1.0, 0.5, 0.2, 0.0]
+	for i in glow_curve.size():
+		env.set_glow_level(i, glow_curve[i])
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	env.glow_strength = 1.1
+	# Ground-hugging mist, thicker in low places: the mere and the crypt floods breathe.
+	env.fog_height = 0.0
+	env.fog_height_density = 0.05 if town else 0.09
+	env.fog_aerial_perspective = 0.35
+	env.fog_sun_scatter = 0.12 if town else 0.0
+	if RenderingServer.get_current_rendering_method() == "forward_plus":
+		# Light bounce and wet-floor reflections (the flagstones and flooded halls catch torchlight).
+		env.ssil_enabled = true
+		env.ssil_radius = 4.0
+		env.ssil_intensity = 0.9
+		env.ssr_enabled = true
+		env.ssr_max_steps = 48
+		env.ssr_fade_in = 0.15
+		env.ssr_fade_out = 2.0
 		env.volumetric_fog_enabled = true
-		env.volumetric_fog_density = 0.012
-		env.volumetric_fog_albedo = Color(0.32, 0.3, 0.4)
-		env.volumetric_fog_length = 48.0
+		env.volumetric_fog_density = 0.012 if town else 0.02
+		env.volumetric_fog_albedo = Color(0.32, 0.3, 0.4) if town else Color(0.2, 0.28, 0.3)
+		env.volumetric_fog_emission = Color(0.0, 0.0, 0.0) if town else Color(0.01, 0.025, 0.03)
+		env.volumetric_fog_length = 48.0 if town else 36.0
+		env.volumetric_fog_gi_inject = 0.6
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -170,7 +198,7 @@ func step_surface(at: Vector3) -> String:
 		return zone.get("surface")
 	var cell: Vector2i = grid.cell_of(at)
 	if Game.area == "town" and grid.inside(cell) and cell.x < Town.MAP[cell.y].length():
-		return "dirt" if Town.MAP[cell.y][cell.x] == "." else "stone"
+		return "dirt" if Town.MAP[cell.y][cell.x] in [".", ":", "P"] else "stone"
 	return "stone"
 
 
@@ -446,8 +474,11 @@ func _spawn_warden_stones(cat) -> void:
 	var missing := Game.WARDEN_STONES - Game.warden_stones()
 	var rooms: Array = cat.rooms.filter(func(r): return r["kind"] == "normal" or r["kind"] == "side")
 	rooms.shuffle()
-	for i in mini(missing, rooms.size()):
-		var c: Vector2i = grid.random_floor_near(rooms[i]["center"], 2, rng)
+	if rooms.is_empty():
+		rooms = cat.rooms.duplicate()
+	# Never fewer stones than the quest needs: if there are too few rooms, the rest share rooms.
+	for i in missing:
+		var c: Vector2i = grid.random_floor_near(rooms[i % rooms.size()]["center"], 2 + i / rooms.size() * 2, rng)
 		var stone := Interactable.new()
 		stone.kind = "stone"
 		stone.display_name = "A Warden's Name-Stone"
@@ -590,6 +621,8 @@ func interact(it: Node3D) -> void:
 				Game.enter_area("catacomb")
 		"stairs", "portal":
 			Game.enter_area("town")
+		"watchfire":
+			hud.banner("Southwatch", "When the bell fell silent, the keeper lit this fire. It still burns for travelers crossing the fen.")
 		"grave":
 			if Game.dig_grave() == "dug":
 				Fx.ring(self, it.global_position, 2.0, Color(1.0, 0.85, 0.55), 0.5)
@@ -599,6 +632,8 @@ func interact(it: Node3D) -> void:
 			if Game.place_warden_stones():
 				Fx.pillar(self, it.global_position, 1.2, Color(0.55, 0.65, 0.95), 1.2)
 				hud.banner("The Wardens' Oath", "Twelve names, spoken aloud. Below, twelve wardens lie down.")
+			elif Game.quest("wardens") == 2:
+				pass  # place_warden_stones already explained why (a full pack)
 			elif Game.quest("wardens") == 1:
 				message("The plinth waits for its stones (%d/%d)." % [Game.warden_stones(), Game.WARDEN_STONES], Color(0.75, 0.8, 0.9))
 			elif Game.quest("wardens") == 0:

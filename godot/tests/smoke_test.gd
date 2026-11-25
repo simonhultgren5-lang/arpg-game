@@ -67,6 +67,17 @@ func _run() -> void:
 		w.player._path_to(start + Vector3(0, 0, -8))
 		await _frames(90)
 		_check(w.player.global_position.distance_to(start) > 3.0, "click-to-move path walks the hero")
+		if hero_class == "warrior":
+			# Walk a circuit through both crossings before reaching Maud.
+			for cell in [Vector2i(7, 41), Vector2i(8, 34), Vector2i(18, 30), Vector2i(18, 36), Vector2i(18, 30), Vector2i(16, 8)]:
+				var stop_at: Vector3 = w.grid.center(cell)
+				w.player._path_to(stop_at)
+				for frame in 900:
+					if w.player.global_position.distance_to(stop_at) < 0.4:
+						break
+					await get_tree().physics_frame
+				_check(w.player.global_position.distance_to(stop_at) < 0.4, "fen route reaches %s" % cell)
+			_check(not w.grid.is_walkable(Vector2i(14, 35)), "open river blocks movement")
 		# talk to Maud and accept the quest
 		w.hud.open_dialogue("maud")
 		_check(w.hud.is_blocking(), "dialogue opens")

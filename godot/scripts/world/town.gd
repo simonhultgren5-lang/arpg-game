@@ -12,6 +12,8 @@ const B = preload("res://scripts/world/build.gd")
 const Interactable = preload("res://scripts/world/interactable.gd")
 const TownsfolkModel = preload("res://scripts/models/townsfolk_model.gd")
 
+const Fen = preload("res://scripts/world/fen.gd")
+
 const MAP := [
 	"####################################",
 	"#T...S.S.S..#CCCCCCCC#..S..S.S..T..#",
@@ -35,9 +37,33 @@ const MAP := [
 	"#.......HHH...,L,,L,..HHH..........#",
 	"#.............,,,,,,...............#",
 	"#.....T.......,,,,,,.........T.....#",
-	"#.............,,P,,,...............#",
 	"#.............,,,,,,...............#",
-	"####################################",
+	"#.............,,,,,,...............#",
+	"##############,,,,,,################",
+	"^^.............:::...............^^^",
+	"^^..............:::.............^^^^",
+	"^^^.^^^^^^^.....:::.............^^^^",
+	"^^^.^^^^^^^.....:::.............^^^^",
+	"^^^^^^^^^^^^.....:::............^^^^",
+	"^^^.^^^^^^^:::::::::............^^^^",
+	"^^^.^^^^^^^:::::::::............^^^^",
+	"^^^.....:::::::::===~~~..........^^^",
+	"^^^.....::.....~~===~~~~~~.......^^^",
+	"^~......::..~~~~~===~~~~~~~~......^^",
+	"^~~~~...::~~~~~~~::....~~~~~~~~...^^",
+	"^~~~~~~~==~~~~~:::........~~~~~~~~~^",
+	"^.~~~~~~==~~...:::..........~~~~~~~^",
+	"^....~~~==....:::..............~~~~^",
+	"^.......::....:::.........^^^....^^^",
+	"^.......::::::::.........^^^^^...^^^",
+	"^.....F.::::::::........^^^^^^^.^^^^",
+	"^.......::::::::........^^^^^^^.^^^^",
+	"^............:::........^^^^^^^.^^^^",
+	"^............:::.........^^^^^..^^^^",
+	"^^...........:::P.........^^^...^^^^",
+	"^^............:::...............^^^^",
+	"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+	"^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
 ]
 const NPC_CHARS := {"M": "maud", "K": "edda", "D": "corwin", "A": "lamplighter"}
 ## Lamps Without Oil: the lamps that light up from the Lamplighter to the unmarked grave.
@@ -70,7 +96,7 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 			var c := Vector2i(x, y)
 			match ch:
 				"#": grid.set_cell(c, LevelGrid.SOLID)
-				".", ",", "P": grid.set_cell(c, LevelGrid.FLOOR)
+				".", ",", "P", ":", "=": grid.set_cell(c, LevelGrid.FLOOR)
 				_: grid.set_cell(c, LevelGrid.PROP)
 			if ch == "P":
 				spawn = grid.center(c)
@@ -90,9 +116,10 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 	level.name = "Town"
 	world.add_child(level)
 	var paved := func(c: Vector2i) -> bool: return chars[c.y][c.x] in [",", "P"]
-	var wall_mat := LevelMesh.build(grid, level, 3.2, Color(0.24, 0.21, 0.24), floor_color, rng, paved)
+	var wall_mat := LevelMesh.build(grid, level, 3.2, Color(0.24, 0.21, 0.24), floor_color, rng, paved, Fen.START_ROW)
 	world.set("wall_material", wall_mat)
 
+	Fen.build(world, level, grid, MAP)
 	var done := {}
 	for y in h:
 		for x in w:
@@ -115,9 +142,42 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 				"Y": _plinth(world, level, p)
 	_lamp_trail(level)
 	_undercroft(world, level)
+	_dress(level)
 	# The road south vanishes into fog.
 	var fog_light := B.omni(Color(0.4, 0.38, 0.55), 0.45, 10.0, grid.center(Vector2i(17, 24)) + Vector3(0, 3, 4), level)
 	fog_light.name = "RoadGlow"
+
+
+## Set dressing (visual only, own RNG so the town's layout never shifts): braziers in the square, clutter
+## against house walls, a fled cart, fencing round the graveyard and bone piles at its edge.
+func _dress(level: Node3D) -> void:
+	var Props = preload("res://scripts/models/props_model.gd")
+	var r := RandomNumberGenerator.new()
+	r.seed = 4242
+	for c in [Vector2i(12, 7), Vector2i(21, 7), Vector2i(13, 11), Vector2i(20, 13)]:
+		Props.brazier(level, grid.center(c) + Vector3(0, 0, 0.6), 11.0, 2.4)
+	for y in chars.size():
+		for x in chars[y].size():
+			var below := y + 1
+			if chars[y][x] != "H" or below >= chars.size() or chars[below][x] not in [".", ","]:
+				continue
+			if r.randf() > 0.38:
+				continue
+			var p := grid.center(Vector2i(x, below)) + Vector3(r.randf_range(-0.8, 0.8), 0, -0.7)
+			if r.randf() < 0.5:
+				Props.barrel(level, p).rotation.y = r.randf() * TAU
+			else:
+				var crate := Props.asset(level, "crate", p)
+				if crate:
+					crate.rotation.y = r.randf() * TAU
+	Props.cart(level, grid.center(Vector2i(9, 12)), 0.5)
+	Props.cart(level, grid.center(Vector2i(25, 17)), -0.8)
+	# Graveyard fencing along its open south edge, and bone piles where the soil was turned.
+	Props.fence(level, grid.center(Vector2i(22, 8)) + Vector3(-1.5, 0, -1.5), grid.center(Vector2i(34, 8)) + Vector3(0, 0, -1.5), r)
+	for i in 6:
+		var c := Vector2i(r.randi_range(22, 34), r.randi_range(1, 6))
+		if chars[c.y][c.x] == ".":
+			Props.bone_pile(level, grid.center(c) + Vector3(r.randf_range(-1, 1), 0, r.randf_range(-1, 1)), r)
 
 
 func _region(start: Vector2i, ch: String, done: Dictionary) -> Rect2i:
@@ -166,18 +226,22 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 				roof.rotation.y = 0.0
 				(roof.mesh as PrismMesh).size = Vector3(s.x + 0.8, 2.2, s.z + 0.6)
 			# door and windows on the south face
-			B.box(Vector3(1.0, 1.9, 0.12), B.mat(Color(0.07, 0.05, 0.04)), Vector3(-s.x * 0.2, 0.95, s.z * 0.5 - 0.15), node)
+			var front := s.z * 0.5 - 0.2  # the plaster's south face
+			if not _kit(node, "house_door", Vector3(-s.x * 0.2, 0, front)):
+				B.box(Vector3(1.0, 1.9, 0.12), B.mat(Color(0.07, 0.05, 0.04)), Vector3(-s.x * 0.2, 0.95, s.z * 0.5 - 0.15), node)
 			var lit := rng.randf() < 0.55
 			var win_mat := B.mat(Color(0.9, 0.55, 0.25), 1.0, Color(1.0, 0.5, 0.2), 2.5) if lit else B.mat(Color(0.03, 0.03, 0.05))
-			B.box(Vector3(0.7, 0.7, 0.1), win_mat, Vector3(s.x * 0.22, 2.0, s.z * 0.5 - 0.15), node)
-			var frame_pos := Vector3(s.x * 0.22, 2.0, s.z * 0.5 - 0.06)
-			B.box(Vector3(0.08, 0.84, 0.10), timber, frame_pos, node)
-			B.box(Vector3(0.85, 0.08, 0.10), timber, frame_pos, node)
-			B.box(Vector3(1.04, 0.12, 0.35), timber, frame_pos - Vector3.UP * 0.43, node)
+			if not _kit(node, "house_window_lit" if lit else "house_window_dark", Vector3(s.x * 0.22, 2.0, front)):
+				B.box(Vector3(0.7, 0.7, 0.1), win_mat, Vector3(s.x * 0.22, 2.0, s.z * 0.5 - 0.15), node)
+				var frame_pos := Vector3(s.x * 0.22, 2.0, s.z * 0.5 - 0.06)
+				B.box(Vector3(0.08, 0.84, 0.10), timber, frame_pos, node)
+				B.box(Vector3(0.85, 0.08, 0.10), timber, frame_pos, node)
+				B.box(Vector3(1.04, 0.12, 0.35), timber, frame_pos - Vector3.UP * 0.43, node)
 			var chimney_pos := Vector3(-s.x * 0.22, wall_h + 1.9, -s.z * 0.22)
-			var brick := B.mat(Color("#493c40"))
-			B.box(Vector3(0.72, 2.25, 0.68), brick, chimney_pos, node)
-			B.box(Vector3(0.89, 0.17, 0.85), brick, chimney_pos + Vector3.UP * 1.07, node)
+			if not _kit(node, "chimney", chimney_pos - Vector3.UP * 1.12):
+				var brick := B.mat(Color("#493c40"))
+				B.box(Vector3(0.72, 2.25, 0.68), brick, chimney_pos, node)
+				B.box(Vector3(0.89, 0.17, 0.85), brick, chimney_pos + Vector3.UP * 1.07, node)
 			if lit:
 				B.omni(Color(1.0, 0.55, 0.25), 0.7, 4.5, Vector3(s.x * 0.22, 2.0, s.z * 0.5 + 0.6), node)
 		"C":
@@ -200,6 +264,9 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			for wx in [-s.x * 0.32, s.x * 0.32]:
 				B.box(Vector3(0.9, 2.4, 0.1), glass, Vector3(wx, 3.6, s.z * 0.5 - 0.25), node)
 			B.box(Vector3(1.6, 2.6, 0.15), B.mat(Color(0.12, 0.06, 0.05), 1.0, Color(0.5, 0.2, 0.08), 0.4), Vector3(0, 1.3, s.z * 0.5 - 0.05), node)
+			var rose := _kit(node, "rose_window", Vector3(0, 6.0, s.z * 0.5 + 0.03))
+			if rose:
+				node.get_child(node.get_child_count() - 1).scale = Vector3.ONE * 1.5
 			B.omni(Color(0.75, 0.35, 0.6), 1.2, 7.0, Vector3(0, 3.5, s.z * 0.5 + 1.5), node)
 			B.torch(node, Vector3(-1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
 			B.torch(node, Vector3(1.4, 2.3, s.z * 0.5 + 0.1), Vector3(0, 0, 1), 7.0, 1.4)
@@ -212,6 +279,8 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 				B.cylinder(0.22, 0.25, 3.4, stone, Vector3(-s.x * 0.5 + 0.6 + i * (s.x - 1.2) / 3.0, 1.7, s.z * 0.5), node, 8)
 			B.label("Mausoleum of the Wardens", B.GOLD, Vector3(0, 5.4, 0), node, 36)
 		"W":
+			if _kit(node, "well", Vector3.ZERO):
+				return
 			var stone := B.mat(Color(0.28, 0.26, 0.28))
 			B.cylinder(1.3, 1.4, 1.0, stone, Vector3(0, 0.5, 0), node, 12)
 			B.cylinder(1.05, 1.05, 1.02, B.mat(Color(0.01, 0.01, 0.02)), Vector3(0, 0.52, 0), node, 12)
@@ -220,6 +289,11 @@ func _building(level: Node3D, ch: String, rect: Rect2i, rng: RandomNumberGenerat
 			B.prism(Vector3(3.0, 1.0, 1.6), B.mat(Color(0.13, 0.09, 0.11)), Vector3(0, 3.0, 0), node)
 		"G":
 			pass  # built by _gate
+
+
+## Hangs a Blender kit piece (assets/models/props/<id>.gltf) on a building; false if it's missing.
+func _kit(parent: Node3D, id: String, pos: Vector3) -> bool:
+	return preload("res://scripts/models/props_model.gd").asset(parent, id, pos) != null
 
 
 func _gate(world: Node3D, level: Node3D, rect: Rect2i) -> void:
@@ -272,6 +346,12 @@ func _tree(level: Node3D, p: Vector3, rng: RandomNumberGenerator) -> void:
 	t.rotation.y = rng.randf() * TAU
 	level.add_child(t)
 	var hgt := rng.randf_range(4.0, 6.0)
+	var modelled := preload("res://scripts/models/props_model.gd").asset(level, "dead_tree", p)
+	if modelled:  # the Blender tree; the rolls above are still spent so the layout never shifts
+		modelled.rotation.y = t.rotation.y
+		modelled.scale = Vector3.ONE * (hgt / 5.0)
+		t.queue_free()
+		return
 	B.cylinder(0.12, 0.35, hgt, bark, Vector3(0, hgt * 0.5, 0), t, 6)
 	for i in 4:
 		var br := B.cylinder(0.03, 0.1, 2.0, bark, Vector3(0, hgt * (0.55 + i * 0.1), 0), t, 5)
