@@ -3,5 +3,6 @@
   "MOTD": "Welcome to the Depths. Dev server, progress may be reset.",
   "PORT": 4100,
   "HOST": "0.0.0.0",
-  "DATA_DIR": "data"
+  "DATA_DIR": "data",
+  "DATABASE_URL": "postgres://depths:depths@127.0.0.1:5432/depths"
 }

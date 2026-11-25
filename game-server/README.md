@@ -2,17 +2,21 @@
 
 Handles accounts (register / log in), cloud saves and the online status the launcher shows.
 
-- **No npm packages:** it uses only what's built into Node.js (SQLite, password hashing, HTTP).
-- **One database file:** everything is stored in `depths.db` in the data folder.
+- **PostgreSQL:** accounts, characters, saves, news, flags, crash reports and usage events are tables in a PostgreSQL database (see [The database](#the-database)). With Docker, the database runs in its own container next to the server.
+- **One npm package:** `pg`, the PostgreSQL driver (`npm ci` in `game-server/`). Everything else is built into Node.js.
 - **Home network:** it's meant for a Raspberry Pi on your LAN while the game is in development. It speaks plain `http`, so don't expose it to the internet as-is (see [Playing over the internet](#playing-over-the-internet)).
 
 ## Run it on your PC (for testing)
 
-From the project root:
+The server needs a PostgreSQL database. The easiest is the one from `docker-compose.yml` (needs Docker Desktop running). From the project root:
 
 ```powershell
+bun run server:install    # npm ci in game-server/ (the pg package), once
+bun run server:db         # starts only the database container, on 127.0.0.1:5432
 bun run server
 ```
+
+`bun run server` connects to `postgres://depths:depths@127.0.0.1:5432/depths`, the database `server:db` starts. To use another PostgreSQL, set `DATABASE_URL` (environment or `game-server/config.json`).
 
 The launcher (`bun run game`) lists **This PC** (`localhost:4100`) when running from source. Select it, register an account and press Play.
 
@@ -28,7 +32,7 @@ From the project root:
 bun run server:pack
 ```
 
-This creates `release/depths-server-<version>.tar.gz` (about 10 KB) with the server, `Dockerfile` and `docker-compose.yml`.
+This creates `release/depths-server-<version>.tar.gz` (about 30 KB) with the server, its schema migrations, `Dockerfile` and `docker-compose.yml` (the server and its PostgreSQL database).
 
 ### 2. Copy it to the Pi
 
@@ -46,10 +50,10 @@ cd depths-server
 docker compose up -d --build
 ```
 
-The first start downloads the Node.js base image, so give it a minute. Then check it:
+The first start downloads the Node.js and PostgreSQL images and installs the `pg` package, so give it a few minutes. To choose the database password, create a file `.env` next to `docker-compose.yml` with `POSTGRES_PASSWORD=something-long` **before** this first start (the database only listens inside Docker and on the Pi itself, so the default is fine on a home network). Then check it:
 
 ```bash
-docker compose ps          # STATUS should say "healthy" after ~10 seconds
+docker compose ps          # both containers should say "healthy" after ~30 seconds
 docker compose logs -f     # live log: registrations and errors (Ctrl+C to stop watching)
 hostname -I                # the Pi's IP address, for the launcher
 ```
@@ -84,7 +88,7 @@ It works whether you installed from the package or from a git clone:
 - **Package folder:** it downloads `depths-server-<version>.tar.gz`, checks its SHA-256 and copies the new files over the folder.
 - **Git clone:** it fast-forwards the clone to the release tag (`v<version>`).
 
-Either way it rebuilds and restarts the container (or restarts the systemd service from `install.sh`), then waits until the new version answers. Accounts and saves stay in the Docker volume. Your `docker-compose.yml` (`SERVER_NAME`, `MOTD`, ports) is kept: if a release changes that file, the new one is saved next to yours as `docker-compose.yml.new`.
+Either way it rebuilds and restarts the containers (or runs `npm ci` and restarts the systemd service from `install.sh`), then waits until the new version answers. Accounts and saves stay in the database's Docker volume. Your `docker-compose.yml` (`SERVER_NAME`, `MOTD`, ports) is kept: if a release changes that file, the new one is saved next to yours as `docker-compose.yml.new`.
 
 | Command | What it does |
 | --- | --- |
@@ -94,6 +98,14 @@ Either way it rebuilds and restarts the container (or restarts the systemd servi
 | `bash update.sh --force` | Reinstalls the newest release |
 
 Nightly updates run as your user, so that user must be allowed to use Docker (`sudo usermod -aG docker $USER`, then log in again). See what they did with `journalctl -u depths-server-update`.
+
+**Updating from a server before 0.5.0-beta.9 (the SQLite versions):** on its first start the server moves everything from its old database file into PostgreSQL by itself, and keeps the file as `depths.db.imported-<date>` in the data volume. The new `docker-compose.yml` adds the database container, but `update.sh` from those older releases keeps your old `docker-compose.yml`, so the server finds no database and doesn't come back. Then run the new `update.sh` once:
+
+```bash
+bash update.sh --force     # switches to the new docker-compose.yml, keeps your SERVER_NAME and MOTD
+```
+
+Your old file is kept as `docker-compose.yml.before-postgres`. Without Docker, `update.sh` runs `install.sh`, which installs PostgreSQL.
 
 **First time on a Pi that runs from a git clone:** older checkouts don't have `update.sh` yet. Pull once by hand, then use it from then on:
 
@@ -117,7 +129,7 @@ docker exec -it depths-server node admin.mjs delete-character edda "Old Name" --
 docker exec -it depths-server node admin.mjs delete-account edda --yes
 docker exec -it depths-server node admin.mjs sign-out edda        # end all logins of an account
 docker exec -it depths-server node admin.mjs stats                # counts and database size
-docker exec -it depths-server node admin.mjs backup               # copy to /data/backups/depths-<date>.db
+docker exec -it depths-server node admin.mjs backup               # copy to /data/backups/depths-<date>.dump
 
 # News in the launcher
 docker exec -it depths-server node admin.mjs news-post "Double XP weekend" "Friday to Sunday, every kill counts twice."
@@ -138,22 +150,34 @@ docker exec -it depths-server node admin.mjs crash 12             # one report, 
 docker exec -it depths-server node admin.mjs telemetry 30         # summary of the last 30 days
 ```
 
-Without Docker, run `node admin.mjs <command>` in the server folder. From a clone of the repo, `bun run admin <command>` uses `game-server/data`. Commands that delete something ask for `--yes` first.
-
-To restore a backup made with `admin.mjs backup`, stop the server first: the command refuses while the server runs. Then `node admin.mjs restore <file> --yes` replaces the database and keeps the old one next to it as `depths.db.before-restore-<time>`.
+Without Docker, run `node admin.mjs <command>` in the server folder. From a clone of the repo, `bun run admin <command>` uses the database from `DATABASE_URL` (default: the one `bun run server:db` starts). Commands that delete something ask for `--yes` first.
 
 ### Back up the data
 
+`node admin.mjs backup` writes one consistent copy of the whole database, also while the server runs:
+
 ```bash
-cd ~/depths-server
-docker compose stop
-docker cp depths-server:/data ./backup-$(date +%F)
-docker compose start
+docker exec -it depths-server node admin.mjs backup        # /data/backups/depths-<date>.dump
+docker cp depths-server:/data/backups ./depths-backups     # copy the backups off the Pi
 ```
 
-To restore, stop the server, copy a backup back with `docker cp ./backup-2026-11-24/. depths-server:/data`, and start it again.
+| Command | What it writes |
+| --- | --- |
+| `node admin.mjs backup [file]` | A `pg_dump` archive (`.dump`) when the PostgreSQL client tools are installed (they are in the Docker image); otherwise the built-in format |
+| `node admin.mjs backup [file] --format json` | The built-in format (`.json.gz`): every table as gzip'd JSON. Needs nothing but Node.js |
+| `node admin.mjs backup [file] --format pg_dump` | Always `pg_dump` (fails if it isn't installed, or is older than the database) |
 
-To wipe everything (all accounts and saves) during development: `docker compose down -v`. The `-v` deletes the volume.
+To restore, stop the server first (the command refuses while it runs), then:
+
+```bash
+docker compose stop depths-server
+docker compose run --rm depths-server node admin.mjs restore /data/backups/depths-2026-11-24-20-00-00.dump --yes
+docker compose start depths-server
+```
+
+`restore` reads both formats. It replaces every account and save, and first keeps what was there as `data/backups/before-restore-<time>.json.gz`.
+
+To wipe everything (all accounts and saves) during development: `docker compose down -v`. The `-v` deletes the volumes.
 
 ### Prebuilt image (optional)
 
@@ -173,7 +197,7 @@ docker compose up -d          # no --build: uses the loaded image
 
 ## Run it on the Raspberry Pi without Docker
 
-The package also contains `install.sh`, which installs Node.js 22 if needed and sets up a systemd service:
+The package also contains `install.sh`, which installs Node.js 22 and PostgreSQL if needed, creates the `depths` database with a random password, installs the `pg` package and sets up a systemd service:
 
 ```bash
 tar xzf depths-server-0.1.0.tar.gz
@@ -181,7 +205,7 @@ cd depths-server
 bash install.sh
 ```
 
-Settings go in `config.json` (created from `config.example.json`), with the same names as in the Docker table plus `PORT`, `HOST` and `DATA_DIR`. Data lives in `depths-server/data/`. Useful commands:
+Settings go in `config.json` (created from `config.example.json`), with the same names as in the Docker table plus `PORT`, `HOST`, `DATA_DIR` and `DATABASE_URL` (`install.sh` writes it and makes the file readable only by you). Accounts and saves live in PostgreSQL; `depths-server/data/` holds backups and, after an upgrade, the old SQLite file. Useful commands:
 
 ```bash
 sudo systemctl status depths-server
@@ -189,7 +213,7 @@ journalctl -u depths-server -f
 sudo systemctl restart depths-server   # after changing config.json
 ```
 
-Running `bash install.sh` again (for example after unpacking a new version) is safe: it keeps `config.json` and `data/`. `bash update.sh` works here too: it restarts the systemd service instead of Docker.
+Running `bash install.sh` again (for example after unpacking a new version) is safe: it keeps `config.json`, `data/` and the database. `bash update.sh` works here too: it runs `npm ci` and restarts the systemd service instead of Docker.
 
 ## Connect the launcher
 
@@ -220,9 +244,31 @@ All responses are JSON. Logged-in requests send `Authorization: Bearer <token>`.
 | POST | `/api/crash` | `source`, `message`, `detail`, `version`, `channel`, `platform`, `installId` | `ok` (no login; 30 per hour per address) |
 | POST | `/api/telemetry` | `events: [{ event, at, props }]` (up to 50), `version`, `channel`, `installId` | `ok` (no login; 120 per hour per address) |
 
-Each account has up to **5 characters**. Names are 2–18 letters (spaces, `-` and `'` allowed) and unique per account; classes are `warrior`, `pyromancer` and `rogue`. A server upgraded from an older version moves each account's existing hero into its first character slot on start-up.
+Each account has up to **5 characters**. Names are 2–18 letters (spaces, `-` and `'` allowed) and unique per account; classes are `warrior`, `pyromancer` and `rogue`. A server upgraded from a version before 0.3 moves each account's existing hero into its first character slot.
 
 Usernames are 3–20 letters, numbers or `_` (not case-sensitive). Passwords need 6+ characters and are stored as salted scrypt hashes. Logins last 30 days. After 10 failed attempts from one address, logins pause for 10 minutes.
+
+## The database
+
+PostgreSQL 16 or newer (the Docker setup uses 17). Times are milliseconds since 1970, in `BIGINT` columns.
+
+| Table | What's in it |
+| --- | --- |
+| `accounts` | Username (unique, not case-sensitive), scrypt password hash, created and last login |
+| `sessions` | SHA-256 of each login token, its account and when it expires |
+| `characters` | Up to 5 heroes per account: name, class, color, level, depth, and `data`: the save (the game's progress under the `dod3d` key) |
+| `news`, `flags` | Set with `admin.mjs`; channel `''` means every launcher |
+| `crashes`, `telemetry` | Reports from launchers whose players opted in; usage events are kept 90 days |
+| `schema_migrations` | Which migrations have run |
+| `sqlite_imports` | Which old SQLite files were imported (by SHA-256), so none is imported twice |
+
+**Migrations.** The schema is in numbered files next to the server: `migration-001-initial.sql`, `migration-002-….sql` and so on. At start-up the server (and `admin.mjs`) applies the ones that haven't run yet, in order, each in its own transaction, holding a lock so two processes never migrate at once. To change the schema, add the next file; never edit one that was released. They aren't in a folder because `update.sh` from older releases only copies files.
+
+**Transactions.** Writes that touch more than one row run in one transaction: register and login (account and session), password changes (password and other sessions), creating a character (with the account row locked, so the five-hero limit and unique names hold under parallel requests), and saves (the character row is locked while the new keys are merged into the old save, so two saves at once never lose each other's keys). A batch of usage events is stored with one statement.
+
+**Import from SQLite.** Servers up to 0.5.0-beta.8 kept everything in `data/depths.db`. If that file exists when the server starts, it is copied into PostgreSQL in one transaction, keeping every id (so the launcher's characters stay the same), and the server checks that every table has as many rows as the file. Then the file is renamed to `depths.db.imported-<date>`; it is never deleted. A file that was imported before is recognised and only renamed. The import only runs into a database without accounts: if PostgreSQL already has players, the file is left where it is and the log says so. `node admin.mjs import-sqlite <file> --yes` does the same by hand. If the import fails, the server stops, so nobody starts over in an empty database.
+
+**Tests.** `bun run test` (or `node --test game-server/tests/server.test.mjs`) runs the server tests against the PostgreSQL in `TEST_DATABASE_URL` (default: the one from `bun run server:db`). Each run makes throwaway databases and drops them afterwards, so the login must be allowed to create databases. Without a reachable PostgreSQL the tests are skipped, with a message. In GitHub Actions they run in the **Game server tests** job, against a PostgreSQL service container.
 
 ## Playing over the internet
 

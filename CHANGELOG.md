@@ -10,6 +10,13 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## Unreleased
+
+### Server
+- **The game server now keeps accounts and saves in a PostgreSQL database.** Logins, heroes, cloud saves, news and settings move over by themselves the first time the new server starts, and the old database file is kept as a backup. Nothing changes in the launcher or the game.
+- **Saves are safer when two arrive at once.** Saving from two PCs, or from the game and an older launcher at the same moment, can no longer lose part of a save, and the five-hero limit holds even when heroes are made at the same time.
+- **For server owners:** the Docker setup now starts a database next to the server. If you update a Raspberry Pi with `update.sh` and the server doesn't come back, run `bash update.sh --force` once. Backups use `node admin.mjs backup`.
+
 ## 0.5.0-beta.8 — The Long Lens (2026-11-25)
 
 ### New

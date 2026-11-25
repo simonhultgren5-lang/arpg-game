@@ -166,7 +166,7 @@ The repo is laid out like an AAA depot: source code in its own folders, game-rea
 
 - **The game:** open `godot/project.godot` in Godot. Started from the editor, the title screen offers a test hero of each class and saves offline. `godot/README.md` covers the controls, the headless smoke test and the model galleries.
 - **The launcher:** `bun run launcher` (or `bun run dev`, which also starts a local server). `F5` or `Ctrl+R` reloads it after editing `launcher/`, and `F12` opens DevTools. Changes to `electron/` need a restart. **Play** needs an exported game (`bun run godot:export`).
-- **`bun run dev`** starts a game server on <http://localhost:4100> with its data in `.dev/server-data`, creates the test account **dev / devpass1** with three heroes (Aldric, Morwen and Edda), and opens the launcher with the dev tools on. In the launcher, pick **This PC** and log in. Closing the launcher stops the server. `bun run dev:reset` deletes the dev data again (it asks first; installed-game data is never touched).
+- **`bun run dev`** starts a game server on <http://localhost:4100> with its own database (run `bun run server:install` and `bun run server:db` once first; the server needs PostgreSQL), creates the test account **dev / devpass1** with three heroes (Aldric, Morwen and Edda), and opens the launcher with the dev tools on. In the launcher, pick **This PC** and log in. Closing the launcher stops the server. `bun run dev:reset` deletes the dev data again (it asks first; installed-game data is never touched).
 - **`bun run test`** runs every automated check: syntax, the game server and admin CLI tests (`game-server/tests/`), and the Godot smoke test and dev console test, headless. Run it before every release.
 
 ### Dev tools in the launcher

@@ -1,7 +1,7 @@
 // Packages the game server for the Raspberry Pi.
 //
 //   bun run server:pack    release/depths-server-<version>.tar.gz
-//                          Server source + Dockerfile + docker-compose.yml. On the Pi:
+//                          Server source + Dockerfile + docker-compose.yml (server + PostgreSQL). On the Pi:
 //                            tar xzf depths-server-<version>.tar.gz && cd depths-server && docker compose up -d --build
 //
 //   bun run server:image   Also builds a ready-made Docker image for the Pi on this PC (needs Docker Desktop):
@@ -24,6 +24,12 @@ const platform = process.env.PLATFORM || 'linux/arm64';
 const FILES = [
   'server.mjs',
   'admin.mjs',
+  'db.mjs',
+  // npm ci installs the one package (pg) from these, in the Docker image or with install.sh.
+  'package.json',
+  'package-lock.json',
+  // Schema migrations. Top-level files, not a folder: update.sh from older releases copies only files.
+  ...fs.readdirSync(srcDir).filter((name) => /^migration-\d{3}-[a-z0-9-]+\.sql$/.test(name)).sort(),
   'Dockerfile',
   'docker-compose.yml',
   '.dockerignore',

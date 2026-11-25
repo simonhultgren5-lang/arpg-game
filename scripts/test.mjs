@@ -4,7 +4,7 @@
 //   bun run test --quick    skip the Godot tests (no Godot needed)
 //
 //   1. Syntax of the launcher, Electron, server and build scripts
-//   2. Game server + admin CLI tests (game-server/tests/)
+//   2. Game server + admin CLI tests (game-server/tests/), on PostgreSQL (skipped without one)
 //   3. Godot: smoke test (plays Act I with every class) and dev console test, headless
 //
 // Exits with code 1 if anything failed.
@@ -27,12 +27,21 @@ const step = (name, ok, detail = '') => {
 const { files, broken } = checkSyntax();
 step(`Syntax of ${files.length} files`, broken.length === 0, broken.join(', '));
 
-// ---- 2. server tests
+// ---- 2. server tests (against PostgreSQL: TEST_DATABASE_URL, or the one from `bun run server:db`)
 console.log('\nGame server tests…');
-const server = spawnSync(process.execPath, ['--no-warnings', '--test', path.join(root, 'game-server', 'tests', 'server.test.mjs')], {
+const serverDir = path.join(root, 'game-server');
+if (!fs.existsSync(path.join(serverDir, 'node_modules', 'pg'))) {
+  console.log('Installing the game server packages (npm ci in game-server/)…');
+  const npm = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: serverDir, stdio: 'inherit', shell: process.platform === 'win32' });
+  if (npm.status !== 0) console.log('npm ci failed; the server tests will be skipped.');
+}
+const server = spawnSync(process.execPath, ['--no-warnings', '--test', path.join(serverDir, 'tests', 'server.test.mjs')], {
   encoding: 'utf8',
 });
-const summary = (server.stdout.match(/^ℹ (pass|fail) \d+/gm) || []).join(', ').replace(/ℹ /g, '');
+const skippedWhy = (server.stdout.match(/^# SKIPPED: (.*)$/m) || [])[1];
+if (skippedWhy) console.log(`! ${skippedWhy}`);
+const summary = (server.stdout.match(/^ℹ (pass|fail|skipped) \d+/gm) || []).join(', ').replace(/ℹ /g, '') +
+  (skippedWhy ? ' (no PostgreSQL, see above)' : '');
 if (server.status !== 0) console.log(server.stdout.split('\n').filter((l) => /✖|not ok|Error|expected|actual/.test(l)).slice(0, 30).join('\n'));
 step('Game server and admin CLI', server.status === 0, summary);
 

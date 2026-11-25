@@ -24,7 +24,7 @@ How to set up, build, test and release the project, and how to use the dev tools
 | --- | --- | --- | --- |
 | Game | `godot/` | Godot 4.7, GDScript | The 3D action RPG (Act I: The Tolling of Hollowmere) |
 | Launcher | `launcher/` + `electron/` | Electron, plain HTML/CSS/JS | Accounts, characters, news, updates; starts the game |
-| Game server | `game-server/` | Node.js (no npm packages), SQLite | Accounts, characters, saves, news, flags, crash reports, telemetry |
+| Game server | `game-server/` | Node.js, PostgreSQL (`pg`) | Accounts, characters, saves, news, flags, crash reports, telemetry |
 | Build scripts | `scripts/` | Node.js | Version sync, export, tests, release, dev setup |
 | Pipeline | `.github/` | GitHub Actions | Compile, test, package, QA and deploy on every push |
 | Art sources | `source-assets/` | Git LFS | Editable originals (Blender, Photoshop, audio masters, films) |
@@ -47,7 +47,8 @@ Install, once per PC:
 | Tool | Why | Get it |
 | --- | --- | --- |
 | Git with **Git LFS** | Code, plus the art, audio and video in LFS | Git for Windows includes LFS |
-| **Node.js 22.13+** (24 recommended) | Launcher, server (built-in SQLite) and scripts | <https://nodejs.org> |
+| **Node.js 22.13+** (24 recommended) | Launcher, server and scripts | <https://nodejs.org> |
+| **Docker Desktop** (or any PostgreSQL 16+) | The game server's database: `bun run server:db` | <https://www.docker.com/products/docker-desktop/> |
 | **Bun** | Installs packages and runs the scripts (`bun.lock`) | <https://bun.sh> (`npm` works too) |
 | **Godot 4.7.2** (standard, not .NET) | The game | <https://godotengine.org> |
 | Godot **export templates** 4.7.2 | Exporting the game `.exe` | In Godot: Editor → Manage Export Templates → Download and Install |
@@ -78,7 +79,7 @@ bun run test                          # everything should pass
 bun run dev
 ```
 
-This starts a local game server on <http://localhost:4100> (data in `.dev/server-data`), creates the test account **dev / devpass1** with three heroes (Aldric, Morwen, Edda), and opens the launcher from source with the dev tools on. In the launcher pick **This PC** and log in. Closing the launcher stops the server.
+This starts a local game server on <http://localhost:4100> (its database `depths_dev` on the PostgreSQL from `bun run server:db`, so start that first), creates the test account **dev / devpass1** with three heroes (Aldric, Morwen, Edda), and opens the launcher from source with the dev tools on. In the launcher pick **This PC** and log in. Closing the launcher stops the server.
 
 `bun run dev -- --no-launcher` starts only the server and test account, handy while you work in the Godot editor. `bun run dev:reset` deletes all dev data (it lists what it will delete and asks first).
 
@@ -111,7 +112,7 @@ bun run launcher        # or bun run dev, which also starts a server
 bun run server          # http://localhost:4100, data in game-server/data
 ```
 
-- One file, `server.mjs`, with no npm packages (Node's built-in SQLite and crypto). Routes are in the `routes` object; tables are created at start-up, so new tables need `CREATE TABLE IF NOT EXISTS`.
+- `server.mjs` (routes are in the `routes` object) and `db.mjs` (the PostgreSQL pool, migrations, transactions, the one-time SQLite import), with one npm package, `pg` (`bun run server:install`). The schema is in numbered `migration-NNN-<name>.sql` files, applied in order at start-up: to change it, add the next file. See [game-server/README.md](game-server/README.md#the-database).
 - `/api/status` lists `features`. When the launcher needs a new server feature, add a feature name there and check for it in the launcher, so old servers fail politely.
 - Add tests in `game-server/tests/server.test.mjs` for every new route.
 - `admin.mjs` manages the database directly; see [section 9](#9-running-the-game-server).
