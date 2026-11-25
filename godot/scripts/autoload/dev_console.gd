@@ -28,7 +28,7 @@ const HELP := [
 	["xp <n>", "add experience"],
 	["gold <n>", "add gold (negative takes it)"],
 	["potions <n>", "set the number of draughts"],
-	["give <weapon|armor|charm> [rarity 0-3]", "put a rolled item in the pack"],
+	["give <weapon|chest|ring|...> [rarity 0-3]", "put a rolled item in the pack"],
 	["loot [n]", "drop n random items at your feet"],
 	["kill", "kill every monster in the area"],
 	["spawn <hollow|archer|crawler|boss> [n] [elite]", "spawn monsters near you"],
@@ -268,8 +268,8 @@ func run(text: String) -> String:
 			return _ok("%d draughts." % int(Game.progress["potions"]))
 		"give":
 			var slot: String = _arg(args, 1, "weapon")
-			if slot not in Items.SLOTS:
-				return _err("give weapon|armor|charm [rarity 0-3]")
+			if slot not in Items.KINDS:
+				return _err("give <%s> [rarity 0-3]" % "|".join(Items.KINDS))
 			var item: Dictionary = {}
 			var want := int(_arg(args, 2, "-1"))
 			for i in 200:  # roll until the rarity matches (or take the last roll)

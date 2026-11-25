@@ -235,7 +235,7 @@ func _physics_process(delta: float) -> void:
 		light.omni_range = 14.0 if Game.has_unique("lamplighters_wick") else 10.0
 	var mhp: float = Game.max_hp()
 	var mmana: float = Game.max_mana()
-	hp = minf(mhp, hp + mhp * 0.006 * delta)
+	hp = minf(mhp, hp + (mhp * 0.006 + Game.life_regen()) * delta)
 	mana = minf(mmana, mana + float(cls["mana_regen"]) * delta)
 	_hurt = maxf(0.0, _hurt - delta * 3.0)
 	_body_mat.emission = Color(1, 0.1, 0.05) * _hurt
@@ -385,14 +385,14 @@ func roll_damage(mult: float) -> Array:
 		amount *= 1.12
 	var crit := randf() < Game.crit_chance() or crit_buff > 0.0
 	if crit:
-		amount *= 2.5 if crit_buff > 0.0 else 1.75
+		amount *= Game.crit_damage() + (0.75 if crit_buff > 0.0 else 0.0)
 		crit_buff = 0.0
 	return [amount, crit]
 
 
 func _basic_attack(at: Vector3) -> void:
 	var basic: Dictionary = cls["basic"]
-	attack_cd = basic["cooldown"]
+	attack_cd = basic["cooldown"] / Game.attack_speed()
 	if _anim:
 		_anim.one_shot("cast" if basic["kind"] == "bolt" else "attack", 1.4)
 	ActAudio.spell(self, basic["id"])
@@ -463,7 +463,7 @@ func cast_skill(i: int) -> void:
 	dir = dir.normalized() if dist > 0.01 else facing()
 	mana -= float(sk["mana"])
 	ActAudio.spell(self, sk["id"])
-	skill_cd[i] = sk["cooldown"]
+	skill_cd[i] = sk["cooldown"] * Game.cooldown_mult()
 	if _anim:
 		_anim.one_shot("cast" if Game.hero_class == "pyromancer" or sk["kind"] in ["nova", "ward", "buff"] else "attack", 1.2)
 	_swing = 1.0

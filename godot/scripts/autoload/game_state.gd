@@ -14,9 +14,14 @@ const Classes = preload("res://scripts/data/classes.gd")
 const Items = preload("res://scripts/data/items.gd")
 const Dialogue = preload("res://scripts/data/act1_dialogue.gd")
 
-const SAVE_VERSION := 1
+## 2 (0.5.0-beta.5): 13 gear slots; armor became chest, charm became amulet (see migrate()).
+const SAVE_VERSION := 2
 const MAX_LEVEL := 20
-const INVENTORY_SIZE := 24
+const INVENTORY_SIZE := 60
+## Cooldown reduction from gear never goes past this.
+const MAX_CDR := 0.4
+## A critical strike deals 175% damage before crit-damage bonuses.
+const BASE_CRIT_DAMAGE := 1.75
 const POTION_PRICE := 25
 const QUEST := "silent_bell"
 ## All Act I quests and their last step (see scripts/data/act1_dialogue.gd for what each step means).
@@ -58,7 +63,7 @@ func _process(delta: float) -> void:
 func new_progress() -> Dictionary:
 	return {
 		"version": SAVE_VERSION, "level": 1, "xp": 0, "gold": 20, "potions": 3,
-		"inventory": [], "equipped": {"weapon": null, "armor": null, "charm": null},
+		"inventory": [], "equipped": empty_equipped(),
 		"quests": {"silent_bell": 0, "lamps": 0, "act_end": 0, "wardens": 0}, "flags": {}, "depth": 1, "kills": 0, "playtime": 0.0,
 	}
 
@@ -69,10 +74,12 @@ func load_hero() -> void:
 	class_data = Classes.get_class_data(hero_class)
 	var saved: Dictionary = await SaveSystem.load_progress()
 	progress = new_progress()
+	if not saved.is_empty():
+		saved = migrate(saved, hero_class)
 	for key in saved:
 		progress[key] = saved[key]
 	if not (progress.get("equipped") is Dictionary):
-		progress["equipped"] = {"weapon": null, "armor": null, "charm": null}
+		progress["equipped"] = empty_equipped()
 	if not (progress.get("inventory") is Array):
 		progress["inventory"] = []
 	if not (progress.get("quests") is Dictionary):
@@ -130,6 +137,54 @@ func monster_level() -> int:
 	return clampi(1 + int(progress["level"]) / 2, 1, 6)
 
 
+static func empty_equipped() -> Dictionary:
+	var eq := {}
+	for slot in Items.SLOTS:
+		eq[slot] = null
+	return eq
+
+
+## Brings a saved progress dictionary up to SAVE_VERSION. Pure: returns a new dictionary.
+## Version 1 had three slots (weapon, armor, charm) and a 24-item pack.
+static func migrate(saved: Dictionary, hero_class := "warrior") -> Dictionary:
+	var p := saved.duplicate(true)
+	var old_eq: Dictionary = p.get("equipped", {}) if p.get("equipped") is Dictionary else {}
+	var bag: Array = p.get("inventory", []) if p.get("inventory") is Array else []
+	var eq := empty_equipped()
+	for item in bag:
+		if item is Dictionary:
+			_migrate_item(item, hero_class)
+	for slot in old_eq:
+		var item = old_eq[slot]
+		if not (item is Dictionary):
+			continue
+		_migrate_item(item, hero_class)
+		var kind: String = item["slot"]
+		var to := "ring_1" if kind == "ring" else kind
+		if eq.has(to) and eq[to] == null:
+			eq[to] = item
+		else:
+			bag.append(item)
+	p["equipped"] = eq
+	p["inventory"] = bag
+	p["version"] = SAVE_VERSION
+	return p
+
+
+static func _migrate_item(item: Dictionary, hero_class: String) -> void:
+	match item.get("slot", ""):
+		"armor":
+			item["slot"] = "chest"
+		"charm":
+			item["slot"] = "amulet"
+	if item.has("unique") and Items.UNIQUES.has(item["unique"]):
+		var u: Dictionary = Items.UNIQUES[item["unique"]]
+		item["slot"] = u["slot"]
+		item["icon"] = u["icon"]
+	if str(item.get("icon", "")) == "" and item.get("slot") != "quest":
+		item["icon"] = Items.guess_icon(item, hero_class)
+
+
 # ------------------------------------------------------------------ stats
 
 func level() -> int:
@@ -171,6 +226,26 @@ func damage_range() -> Vector2:
 
 func crit_chance() -> float:
 	return 0.05 + gear_stat("crit") / 100.0
+
+
+## Damage multiplier of a critical strike.
+func crit_damage() -> float:
+	return BASE_CRIT_DAMAGE + gear_stat("crit_dmg") / 100.0
+
+
+## Multiplier on attack rate (divide attack cooldowns by it).
+func attack_speed() -> float:
+	return 1.0 + gear_stat("attack_speed") / 100.0
+
+
+## Multiplier on skill cooldowns; never below 1 - MAX_CDR.
+func cooldown_mult() -> float:
+	return maxf(1.0 - MAX_CDR, 1.0 - gear_stat("cdr") / 100.0)
+
+
+## Life per second from gear (on top of the hero's own slow recovery).
+func life_regen() -> float:
+	return float(gear_stat("regen"))
 
 
 func move_speed() -> float:
@@ -226,32 +301,62 @@ func add_item(item: Dictionary) -> bool:
 
 
 func equip(index: int) -> void:
+	equip_to(index)
+
+
+## Wears bag item `index` in `slot` (empty: the slot its kind goes in; a ring takes the free ring slot,
+## else ring_1). Whatever was there goes back into the bag in its place. False if it doesn't fit.
+func equip_to(index: int, slot := "") -> bool:
 	if index < 0 or index >= inventory().size():
-		return
+		return false
 	var item: Dictionary = inventory()[index]
-	var slot: String = item.get("slot", "")
-	if slot == "" or slot == "quest":
-		return
-	var old = progress["equipped"].get(slot)
+	var kind: String = item.get("slot", "")
+	if kind == "" or kind == "quest" or not kind in Items.KINDS:
+		return false
+	var eq: Dictionary = progress["equipped"]
+	if slot == "":
+		slot = kind
+		if kind == "ring":
+			slot = "ring_1" if eq.get("ring_1") == null or eq.get("ring_2") != null else "ring_2"
+	if Items.slot_kind(slot) != kind or not eq.has(slot):
+		return false
+	var old = eq.get(slot)
 	inventory().remove_at(index)
 	if old is Dictionary:
 		inventory().insert(index, old)
-	progress["equipped"][slot] = item
+	eq[slot] = item
 	inventory_changed.emit()
 	stats_changed.emit()
+	return true
 
 
-func unequip(slot: String) -> void:
+## Takes off what `slot` holds into the bag. False if the slot is empty or the bag is full.
+func unequip(slot: String) -> bool:
 	var item = progress["equipped"].get(slot)
 	if not (item is Dictionary):
-		return
+		return false
 	if inventory().size() >= INVENTORY_SIZE:
 		message.emit("Your pack is full.", Color(0.9, 0.4, 0.3))
-		return
+		return false
 	progress["equipped"][slot] = null
 	inventory().append(item)
 	inventory_changed.emit()
 	stats_changed.emit()
+	return true
+
+
+## Moves a bag item: onto another item swaps the two, past the end moves it last.
+func move_item(from: int, to: int) -> void:
+	var bag := inventory()
+	if from < 0 or from >= bag.size() or from == to:
+		return
+	if to >= bag.size():
+		bag.append(bag.pop_at(from))
+	else:
+		var t = bag[to]
+		bag[to] = bag[from]
+		bag[from] = t
+	inventory_changed.emit()
 
 
 func salvage(index: int) -> void:
@@ -412,7 +517,7 @@ func run_action(action: String) -> void:
 			if not flags().get("corwin_gift", false):
 				flags()["corwin_gift"] = true
 				add_item({
-					"uid": "corwin-lantern", "name": "Gravedigger's Lantern", "slot": "charm", "rarity": 1,
+					"uid": "corwin-lantern", "name": "Gravedigger's Lantern", "slot": "amulet", "icon": "locket", "rarity": 1,
 					"ilvl": 2, "stats": {"life": 12, "armor": 4},
 					"lore": "Forty years of graves, and it never once went out.",
 				})

@@ -35,7 +35,7 @@ func setup() -> void:
 				"weapon":
 					var w := B.box(Vector3(0.1, 0.06, 1.0), m, Vector3(0, 0.15, 0), _visual)
 					w.rotation.y = randf() * TAU
-				"armor":
+				"chest", "legs", "shoulders", "head", "offhand":
 					B.box(Vector3(0.6, 0.25, 0.45), m, Vector3(0, 0.15, 0), _visual)
 				_:
 					B.sphere(0.16, m, Vector3(0, 0.2, 0), _visual, 8)
