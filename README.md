@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="launcher/assets/icon.png" alt="Depths of Darkness logo" width="160">
-</p>
-
-<h1 align="center">Depths of Darkness</h1>
+# <img src="launcher/assets/icon-96.png" alt="" width="48" height="48" align="absmiddle"> Depths of Darkness
 
 A grim gothic action RPG in 3D. Pick a Warrior, Pyromancer or Rogue, walk out of the fog into the cursed town of Hollowmere, and descend into the crypt beneath it.
 
