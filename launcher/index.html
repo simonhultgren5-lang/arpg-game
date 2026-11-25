@@ -18,12 +18,18 @@
 
 <main class="layout">
   <section class="hero" aria-label="Game">
+    <!-- The Act I film plays silently behind the launcher; "Watch the Act I film" plays it full size with sound. -->
+    <video class="hero-film" id="actFilm" muted loop playsinline preload="auto" poster="assets/act-i-poster.jpg" aria-hidden="true">
+      <source src="assets/act-i.mp4" type="video/mp4">
+      <track kind="captions" srclang="en" label="English" src="assets/act-i.en.vtt">
+    </video>
+    <div class="hero-film-shade" aria-hidden="true"></div>
     <div class="arch" aria-hidden="true"></div>
     <div class="hero-content">
       <img class="logo-emblem" src="app://game/img/emblem.svg" alt="" width="84" height="84">
       <p class="kicker">Dark Fantasy Action RPG</p>
       <h1>Depths<br>of Darkness</h1>
-      <button type="button" class="trailer-link" id="btnTrailer">Watch the Act I trailer</button>
+      <button type="button" class="trailer-link" id="btnTrailer"><span class="play-glyph" aria-hidden="true">&#9654;</span> Watch the Act I film</button>
       <div class="motd" id="motd" hidden>
         <span class="motd-label" id="motdLabel">Message from the server</span>
         <p id="motdText"></p>
@@ -132,13 +138,12 @@
   </aside>
 </main>
 
-<dialog class="trailer-dialog" id="trailerDialog" aria-label="Act I trailer">
-  <form method="dialog"><button type="submit" class="btn ghost">Close trailer</button></form>
-  <video id="actTrailer" controls playsinline preload="none" poster="assets/act-i-poster.jpg">
-    <source src="assets/act-i.mp4" type="video/mp4">
-    <track kind="captions" srclang="en" label="English" src="assets/act-i.en.vtt">
-  </video>
-</dialog>
+<!-- Shown over the film while it plays with sound. -->
+<div class="film-bar" id="filmBar" hidden>
+  <button type="button" class="btn ghost" id="btnFilmBack">&#8592; Back to the launcher</button>
+  <span class="film-hint">Esc to return</span>
+  <button type="button" class="btn ghost" id="btnFilmCaptions" aria-pressed="true">Captions on</button>
+</div>
 
 <!-- Patch Notes panel: every version from CHANGELOG.md -->
 <div class="notes-panel" id="notesPanel" role="dialog" aria-modal="true" aria-labelledby="notesPanelTitle" hidden>

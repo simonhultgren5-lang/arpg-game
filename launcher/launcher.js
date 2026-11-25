@@ -4,19 +4,79 @@
   const api = window.launcher;
   const $ = (id) => document.getElementById(id);
   const POLL_MS = 8000;
-  const trailer = $('actTrailer');
-  const trailerDialog = $('trailerDialog');
-  $('btnTrailer').addEventListener('click', () => {
-    trailerDialog.showModal();
-    trailer.play().catch(() => { /* Native controls remain available. */ });
+  // ---------------------------------------------------------------- Act I film
+  // Loops silently behind the hero art. "Watch the Act I film" plays it full size from the start with
+  // sound and captions; Esc, the back button or the end of the film returns to the silent loop.
+  const film = $('actFilm');
+  const filmBar = $('filmBar');
+  const btnCaptions = $('btnFilmCaptions');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let watching = false;
+  let idleTimer = 0;
+  function playBackground() {
+    if (watching || document.hidden || reducedMotion.matches) return;
+    film.play().then(() => film.classList.add('playing')).catch(() => { /* the poster stays */ });
+  }
+  function showCaptions(on) {
+    const track = film.textTracks && film.textTracks[0];
+    if (track) track.mode = on ? 'showing' : 'hidden';
+    btnCaptions.textContent = on ? 'Captions on' : 'Captions off';
+    btnCaptions.setAttribute('aria-pressed', String(on));
+  }
+  function nudgeIdle() {
+    document.body.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (watching) document.body.classList.add('idle'); }, 2500);
+  }
+  let captionsWanted = true;
+  function watchFilm() {
+    watching = true;
+    document.body.classList.add('watching');
+    filmBar.hidden = false;
+    film.loop = false;
+    film.muted = false;
+    film.controls = true;
+    film.removeAttribute('aria-hidden');
+    film.currentTime = 0;
+    showCaptions(captionsWanted);
+    film.play().catch(() => { /* the native controls remain */ });
+    nudgeIdle();
+    $('btnFilmBack').focus();
+  }
+  function leaveFilm() {
+    if (!watching) return;
+    watching = false;
+    clearTimeout(idleTimer);
+    document.body.classList.remove('watching', 'idle');
+    filmBar.hidden = true;
+    film.controls = false;
+    film.muted = true;
+    film.loop = true;
+    film.setAttribute('aria-hidden', 'true');
+    showCaptions(false);
+    $('btnTrailer').focus();
+    playBackground();
+  }
+  $('btnTrailer').addEventListener('click', watchFilm);
+  $('btnFilmBack').addEventListener('click', leaveFilm);
+  btnCaptions.addEventListener('click', () => {
+    captionsWanted = btnCaptions.getAttribute('aria-pressed') !== 'true';
+    showCaptions(captionsWanted);
   });
-  trailerDialog.addEventListener('close', () => {
-    trailer.pause();
-    trailer.currentTime = 0;
+  film.addEventListener('ended', leaveFilm);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && watching) { e.preventDefault(); leaveFilm(); }
   });
+  document.addEventListener('mousemove', () => { if (watching) nudgeIdle(); });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) trailer.pause();
+    if (document.hidden) film.pause();
+    else if (!watching) playBackground();
+    else film.play().catch(() => {});
   });
+  reducedMotion.addEventListener('change', () => (reducedMotion.matches ? film.pause() : playBackground()));
+  showCaptions(false);
+  if (film.readyState >= 2) playBackground();
+  else film.addEventListener('canplay', playBackground, { once: true });
 
   // ---------------------------------------------------------------- classes & colors
   // Same classes, colors and starting kit as the game (game/js/06-onboarding-sanctuary.js).
@@ -134,7 +194,16 @@
       const meta = document.createElement('span');
       meta.className = 'server-meta';
       meta.textContent = server.url.replace(/^https?:\/\//, '');
+      if (st.state === 'online' && st.info?.version) meta.textContent += ` · v${st.info.version}`;
       text.append(name, meta);
+      // The server checks GitHub for new releases (game-server/update.sh installs them on the Pi).
+      if (st.state === 'online' && st.info?.update?.version) {
+        const upd = document.createElement('span');
+        upd.className = 'server-update';
+        upd.textContent = `Server update ${st.info.update.version} available`;
+        upd.title = 'Install it on the server computer:\n  bash game-server/update.sh\nOr turn on nightly updates once:\n  bash game-server/update.sh --auto';
+        text.append(upd);
+      }
       const right = document.createElement('span');
       right.className = `server-state ${st.state}`;
       right.textContent =
