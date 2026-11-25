@@ -69,33 +69,65 @@ static func telegraph(parent: Node, pos: Vector3, radius: float, color: Color, d
 	return mi
 
 
-## A fading fan in front of the hero for melee sweeps.
+## A tapered blade wake. UV.x travels along the swing and UV.y crosses the blade edge.
 static func slash(parent: Node, origin: Vector3, dir: Vector3, reach: float, arc_deg: float, color: Color) -> void:
 	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
 	var base_angle := atan2(dir.x, dir.z)
-	var half := deg_to_rad(arc_deg) * 0.5
-	var steps := 14
-	for i in steps:
-		var a0 := base_angle - half + (2.0 * half) * i / steps
-		var a1 := base_angle - half + (2.0 * half) * (i + 1) / steps
-		var inner := reach * 0.35
-		var p0 := Vector3(sin(a0), 0, cos(a0))
-		var p1 := Vector3(sin(a1), 0, cos(a1))
-		st.add_vertex(p0 * inner)
-		st.add_vertex(p0 * reach)
-		st.add_vertex(p1 * reach)
-		st.add_vertex(p0 * inner)
-		st.add_vertex(p1 * reach)
-		st.add_vertex(p1 * inner)
+	for i in 33:
+		var u := i / 32.0
+		var angle := base_angle + deg_to_rad(arc_deg) * (u - 0.5)
+		var radial := Vector3(sin(angle), 0, cos(angle))
+		var width := reach * (0.015 + 0.22 * sin(PI * u))
+		var rise := Vector3.UP * (0.68 + u * 0.35)
+		st.set_uv(Vector2(u, 0))
+		st.add_vertex(radial * (reach - width) + rise)
+		st.set_uv(Vector2(u, 1))
+		st.add_vertex(radial * reach + rise)
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
-	var m := glow_mat(color, 0.55)
-	mi.material_override = m
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://shaders/blade_wake.gdshader")
+	mat.set_shader_parameter("tint", color)
+	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mi)
-	mi.global_position = origin + Vector3(0, 0.9, 0)
-	_fade_free(mi, m, 0.18)
+	mi.global_position = origin
+	var tw := mi.create_tween()
+	tw.tween_method(func(value: float): mat.set_shader_parameter("progress", value), 0.0, 1.0, 0.24)
+	tw.tween_callback(mi.queue_free)
+
+
+## Short directional splinters at the point of contact. Critical hits throw a wider burst.
+static var _spark_mesh: SphereMesh
+
+static func impact(parent: Node, pos: Vector3, dir: Vector3, crit: bool) -> void:
+	if _spark_mesh == null:
+		_spark_mesh = SphereMesh.new()
+		_spark_mesh.radius = 0.026
+		_spark_mesh.height = 0.15
+		_spark_mesh.radial_segments = 4
+		_spark_mesh.rings = 1
+		_spark_mesh.material = glow_mat(Color(1.0, 0.69, 0.32))
+	var sparks := CPUParticles3D.new()
+	sparks.emitting = false
+	sparks.mesh = _spark_mesh
+	sparks.amount = 12 if crit else 6
+	sparks.one_shot = true
+	sparks.explosiveness = 1.0
+	sparks.lifetime = 0.32
+	sparks.local_coords = false
+	sparks.direction = (dir.normalized() + Vector3.UP).normalized()
+	sparks.spread = 64 if crit else 44
+	sparks.gravity = Vector3.DOWN * 8
+	sparks.initial_velocity_min = 1.7
+	sparks.initial_velocity_max = 4.3 if crit else 3.0
+	sparks.particle_flag_align_y = true
+	sparks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(sparks)
+	sparks.global_position = pos
+	sparks.finished.connect(sparks.queue_free)
+	sparks.emitting = true
 
 
 ## A column of fire or light.

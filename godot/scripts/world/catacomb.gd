@@ -220,9 +220,8 @@ func _decorate(level: Node3D, room: Dictionary, rng: RandomNumberGenerator) -> v
 					B.cylinder(0.55, 0.65, 2.6, stone, p + Vector3(0, 1.3, 0), level, 8)
 					B.box(Vector3(1.5, 0.3, 1.5), stone, p + Vector3(0, 0.15, 0), level)
 				"ossuary":
-					var sarc := B.box(Vector3(1.0, 0.8, 1.8), B.mat(Color(0.3, 0.27, 0.26)), p + Vector3(0, 0.4, 0), level)
+					var sarc := preload("res://scripts/models/props_model.gd").sarcophagus(level, p)
 					sarc.rotation.y = rng.randi_range(0, 1) * PI * 0.5
-					B.sphere(0.16, B.mat(Color(0.75, 0.7, 0.6)), p + Vector3(0.2, 0.9, 0.3), level, 6)
 	# scattered bones and candles
 	for i in rng.randi_range(2, 5):
 		var c := grid.random_floor_near(room["center"], 3, rng)

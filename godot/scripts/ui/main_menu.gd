@@ -12,6 +12,7 @@ var _buttons: VBoxContainer
 var _busy := false
 var _ember_t := 0.0
 var _glow: TextureRect
+var _portrait := TextureRect.new()
 
 
 func _ready() -> void:
@@ -39,10 +40,17 @@ func _ready() -> void:
 	_glow.stretch_mode = TextureRect.STRETCH_SCALE
 	add_child(_glow)
 
+	_portrait.anchor_right = 0.43
+	_portrait.anchor_bottom = 1.0
+	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_portrait)
+	_show_portrait(str(Boot.character.get("heroClass", "warrior")))
 	var col := VBoxContainer.new()
 	col.set_anchors_preset(Control.PRESET_CENTER)
-	col.anchor_left = 0.5
-	col.anchor_right = 0.5
+	col.anchor_left = 0.67
+	col.anchor_right = 0.67
 	col.anchor_top = 0.5
 	col.anchor_bottom = 0.5
 	col.offset_left = -300
@@ -116,7 +124,16 @@ func _show_buttons() -> void:
 				_start()
 			)
 			b.custom_minimum_size = Vector2(560, 0)
+			b.mouse_entered.connect(_show_portrait.bind(c))
+			b.focus_entered.connect(_show_portrait.bind(c))
+	_add_button("Field guide", func(): get_tree().change_scene_to_file("res://scenes/field_guide.tscn"))
 	_add_button("Quit", func(): Game.quit_game())
+
+
+func _show_portrait(id: String) -> void:
+	if id not in ["warrior", "rogue", "pyromancer"]:
+		id = "warrior"
+	_portrait.texture = load("res://art/field_guide/previews/%s.jpg" % id)
 
 
 func _add_button(text: String, cb: Callable) -> Button:

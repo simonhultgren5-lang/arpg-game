@@ -4,6 +4,7 @@ extends CharacterBody3D
 ## E talks or uses the nearest thing.
 
 const B = preload("res://scripts/world/build.gd")
+const WarriorModel = preload("res://scripts/models/warrior_model.gd")
 const Fx = preload("res://scripts/world/fx.gd")
 const Projectile = preload("res://scripts/actors/projectile.gd")
 
@@ -35,6 +36,7 @@ var _step_t := 0.0
 
 func setup() -> void:
 	cls = Game.class_data
+	ActAudio.voice(self, Game.hero_class)
 	add_to_group("player")
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	collision_layer = 2
@@ -64,26 +66,19 @@ func _build_model() -> void:
 	var skin := B.mat(Color(0.72, 0.58, 0.5))
 	var steel := B.mat(Color(0.7, 0.7, 0.75), 0.3, Color.BLACK, 1.0, 0.85)
 	var gold := B.mat(B.GOLD, 0.35, Color.BLACK, 1.0, 0.8)
+	_weapon = Node3D.new()
+	_weapon.position = Vector3(0.38, 1.25, 0.05)
+	_model.add_child(_weapon)
+	if Game.hero_class == "warrior":
+		WarriorModel.build(_model, _body_mat, _weapon)
+		return
 	# legs, body, head
 	for side in [-0.15, 0.15]:
 		B.box(Vector3(0.18, 0.8, 0.2), dark, Vector3(side, 0.4, 0), _model)
 	B.capsule(0.32, 1.0, _body_mat, Vector3(0, 1.15, 0), _model)
 	B.sphere(0.21, skin, Vector3(0, 1.82, 0), _model, 10)
 	B.box(Vector3(0.5, 0.08, 0.35), gold, Vector3(0, 0.88, 0), _model)  # belt
-	_weapon = Node3D.new()
-	_weapon.position = Vector3(0.38, 1.25, 0.05)
-	_model.add_child(_weapon)
 	match Game.hero_class:
-		"warrior":
-			B.sphere(0.24, steel, Vector3(0, 1.88, 0), _model, 10)  # helm
-			B.box(Vector3(0.36, 0.06, 0.1), B.mat(Color(0.02, 0.02, 0.02)), Vector3(0, 1.84, 0.2), _model)
-			for side in [-0.38, 0.38]:
-				B.sphere(0.17, steel, Vector3(side, 1.55, 0), _model, 8)
-			var blade := B.box(Vector3(0.08, 1.15, 0.16), steel, Vector3(0, 0.55, 0.0), _weapon)
-			blade.name = "Blade"
-			B.box(Vector3(0.38, 0.07, 0.1), gold, Vector3(0, 0.0, 0), _weapon)
-			B.box(Vector3(0.12, 0.8, 0.65), _body_mat, Vector3(-0.45, 1.15, 0.12), _model)  # shield
-			B.sphere(0.09, gold, Vector3(-0.52, 1.15, 0.12), _model, 6)
 		"pyromancer":
 			B.cylinder(0.0, 0.3, 0.55, _body_mat, Vector3(0, 2.0, -0.03), _model, 10)  # hood
 			B.cylinder(0.32, 0.48, 0.9, _body_mat, Vector3(0, 0.55, 0), _model, 10)  # robe
@@ -296,6 +291,9 @@ func _animate(delta: float) -> void:
 	_swing = maxf(0.0, _swing - delta * 5.0)
 	var s := sin((1.0 - _swing) * PI) if _swing > 0.0 else 0.0
 	match Game.hero_class:
+		"warrior":
+			_weapon.rotation.x = -0.3 + s * 1.65
+			_weapon.rotation.z = s * 0.65
 		"pyromancer":
 			_weapon.rotation.x = 0.15 - s * 0.9
 		_:
@@ -319,6 +317,7 @@ func roll_damage(mult: float) -> Array:
 func _basic_attack(at: Vector3) -> void:
 	var basic: Dictionary = cls["basic"]
 	attack_cd = basic["cooldown"]
+	ActAudio.spell(self, basic["id"])
 	_swing = 1.0
 	var dir := at - global_position
 	dir.y = 0.0
@@ -369,6 +368,7 @@ func cast_skill(i: int) -> void:
 	var dist := dir.length()
 	dir = dir.normalized() if dist > 0.01 else facing()
 	mana -= float(sk["mana"])
+	ActAudio.spell(self, sk["id"])
 	skill_cd[i] = sk["cooldown"]
 	_swing = 1.0
 	_face(dir, 1.0)

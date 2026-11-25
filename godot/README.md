@@ -2,7 +2,7 @@
 
 A three-quarter 3D rebuild of Depths of Darkness in Godot 4 (GDScript). This folder is a playable **vertical slice of Act I**: the cursed town of Hollowmere, a procedurally assembled crypt beneath it, and the first boss. The 2D game in `game/` keeps shipping until this version replaces it.
 
-Everything visible is built from primitive meshes, lights and fog at runtime: there are no downloaded assets. The only art files are the emblem (`art/emblem.svg`) and the boot splash rendered from it (`art/splash.png`).
+The Warrior, Hollow, Bone Archer, torch sconces, barrels and sarcophagi use original procedural meshes from `scripts/models/`. The rest of the world uses runtime-built primitives, lights and fog. Open **Field guide** on the title screen to browse 13 original Act I illustrations. The portrait-format 4K editions in `art/field_guide/` were resampled from 941 × 1672 generated paintings. Hero selection and dialogue use smaller portrait textures.
 
 ## Run it
 
@@ -29,6 +29,8 @@ godot --headless --path godot res://tests/smoke_test.tscn
 
 `res://tests/screenshots.tscn` renders a few screenshots into a folder (needs a window): `godot --path godot res://tests/screenshots.tscn -- --out C:\temp\shots --class rogue`.
 
+Preview the procedural assets with `godot --path godot res://tests/model_gallery.tscn` from the repository root. Add `-- --out C:/temp/gallery` to save the rendered lineup. Include `--effects` after `--` to capture a melee strike and hit sparks.
+
 ## Controls
 
 | Input | Action |
@@ -46,13 +48,13 @@ godot --headless --path godot res://tests/smoke_test.tscn
 | Mouse wheel | Zoom |
 | H | Show or hide the controls help |
 | Esc | Close a panel, or pause (save and return to title, save and quit) |
-| 1–9 in a dialogue | Pick a reply |
+| 1Ã¢â‚¬â€œ9 in a dialogue | Pick a reply |
 
 ## The slice
 
 - **Classes** (from the 2D game): **Warrior** (Grave Cleave; Earthsplitter stun slam, Iron Rush charge), **Pyromancer** (Ember Bolt; Cinder Nova knockback ring, Pyre delayed fire pillar with burning ground) and **Rogue** (Twin Cuts; Knife Fan, Veilstep blink with a guaranteed critical hit). The armor color chosen in the launcher tints the hero.
 - **Hollowmere** (town hub): Sister Maud (quest giver), Edda the smith (sells draughts), Old Corwin the gravedigger (lore, a gift charm), St. Aldric's chapel, the graveyard and the Mausoleum Gate down to the crypt.
-- **The Sunken Crypt**: a new layout every visit. Rooms on a 4×4 slot grid are chained by a random walk from the entry stairs to the bell-pit, with side rooms branching off; each room is one of four tiles (hall, pillared nave, ossuary, flooded chapel). Torch-lit, with Hollows and Grave Crawlers (melee), Bone Archers (ranged) and elite packs.
+- **The Sunken Crypt**: a new layout every visit. Rooms on a 4Ãƒâ€”4 slot grid are chained by a random walk from the entry stairs to the bell-pit, with side rooms branching off; each room is one of four tiles (hall, pillared nave, ossuary, flooded chapel). Torch-lit, with Hollows and Grave Crawlers (melee), Bone Archers (ranged) and elite packs.
 - **Boss: Hask, the Bell-Warden**: telegraphed bell tolls, summons the dead at half health, enrages at a quarter. Drops the Black Clapper and opens a portal home.
 - **Quest "The Silent Bell"**: talk to Maud, descend, slay Hask, bring the clapper back. Rewards gold, XP and an item.
 - **Progression**: XP and level-ups (life, resource and damage grow), gold, draughts, and random gear (weapon, armor, charm) in four rarities: Worn, Hallowed, Cursed, Relic.
@@ -87,7 +89,7 @@ Boot file contents:
 | Field | Required | Notes |
 | --- | --- | --- |
 | `id` | yes | Character id (string or number). Online: the server's character id. Offline: the launcher's local character id. |
-| `name` | yes | 2–18 characters. |
+| `name` | yes | 2Ã¢â‚¬â€œ18 characters. |
 | `heroClass` | yes | `warrior`, `pyromancer` or `rogue` (anything else falls back to `warrior`). |
 | `color` | no | Armor color as `#rrggbb`. Default `#8d3430`. |
 | `serverUrl` | online only | Base URL of the game server, no trailing slash. |
