@@ -5,7 +5,7 @@ extends Node
 ## Online:  GET/PUT <serverUrl>/api/characters/<id>/save with "Authorization: Bearer <token>".
 ##          The server only keeps string values under keys starting with "dod", so the blob is sent as
 ##          {"data": {"dod3d": "<progress JSON>"}, "meta": {"heroLevel": n, "depth": n}}.
-##          A local copy is kept as user://saves/online-<id>.json in case the server is unreachable.
+##          A local copy is kept as user://saves/online-<server hash>-<id>.json in case the server is unreachable.
 
 signal status_changed(text: String)
 
@@ -19,7 +19,9 @@ var _pending := 0
 func _local_path() -> String:
 	var id := str(Boot.character.get("id", "unknown")).validate_filename()
 	if Boot.is_online():
-		id = "online-" + id
+		# Character ids are only unique per server, so the server is part of the name.
+		# The launcher builds the same name (electron/characters.cjs) to delete it with the character.
+		id = "online-%s-%s" % [Boot.server_url.md5_text().left(8), id]
 	return "%s/%s.json" % [SAVE_DIR, id]
 
 
@@ -42,15 +44,31 @@ func load_progress() -> Dictionary:
 		return local
 	var save = body.get("save")
 	if save == null:
-		return {}  # a brand-new character on the server
+		return _adopt_old_copy()  # a new character on the server, or progress that never reached it
 	if save is Dictionary and save.get("data") is Dictionary:
 		var blob = save["data"].get(SAVE_KEY)
 		if blob is String:
 			var parsed = JSON.parse_string(blob)
 			if parsed is Dictionary:
 				return parsed
-	# The character exists but has no 3D progress yet (for example a hero from the 2D game).
-	return {}
+	# The character exists but has no game progress yet (for example a hero from the 2D game).
+	return _adopt_old_copy()
+
+
+## Before 0.4.0 the local copy of an online hero was "online-<id>.json", without the server. Until
+## 0.3.3 that copy was often the only one (saves to .local servers failed), so when the server has no
+## progress for the hero, pick it up once: it moves to the new name and goes up with the next save.
+func _adopt_old_copy() -> Dictionary:
+	var old := "%s/online-%s.json" % [SAVE_DIR, str(Boot.character.get("id", "unknown")).validate_filename()]
+	if not FileAccess.file_exists(old):
+		return {}
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(old))
+	if not (parsed is Dictionary):
+		return {}
+	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	DirAccess.rename_absolute(old, _local_path())
+	_status("Restored this hero's progress from this PC.")
+	return parsed
 
 
 func save_progress(progress: Dictionary) -> void:

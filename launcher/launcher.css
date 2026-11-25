@@ -237,10 +237,6 @@ legend{padding:0;margin-bottom:6px;font:600 10px var(--body);letter-spacing:.14e
 .play-btn:disabled{border-color:var(--edge-2);background:#1b1524;box-shadow:none;color:var(--dim)}
 .play-btn:disabled small{color:var(--faint)}
 .play-btn.busy #playLabel::after{content:"";display:inline-block;width:14px;height:14px;margin-left:10px;vertical-align:-1px;border:2px solid #fff2de55;border-top-color:#fff2de;border-radius:50%;animation:spin .8s linear infinite}
-.play-3d{display:flex;align-items:center;justify-content:center;gap:9px;min-height:36px;border:1px solid var(--edge-2);border-radius:7px;background:#1b1524;color:var(--text);font:600 12px var(--body);letter-spacing:.1em;text-transform:uppercase}
-.play-3d:hover:not(:disabled){border-color:var(--gold-2);color:var(--gold);box-shadow:0 0 18px #e3b67e33}
-.play-3d:disabled{opacity:.5}
-.tag-preview{padding:1px 7px;border:1px solid #bc90bd88;border-radius:999px;color:#d8b6dc;font:700 9px var(--body);letter-spacing:.14em}
 .link-btn{align-self:center;padding:4px 6px;border:0;background:none;color:var(--dim);font-size:12px;text-decoration:underline;text-underline-offset:3px}
 .link-btn:hover{color:var(--gold)}
 

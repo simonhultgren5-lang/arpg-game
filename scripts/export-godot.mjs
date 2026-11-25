@@ -1,4 +1,4 @@
-// Exports the 3D game (godot/) to godot/build/DepthsOfDarkness.exe, which the installer bundles.
+// Exports the game (godot/) to godot/build/DepthsOfDarkness.exe, which the installer bundles.
 //
 //   bun run godot:export
 //
@@ -36,7 +36,7 @@ if (!godot) {
   console.error('\n✗ Godot not found. Set GODOT to the Godot .exe, for example:\n  $env:GODOT="C:\\Tools\\Godot_v4.7.2-stable_win64_console.exe"\n');
   process.exit(1);
 }
-console.log(`Exporting the 3D game with ${godot}`);
+console.log(`Exporting the game with ${godot}`);
 fs.mkdirSync(path.dirname(output), { recursive: true });
 fs.rmSync(output, { force: true });
 // Import first so a fresh checkout (no .godot/ cache) exports every resource.

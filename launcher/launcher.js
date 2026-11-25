@@ -79,25 +79,25 @@
   else film.addEventListener('canplay', playBackground, { once: true });
 
   // ---------------------------------------------------------------- classes & colors
-  // Same classes, colors and starting kit as the game (game/js/06-onboarding-sanctuary.js).
+  // Same classes and skills as the game (godot/scripts/data/classes.gd).
   const CLASSES = {
     warrior: {
       name: 'Warrior',
-      role: 'Melee · Swords, Whirlwind & Bleed',
+      role: 'Melee · Grave Cleave, Earthsplitter & Iron Rush',
       lore: 'A sworn blade of the fallen watch. Wades into the horde, shield first, and leaves it bleeding.',
       // crossed sword over a heater shield
       icon: '<path d="M32 6 52 13v15c0 13-8.5 22-20 30C20.5 50 12 41 12 28V13Z" class="e-fill"/><path d="M32 6 52 13v15c0 13-8.5 22-20 30C20.5 50 12 41 12 28V13Z" class="e-line"/><path d="m21 43 22-26m-4-3 6 6m-23 18-3 3m4 1-6-6" class="e-line e-bright"/>',
     },
     pyromancer: {
       name: 'Pyromancer',
-      role: 'Ranged · Fire Spells & Blink',
+      role: 'Ranged · Ember Bolt, Cinder Nova & Pyre',
       lore: 'Bargained with the ember beneath the world. Burns whole crypts clean from a safe distance.',
       // flame inside a rune circle
       icon: '<circle cx="32" cy="34" r="22" class="e-fill"/><circle cx="32" cy="34" r="22" class="e-line" stroke-dasharray="3 4"/><path d="M32 12c3 9 13 13 13 25a13 13 0 0 1-26 0c0-7 4-10 6-15 1 4 3 6 5 7-1-6 0-11 2-17Z" class="e-line e-bright"/><path d="M32 33c2 4 5 5 5 9a5 5 0 0 1-10 0c0-3 3-5 5-9Z" class="e-line"/>',
     },
     rogue: {
-      name: 'Shadow Rogue',
-      role: 'Fast · Twin Blades, Crit & Dodge',
+      name: 'Rogue',
+      role: 'Fast · Twin Cuts, Knife Fan & Veilstep',
       lore: 'Paid in coin, loyal to nothing. Strikes from the dark between torches and is gone again.',
       // twin daggers under a crescent
       icon: '<path d="M44 8a22 22 0 1 0 12 30A18 18 0 1 1 44 8Z" class="e-fill"/><path d="M44 8a22 22 0 1 0 12 30A18 18 0 1 1 44 8Z" class="e-line"/><path d="m18 50 18-20m-3-3 6 6M18 50l-4 4m28-4L28 34m-2 6 6-6m10 16 4 4" class="e-line e-bright"/>',
@@ -142,7 +142,7 @@
   let busy = false;
   let upd = null; // update status from electron/updates.cjs
   let playAction = 'play'; // 'play' | 'install-launcher' | 'open-releases'
-  let has3d = false; // the 3D preview (godot/) is installed with this launcher
+  let gameInstalled = true; // the game export (godot/) ships with the launcher
   let playError = '';
 
   function readPref(key) {
@@ -428,48 +428,20 @@
       sub = playError;
       enabled = false;
     }
-    // Updates take priority over playing.
     playAction = 'play';
-    const game = upd?.game;
-    if (game && ['downloading', 'installing'].includes(game.state)) {
-      label = 'Updating';
-      sub = game.state === 'installing'
-        ? `Installing v${game.latest}…`
-        : `Downloading v${game.latest} · ${Math.round(game.progress * 100)}%`;
+    if (!gameInstalled) {
+      sub = 'The game is missing. Reinstall Depths of Darkness.';
       enabled = false;
-    } else if (game?.state === 'needs-launcher') {
-      label = 'Update';
-      if (upd.launcher.state === 'ready') {
-        sub = `Restart to install v${game.latest}`;
-        enabled = true;
-        playAction = 'install-launcher';
-      } else if (upd.launcher.state === 'manual') {
-        sub = `Download v${game.latest} to keep playing online`;
-        enabled = true;
-        playAction = 'open-releases';
-      } else if (upd.launcher.state === 'downloading') {
-        sub = `Downloading the new launcher… ${Math.round((upd.launcher.progress || 0) * 100)}%`;
-        enabled = false;
-      } else {
-        // The patch needs a newer launcher than any published one: send the player to the download page.
-        sub = `Get the new launcher to install v${game.latest}`;
-        enabled = true;
-        playAction = 'open-releases';
-      }
     }
     if (busy) {
       label = 'Loading';
-      sub = mode === 'offline' ? 'Starting…' : 'Downloading your hero…';
+      sub = mode === 'offline' ? 'Starting…' : 'Connecting…';
       enabled = false;
     }
     $('playLabel').textContent = label;
     $('playSub').textContent = sub;
     btn.disabled = !enabled;
-    // The 3D preview plays the same character; only when the normal Play would work too.
-    $('btnPlay3d').hidden = !has3d;
-    $('btnPlay3d').disabled = !(enabled && playAction === 'play' && currentCharacter());
-    btn.classList.toggle('busy', busy || ['downloading', 'installing'].includes(game?.state));
-    $('btnOffline').disabled = Boolean(game && ['downloading', 'installing'].includes(game.state));
+    btn.classList.toggle('busy', busy);
   }
 
   // ---------------------------------------------------------------- updates
@@ -666,17 +638,13 @@
   function renderUpdates() {
     if (!upd) return;
     const { game, launcher } = upd;
-    $('versionLabel').textContent = `Game v${game.current} · Launcher v${launcher.current}`;
+    $('versionLabel').textContent = `v${launcher.current}`;
     $('updateState').textContent =
       {
         disabled: 'Updates are off when running from source',
         checking: 'Checking for updates…',
         'up-to-date': 'Up to date',
-        updated: `Updated to v${game.current}`,
-        downloading: 'Updating…',
-        installing: 'Updating…',
-        'needs-launcher': 'Launcher update needed',
-        error: game.latest && game.latest !== game.current ? 'Update failed' : 'Could not check for updates',
+        error: 'Could not check for updates',
       }[game.state] || '';
 
     const card = $('updateCard');
@@ -700,29 +668,12 @@
       title = `Version ${launcher.latest} is out`;
       notes = launcher.notes;
       actions.append(updateButton('Download', () => api.openReleasesPage()));
-    } else if (['downloading', 'installing'].includes(game.state)) {
-      label = 'Updating';
-      title = `Updating to v${game.latest}`;
-      notes = game.notes;
-      progress = game.state === 'installing' ? 1 : game.progress;
-    } else if (game.state === 'needs-launcher') {
-      label = 'Update';
-      title = `v${game.latest} needs the new launcher`;
-      notes = game.notes;
-      if (launcher.state === 'downloading') progress = launcher.progress;
     } else if (game.state === 'error') {
       label = 'Update';
       title = 'Update problem';
       error = game.error;
       tone = 'problem';
-      actions.append(updateButton(game.latest && game.latest !== game.current ? 'Retry update' : 'Check again', () =>
-        game.latest && game.latest !== game.current ? api.retryGameUpdate() : api.checkForUpdates(),
-      ));
-    } else if (game.state === 'updated') {
-      label = "What's new";
-      title = `Updated to v${game.current}`;
-      notes = game.notes;
-      tone = 'ready';
+      actions.append(updateButton('Check again', () => api.checkForUpdates()));
     } else if (launcher.state === 'downloading') {
       label = 'Launcher update';
       title = `Downloading launcher v${launcher.latest}`;
@@ -898,21 +849,6 @@
       showPlayError(result.error);
       if (!scope.offline) await check(scope.serverId);
     }
-    render();
-  });
-  $('btnPlay3d').addEventListener('click', async () => {
-    const scope = currentScope();
-    const character = currentCharacter();
-    if (!scope || !character || busy) return;
-    busy = true;
-    renderPlay();
-    const result = await api.play(
-      scope.offline
-        ? { engine: '3d', offline: true, characterId: character.id }
-        : { engine: '3d', serverId: scope.serverId, characterId: character.id },
-    );
-    busy = false;
-    if (result?.error) showPlayError(result.error);
     render();
   });
   $('btnOffline').addEventListener('click', async () => {
@@ -1149,21 +1085,17 @@
     state = await api.getState();
     upd = await api.getUpdateStatus();
     api.onUpdateStatus((next) => {
-      const justUpdated = next.game.state === 'updated' && upd?.game.state !== 'updated';
-      const newRelease =
-        (next.game.latest && next.game.latest !== upd?.game.latest) ||
-        (next.launcher.latest && next.launcher.latest !== upd?.launcher.latest);
+      const newRelease = next.launcher.latest && next.launcher.latest !== upd?.launcher.latest;
       upd = next;
       if (newRelease) loadPatchNotes();
       renderUpdates();
       renderNotesCard();
       renderPlay();
-      if (justUpdated) loadPatchNotes();
     });
     setAuthMode('login');
-    has3d = Boolean((await api.get3dStatus?.())?.available);
-    api.onGameClosed?.(() => {
-      // Back from the 3D game: refresh the character list.
+    gameInstalled = Boolean((await api.getGameStatus())?.installed);
+    api.onGameClosed(() => {
+      // Back from the game: refresh the character list (levels may have changed).
       if (mode === 'offline') loadOfflineCharacters();
       else checkAll();
     });

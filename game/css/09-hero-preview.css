@@ -1,7 +1,0 @@
-#classStart .heroPreview{position:relative;overflow:hidden}
-#classStart .heroPreview :is(#creatorFigure,#creatorWeapon){display:none}
-.hero-preview-action{position:absolute;inset:0;border:0;background:transparent;padding:0;width:100%;height:100%;cursor:pointer}
-.hero-preview-action:hover{background:#eac7f30a}
-.hero-preview-action canvas{display:block;width:100%;height:100%;object-fit:contain}
-.hero-preview-action:focus-visible{outline:2px solid #ffd495;outline-offset:-4px}
-.hero-preview-caption{position:absolute;left:0;right:0;bottom:6px;color:#e0c7d1;font:10px system-ui;text-shadow:0 1px 5px #100c16;pointer-events:none}

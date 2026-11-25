@@ -9,6 +9,16 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.4.0
+
+### New
+- **Depths of Darkness is now a 3D game.** Act I, The Tolling of Hollowmere, is the game: press **Play** in the launcher to walk into Hollowmere with your character. The old 2D game is gone.
+- Your characters keep their name, class and armor colour, and start their story in Hollowmere. Progress from the 2D game doesn't carry over.
+
+### Changes
+- The launcher has a single **Play** button, and the character list shows each hero's level and depth in the 3D game.
+- Updates now come as one download that brings the launcher and the game together.
+
 ## 0.3.3 (2026-11-25)
 
 ### New

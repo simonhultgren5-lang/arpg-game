@@ -1,6 +1,6 @@
-# Depths of Darkness: Godot 4 (3D) version
+# Depths of Darkness: the game (Godot 4)
 
-A three-quarter 3D rebuild of Depths of Darkness in Godot 4 (GDScript). This folder is a playable **vertical slice of Act I**: the cursed town of Hollowmere, a procedurally assembled crypt beneath it, and the first boss. The 2D game in `game/` keeps shipping until this version replaces it.
+Depths of Darkness is a three-quarter 3D action RPG made with Godot 4 (GDScript). This folder is the whole game. **Act I** is playable: the cursed town of Hollowmere, a procedurally assembled crypt beneath it, and the first boss. The launcher (`launcher/` + `electron/`, see the root README) starts it with the player's character.
 
 The Warrior, Hollow, Bone Archer, the townsfolk (Sister Maud, Edda, Old Corwin), torch sconces, barrels and sarcophagi use original procedural meshes from `scripts/models/`. The rest of the world uses runtime-built primitives, lights and fog. Open **Field guide** on the title screen to browse 13 original Act I illustrations. The portrait-format 4K editions in `art/field_guide/` were resampled from 941 × 1672 generated paintings. Hero selection and dialogue use smaller portrait textures.
 
@@ -52,7 +52,7 @@ Preview the procedural assets with `godot --path godot res://tests/model_gallery
 
 ## The slice
 
-- **Classes** (from the 2D game): **Warrior** (Grave Cleave; Earthsplitter stun slam, Iron Rush charge), **Pyromancer** (Ember Bolt; Cinder Nova knockback ring, Pyre delayed fire pillar with burning ground) and **Rogue** (Twin Cuts; Knife Fan, Veilstep blink with a guaranteed critical hit). The armor color chosen in the launcher tints the hero.
+- **Classes:** **Warrior** (Grave Cleave; Earthsplitter stun slam, Iron Rush charge), **Pyromancer** (Ember Bolt; Cinder Nova knockback ring, Pyre delayed fire pillar with burning ground) and **Rogue** (Twin Cuts; Knife Fan, Veilstep blink with a guaranteed critical hit). The armor color chosen in the launcher tints the hero.
 - **Hollowmere** (town hub): Sister Maud (quest giver), Edda the smith (sells draughts), Old Corwin the gravedigger (lore, a gift charm), St. Aldric's chapel, the graveyard and the Mausoleum Gate down to the crypt.
 - **The Sunken Crypt**: a new layout every visit. Rooms on a 4Ãƒâ€”4 slot grid are chained by a random walk from the entry stairs to the bell-pit, with side rooms branching off; each room is one of four tiles (hall, pillared nave, ossuary, flooded chapel). Torch-lit, with Hollows and Grave Crawlers (melee), Bone Archers (ranged) and elite packs.
 - **Boss: Hask, the Bell-Warden**: telegraphed bell tolls, summons the dead at half health, enrages at a quarter. Drops the Black Clapper and opens a portal home.
@@ -117,7 +117,7 @@ The game keeps the hero's progress as **one JSON object** (level, XP, gold, drau
   }
   ```
 
-  On load the game reads `save.data.dod3d`. A character with no `dod3d` yet starts fresh in the 3D game. A copy is also kept in `user://saves/online-<id>.json`; if the server can't be reached, the game plays from that copy and says so in the bottom-left corner.
+  On load the game reads `save.data.dod3d`. A character with no `dod3d` yet starts fresh (for example a hero made before 0.4.0, when the game was 2D). A copy is also kept in `user://saves/online-<server>-<id>.json` (`<server>` is the first 8 hex digits of the MD5 of the server URL); if the server can't be reached, the game plays from that copy and says so in the bottom-left corner.
 - On quit the game waits up to 4 seconds for the last online save to finish.
 - For `http://` servers the game looks up the host name's IPv4 address once and connects to that. Names like `raspberrypi.local` often resolve to an IPv6 link-local address first, which Godot can't connect to. `https://` URLs keep the name for the certificate check.
 
@@ -125,9 +125,9 @@ The game keeps the hero's progress as **one JSON object** (level, XP, gold, drau
 
 ### How the launcher runs it
 
-- **Export:** `bun run godot:export` (repo root) exports the **Windows Desktop** preset in `export_presets.cfg` to `build/DepthsOfDarkness.exe`. The installer bundles it as `resources/game3d/DepthsOfDarkness.exe`.
-- **Launch:** the launcher's **Play Act I in 3D** button writes the boot file to `<launcher userData>/boot-character.json`, starts the exe, hides itself, and comes back (refreshing the character list) when the game exits. The boot file is deleted then. See `play3d()` in `electron/main.cjs`.
-- **Saves:** the server merges a character's save instead of replacing it: a write with only `dod3d*` keys replaces the 3D keys and keeps the 2D game's keys, and the other way round. 3D writes don't change the level and depth the launcher shows. The launcher only starts the 3D game online when the server's `/api/status` lists the `save-merge` feature.
+- **Export:** `bun run godot:export` (repo root) exports the **Windows Desktop** preset in `export_presets.cfg` to `build/DepthsOfDarkness.exe`. The installer bundles it as `resources/game/DepthsOfDarkness.exe`.
+- **Launch:** the launcher's **Play** button writes the boot file to `<launcher userData>/boot-character.json`, starts the exe, hides itself, and comes back (refreshing the character list) when the game exits. The boot file is deleted then. See `launchGame()` in `electron/main.cjs`.
+- **Saves:** the server keeps the `dod3d` key apart from anything an old 2D launcher (before 0.4.0) might still write, so neither can erase the other. The `meta` level and depth of the game's saves are what the launcher's character list shows. Offline, the launcher reads level and depth from `user://saves/<id>.json`, and deletes a character's save file when the character is deleted. The launcher only starts the game online when the server's `/api/status` lists the `save-merge` feature.
 
 ## Layout
 

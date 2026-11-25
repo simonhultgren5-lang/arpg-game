@@ -1,22 +1,18 @@
 # Depths of Darkness
 
-A dark fantasy top-down dungeon crawler. Pick a Warrior, Pyromancer or Shadow Rogue, descend through procedural depths, fight a boss every third floor, and build your hero with talents, gear and crafting.
+A grim gothic action RPG in 3D. Pick a Warrior, Pyromancer or Rogue, walk out of the fog into the cursed town of Hollowmere, and descend into the crypt beneath it.
 
-The game ships two ways from the same source:
+The game is made with **Godot 4** in [`godot/`](godot/README.md). It ships as a Windows app with a **launcher** (`launcher/` + `electron/`): pick a server, log in or register, pick one of your characters, and press Play. Accounts and saves live on the **game server** in [`game-server/`](game-server/README.md), which you host yourself (for now on a Raspberry Pi on your home network). The launcher can also play offline with characters stored on the PC.
 
-| Build | What it is | Saves |
-| --- | --- | --- |
-| **Desktop app** (`.exe`) | Windows game with a launcher: pick a server, log in or register, then play fullscreen. | Your account on the game server, or local when playing offline |
-| **Website** | The game inside a web page with Google login, cloud saves and leaderboards. | Local + cloud when signed in |
-
-The desktop app talks to the **game server** in [`game-server/`](game-server/README.md), which you host yourself (for now on a Raspberry Pi on your home network).
+The story is planned in four acts ([godot/story/ACTS.md](godot/story/ACTS.md)). Act I is playable.
 
 ---
 
 ## Requirements
 
-- **Node.js 20 or newer** (developed on Node 24): <https://nodejs.org>
+- **Node.js 22 or newer** (developed on Node 24): <https://nodejs.org>
 - **Bun** (recommended, the repo uses `bun.lock`) or npm, which comes with Node
+- **Godot 4.7+** with its Windows export templates (in Godot: Editor → Manage Export Templates), to build the game
 - **Windows** to build the `.exe`
 
 ## Quick start
@@ -29,31 +25,33 @@ Then pick what you want to do:
 
 | Goal | Command | Result |
 | --- | --- | --- |
-| Run a game server on this PC | `bun run server` | Accounts and cloud saves on <http://localhost:4100> |
-| Package the server for the Raspberry Pi | `bun run server:pack` | `release/depths-server-<version>.tar.gz` (run it with Docker, see [game-server/README.md](game-server/README.md)) |
-| Play the desktop version from source | `bun run game` | Opens the launcher, then the game |
-| Skip the launcher (offline) | `bun run game:offline` | Opens the game directly with local saves |
+| Work on the game | Open `godot/project.godot` in Godot and press F5 | The title screen offers a test hero of each class |
+| Export the game | `bun run godot:export` | `godot/build/DepthsOfDarkness.exe` |
+| Run the launcher from source | `bun run launcher` | The launcher; **Play** starts the exported game |
+| Run a game server on this PC | `bun run server` | Accounts and saves on <http://localhost:4100> |
+| Package the server for the Raspberry Pi | `bun run server:pack` | `release/depths-server-<version>.tar.gz` (see [game-server/README.md](game-server/README.md)) |
 | Build the Windows `.exe` | `bun run dist` | Installer and portable `.exe` in `release/` |
-| Run the website version | `bun run dev` | <http://localhost:3000> |
 
 (`npm run <script>` works the same as `bun run <script>`.)
 
+`bun run godot:export` finds Godot through the `GODOT` environment variable (path to the Godot `.exe`, the `_console` one is best), `godot` on your PATH, or a Godot download in your Downloads folder.
+
 ## The launcher and accounts
 
-The desktop app opens a launcher first:
-
-- **Server list** with a live online/offline dot and ping for each server. **+** adds a server by address (`192.168.1.50` or `my-pi.local:4100`; port 4100 is assumed). Hover a server and press ✕ to remove it.
+- **Server list** with a live online/offline dot, ping and server version for each server. **+** adds a server by address (`192.168.1.50` or `my-pi.local:4100`; port 4100 is assumed). Hover a server and press ✕ to remove it. When a newer server is released, the server shows **Server update available**.
 - **Log in / Register** for the selected server. Accounts live on that server, so each server has its own accounts.
 - **Characters:** each account has up to **5 characters**. Create one in the launcher (name, class, armor color), select it, and press **Play**. Delete a character by hovering it and pressing ✕, then typing its name to confirm. Double-click a character to play it straight away.
-- **Play** downloads the selected character from the server and starts the game with them. While you play, every save is uploaded in the background. The title screen and pause menu show the account and whether the last save reached the server. **Change Character** on the title screen returns to the launcher.
-- **Play offline** switches the launcher to characters stored on this PC only (also up to 5).
+- **Play** hides the launcher and starts the game with that character. The game loads and saves the hero's progress on the server (see [godot/README.md](godot/README.md), "Launcher contract"). When the game closes, the launcher comes back with the character list refreshed.
+- **Play offline** switches to characters stored on this PC only (also up to 5).
+- **The Act I film** loops behind the launcher; **Watch the Act I film** plays it full size with sound.
 - **What's new** shows the highlights of the newest version, with a NEW badge until the player opens the notes. **Patch notes** (on the card or in the footer) opens every version's notes.
 
-Every character has its own separate save storage on the PC, so switching characters or accounts never overwrites another hero. Heroes from before characters existed show up as the first character, on the server and offline. If the same character plays on two PCs, the most recent upload wins.
+The app icon and logo come from `launcher/assets/emblem.svg` (the game has its own copy in `godot/art/`). After changing it, run `bun run icons` to regenerate `launcher/assets/icon.ico` and `icon.png`.
 
-The app icon and logo come from `game/img/emblem.svg`. After changing it, run `bun run icons` to regenerate `launcher/assets/icon.ico` and `icon.png`.
+**Where things are stored on the PC:**
 
-To host the server on your Raspberry Pi, follow [game-server/README.md](game-server/README.md).
+- The launcher's server list and logins (`launcher.json`) and offline characters (`offline-characters.json`) are in `%APPDATA%\Depths of Darkness\`. Running the launcher from source uses `%APPDATA%\Depths of Darkness (dev)\` instead.
+- The game's saves are in `%APPDATA%\Godot\app_userdata\Depths of Darkness\saves\`: `<id>.json` for an offline hero, and `online-<server>-<id>.json` as a local copy of an online hero.
 
 ## Building the `.exe`
 
@@ -61,155 +59,93 @@ To host the server on your Raspberry Pi, follow [game-server/README.md](game-ser
 bun run dist
 ```
 
-The first build downloads Electron's packaging tools, so it takes a few minutes. When it finishes, `release/` contains:
+This exports the game, then packages the launcher with the game inside (`resources/game/DepthsOfDarkness.exe`). The first build downloads Electron's packaging tools, so it takes a few minutes. When it finishes, `release/` contains:
 
 - `Depths-of-Darkness-Setup-<version>.exe`: installer with Start menu and desktop shortcuts. Updates itself.
-- `Depths-of-Darkness-<version>-portable.exe`: a single file that runs without installing. Gets game patches, but needs a manual download for launcher updates.
+- `Depths-of-Darkness-<version>-portable.exe`: a single file that runs without installing. Needs a manual download for updates.
 - `win-unpacked/`: the unpacked app, handy for quick testing
 
 For a faster test build that only produces `release/win-unpacked/`, run `bun run dist:dir`.
 
-### The 3D preview (`godot/`)
-
-The installer also bundles the 3D version of the game, made with Godot 4 (see [godot/README.md](godot/README.md)). The launcher's **Play Act I in 3D** button starts it with the selected character. `bun run dist` and `bun run release:launcher` export it first with `bun run godot:export`, which needs **Godot 4.7+ with its Windows export templates** (in Godot: Editor → Manage Export Templates). The script finds Godot through the `GODOT` environment variable, `godot` on your PATH, or a Godot download in your Downloads folder.
-
-Online, the 3D preview needs a game server from 0.3.0 or newer: older servers would let a 3D save replace the character's main-game save, so the launcher refuses to start the 3D game there.
-
 ## Version number
 
-The version lives in **one place: `version` in `package.json`**. It shows in the bottom-right corner of the main menu, at the bottom of the pause menu, in the window title, and in the installer's file names.
-
-To bump it when you start a new update:
+The version lives in **one place: `version` in `package.json`**. It shows on the game's title screen, in the launcher, in the game server's status, and in the installer's file names.
 
 ```powershell
-bun run bump:patch   # 0.1.0 -> 0.1.1  (bug fixes)
-bun run bump:minor   # 0.1.0 -> 0.2.0  (new features)
-bun run bump:major   # 0.1.0 -> 1.0.0  (big release)
+bun run bump:patch   # 0.4.0 -> 0.4.1  (bug fixes)
+bun run bump:minor   # 0.4.0 -> 0.5.0  (new features)
+bun run bump:major   # 0.4.0 -> 1.0.0  (big release)
 ```
 
-Each command updates `package.json` and regenerates `game/js/00-version.js`. That file is generated, so don't edit it by hand. If you change `package.json` yourself, `game`, `dist`, `dev` and `build` all re-sync the version automatically, or you can run `bun run version:sync`.
+Each command updates `package.json`, then copies the version into `godot/project.godot` and `game-server/server.mjs`. If you change `package.json` yourself, `launcher`, `dist` and `release` re-sync it automatically, or run `bun run version:sync`.
 
 ## Project structure
 
 ```
-game/                   The game itself: plain HTML, CSS and JavaScript (no build step)
-  index.html            Page markup plus the list of CSS and JS files, in load order
-  css/                  Styles, numbered in load order (01-base.css … 12-menus.css)
-  js/                   Game code, numbered in load order
-    00-version.js       Generated version number (see "Version number")
-    00-session.js       Desktop: which account is playing; loads the downloaded hero first
-    01-core.js          Engine: rendering, combat, enemies, loot, saving
-    02-…17-*.js         Expansions and systems layered on top of the core
-    18-menu-dialog.js   Shared dialog used by every menu
-    19-menu-title.js    Main menu
-    20-menu-in-game.js  Pause menu, Esc handling, hero creation, death screen
-    21-settings.js      In-game Settings screen (desktop and standalone)
-    22-cloud.js         Desktop: uploads saves, account/sync status, Back to Launcher
-  licenses/fonts.txt    Licenses for the embedded fonts
-launcher/               Launcher window: server list, login/register, Play (HTML, CSS, JS)
-electron/               Desktop app wrapper
-  main.cjs              Opens the launcher and game windows, serves files, per-account storage
+godot/                  The game (Godot 4, GDScript); see godot/README.md
+  story/ACTS.md         The four-act story outline
+launcher/               Launcher window: film, servers, login, characters, Play (HTML, CSS, JS)
+  assets/               Emblem, icons, fonts, the Act I film and its captions
+electron/               Desktop app
+  main.cjs              Opens the launcher, starts the game with the chosen character
   servers.cjs           Server list, saved logins (encrypted) and requests to game servers
-  cloud-sync.cjs        Uploads the hero to the server while playing online
-  updates.cjs           Checks GitHub for game patches and launcher updates and installs them
-  preload.cjs           Bridge the game uses for fullscreen, Quit and cloud saves
+  characters.cjs        Offline characters, and the game's save files on this PC
+  updates.cjs           Checks GitHub for new versions and installs them
   launcher-preload.cjs  Bridge the launcher uses
-game-server/            Self-hosted game server (accounts, cloud saves, status); see its README
+game-server/            Self-hosted game server (accounts, saves, status, update.sh); see its README
 scripts/
-  sync-version.mjs      Copies the version from package.json into the game
-  build-game-pak.mjs    Packs game/ into a patch file (depths-game-<version>.pak)
+  sync-version.mjs      Copies the version from package.json into the game and the server
+  export-godot.mjs      Exports the game to godot/build/DepthsOfDarkness.exe
   patch-notes.mjs       Turns CHANGELOG.md into patch-notes.json for the launcher
-  release.mjs           Publishes a release to GitHub (bun run release / release:launcher)
+  release.mjs           Publishes a release to GitHub (bun run release)
   pack-server.mjs       Packages the game server for the Raspberry Pi
+  build-icons.cjs       Renders the emblem into the app icons
 CHANGELOG.md            Patch notes; the launcher shows them to players
-src/                    Website shell (React): login, cloud saves, leaderboard, options
-server.ts               Website server (API + serves game/ at /game)
-release/                Desktop builds (created by `bun run dist`, not committed)
+release/                Builds (created by `bun run dist` and `bun run release`, not committed)
 ```
 
-### How the game code fits together
+## Developing
 
-The files in `game/js/` are **classic scripts that share global variables** (for example `P` for the player, `fl` for the current depth, `save()`). They run in the exact order they are listed in `game/index.html`, and later files extend earlier ones. So:
-
-- **To change existing behavior**, find the file that owns it. Searching for a menu's id (like `titleScreen` or `worldPanel`) or a function name across `game/js/` is the quickest way.
-- **To add a new system**, create a new numbered file (e.g. `game/js/22-my-feature.js`), wrap it in `(()=>{ ... })();` so its own variables stay private, and add a `<script src="js/22-my-feature.js"></script>` line to `game/index.html` after the files it depends on. CSS works the same way with `game/css/`.
-- Don't convert these files to ES modules (`import`/`export`): they rely on shared globals.
-
-## Developing the desktop app
-
-`bun run game` opens the launcher and starts the game windowed so it's easy to work alongside your editor. While running from source:
-
-| Key | Action |
-| --- | --- |
-| `F5` or `Ctrl+R` | Reload the game after editing files in `game/` |
-| `F12` or `Ctrl+Shift+I` | Open DevTools |
-| `F11` or `Alt+Enter` | Toggle fullscreen (also works in the packaged game) |
-
-The installed game starts fullscreen and remembers the player's choice. DevTools and reload shortcuts are disabled in packaged builds.
-
-**Where desktop saves live:** `%APPDATA%\Depths of Darkness\`. Hero progress is in the app's local storage there (one storage area per account under `Partitions\`), the launcher's server list and logins are in `launcher.json`, and window settings are in `window.json`. Running from source uses a separate `%APPDATA%\Depths of Darkness (dev)\` folder, so playtesting never touches your installed game's hero.
-
-## Running the website version
-
-```powershell
-bun run dev
-```
-
-Opens on <http://localhost:3000>. The game also loads on its own at <http://localhost:3000/game/index.html>. When opened directly on localhost it shows the developer-only **Admin Workshop** button; players never see it in the desktop app.
-
-Cloud saves, login and the leaderboard need Firebase and (optionally) PostgreSQL. Copy `.env.example` to `.env` and fill in the values. Without a database the server falls back to an in-memory store, so data resets on restart.
-
-Production build:
-
-```powershell
-bun run build
-$env:NODE_ENV = "production"; bun run start
-```
+- **The game:** open `godot/project.godot` in Godot. Started from the editor, the title screen offers a test hero of each class and saves offline. `godot/README.md` covers the controls, the headless smoke test and the model galleries.
+- **The launcher:** `bun run launcher`. `F5` or `Ctrl+R` reloads it after editing `launcher/`, and `F12` opens DevTools. Changes to `electron/` need a restart. **Play** needs an exported game (`bun run godot:export`).
 
 ## Releasing an update
 
-Players don't download anything by hand. When the launcher starts, it checks your latest GitHub release and updates itself and the game.
-
-| What changed | Command | What players get |
-| --- | --- | --- |
-| Only `game/` (gameplay, menus, balance, art) | `bun run release` | A ~0.6 MB game patch, installed automatically when the launcher opens |
-| `electron/` or `launcher/` too | `bun run release:launcher` | The game patch, plus a new launcher that downloads in the background and installs with **Restart to update** |
-
-Steps:
+Players don't download anything by hand. When the launcher starts (and every few minutes while it's open), it checks your latest GitHub release, downloads the new installer in the background and offers **Restart to update**. The game ships inside the installer, so every release updates both.
 
 1. Bump the version: `bun run bump:patch` (or `minor` / `major`).
-2. Make and test your changes with `bun run game`.
+2. Make and test your changes.
 3. Add a `## <version> (<date>)` section to [CHANGELOG.md](CHANGELOG.md), with optional `### New` / `### Changes` / `### Fixes` subheadings and one `- ` line per change. This is what players read in the launcher's **What's new** card and **Patch Notes** panel.
 4. Commit and push.
-5. Run `bun run release` (or `bun run release:launcher`). It builds the patch, writes the update files and creates the GitHub release `v<version>`. Add `-- --dry-run` to build into `release/upload/` without publishing.
+5. Run `bun run release`. It exports the game, builds the installer, packs the game server, writes the update files and creates the GitHub release `v<version>`. Add `-- --dry-run` to build into `release/upload/` without publishing.
 
 The release script needs the GitHub CLI logged in (`gh auth login`), and it refuses to publish if the version already has a release, the changelog section is missing, or your changes aren't committed and pushed.
 
-**How it works:** every release carries `game-update.json`, `launcher-update.json` and `patch-notes.json` (all of `CHANGELOG.md`). Launchers read them from `https://github.com/<repo>/releases/latest/download/`, so the newest release is always the one players get. A game patch is the whole `game/` folder, checked against its SHA-256 before it's used. It's unpacked to `%APPDATA%\Depths of Darkness\game-versions\` and replaces the bundled game. If a download fails, the launcher keeps the current version and offers **Retry update**. Saves are never touched.
+**How it works:** every release carries `launcher-update.json` (the installer's URL, size and SHA-256), `patch-notes.json` (all of `CHANGELOG.md`), and `server-update.json` with `depths-server-<version>.tar.gz` for game servers. Launchers and servers read them from `https://github.com/<repo>/releases/latest/download/`, so the newest release is always the one players get. Installers are checked against their SHA-256 before they run.
 
-**When the game needs a newer launcher:** if new game code relies on something only a newer launcher provides (for example a new `window.dodDesktop` feature), raise `desktop.minLauncherVersion` in `package.json` and use `release:launcher`. Older launchers then install the launcher update first.
+**Patch notes:** `CHANGELOG.md` is the only place you write them. The launcher bundles a copy (`launcher/patch-notes.json`, generated by `bun run launcher` and `bun run dist`, not committed) so the notes work offline, and downloads the newest copy from the latest release.
 
-**Patch notes:** `CHANGELOG.md` is the only place you write them. The launcher bundles a copy (`launcher/patch-notes.json`, generated by `bun run game` and `bun run dist`, not committed) so the notes work offline. It also downloads the newest copy from the latest release, so a game-only patch brings its notes to every launcher. Preview your notes with `bun run game` before releasing.
-
-**Testing updates locally:** `bun run game` never patches itself. To try the whole flow, serve a folder containing a `.pak` file and a `game-update.json` whose `version` is higher than the current one and whose `url` is just the `.pak` file name (for example with `python -m http.server 5555`). Then start the game with `$env:DOD_UPDATES="1"; $env:DOD_UPDATE_URL="http://127.0.0.1:5555/"; bun run game`.
-
-**First updater release:** the v0.1.0 installer has no updater, so players on it must install the next version once by hand. Make that next release with `bun run release:launcher`. Every update after that arrives through the launcher.
+**Testing updates locally:** the launcher never updates itself when run from source. To try the flow, serve a folder with a `launcher-update.json` whose `version` is higher than the current one, and start the launcher with `$env:DOD_UPDATES="1"; $env:DOD_UPDATE_URL="http://127.0.0.1:5555/"; bun run launcher`.
 
 ## Troubleshooting
 
-- **`bun run game` says Electron failed to install.** Bun skips install scripts for packages it doesn't trust. `electron` is listed in `trustedDependencies`, but if the binary is still missing run `node node_modules/electron/install.js`.
+- **`bun run launcher` says Electron failed to install.** Bun skips install scripts for packages it doesn't trust. `electron` is listed in `trustedDependencies`, but if the binary is still missing run `node node_modules/electron/install.js`.
+- **Play says "Export the game first".** Running from source, the launcher starts `godot/build/DepthsOfDarkness.exe`. Run `bun run godot:export`.
+- **The export fails.** Install Godot's export templates (Editor → Manage Export Templates) for the same Godot version, and point `GODOT` at that Godot.
 - **Windows SmartScreen warns about the `.exe`.** The build isn't code-signed, so Windows doesn't recognize the publisher yet. Choose *More info → Run anyway*. Signing needs a code-signing certificate.
-- **Edits don't show up in the desktop app.** Press `F5` in the game window. Changes to `electron/main.cjs` need a full restart of `bun run game`.
 
 ## Controls
 
-| Key | Action |
+| Input | Action |
 | --- | --- |
-| `W A S D` / arrow keys | Move |
-| Left mouse (hold) | Advance and attack |
-| Right mouse (hold) | Aim while strafing |
-| `1`–`4` | Abilities |
-| `Q` | Health potion |
-| `I` / `K` / `O` / `B` | Bag / Spell book / Atelier / Codex |
-| `M` | Mute |
-| `Esc` | Close panel, or open the pause menu |
+| Left click | Move, attack, or talk to / use what you clicked (hold to keep going) |
+| Shift + left click | Attack toward the cursor without moving |
+| Right click or `1` | First skill · `2` second skill |
+| `Q` | Grave-moss draught (heals) |
+| `W A S D` / arrows | Move directly |
+| `E` | Talk to or use the nearest NPC, gate or stairs |
+| `I` or `C` | Hero and pack |
+| Mouse wheel | Zoom |
+| `Esc` | Close a panel, or pause |
+
+The full list is in [godot/README.md](godot/README.md#controls).

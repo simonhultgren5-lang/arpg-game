@@ -1,7 +1,0 @@
-#killStreak{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 108px);transform:translateX(-50%);z-index:26;display:grid;justify-items:center;gap:3px;pointer-events:none;white-space:nowrap;background:#1a141def;border:1px solid #8c684b;border-radius:5px;padding:6px 12px 8px;color:#ffe1a0}
-#killStreak[hidden]{display:none}
-#killStreak strong{font:700 15px Georgia,serif}
-#killStreak span{font-size:10px;color:#e5cdb0}
-#killStreak span:empty{display:none}
-#killStreak i{position:absolute;height:2px;bottom:0;left:0;right:0;background:#ffd690;transform-origin:left;transform:scaleX(var(--streak-time,0))}
-@media(max-width:760px){#killStreak{top:calc(env(safe-area-inset-top,0px) + 165px)}#killStreak strong{font-size:13px}}
