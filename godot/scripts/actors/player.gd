@@ -5,6 +5,8 @@ extends CharacterBody3D
 
 const B = preload("res://scripts/world/build.gd")
 const WarriorModel = preload("res://scripts/models/warrior_model.gd")
+const RogueModel = preload("res://scripts/models/rogue_model.gd")
+const MageModel = preload("res://scripts/models/mage_model.gd")
 const Fx = preload("res://scripts/world/fx.gd")
 const Projectile = preload("res://scripts/actors/projectile.gd")
 
@@ -69,9 +71,16 @@ func _build_model() -> void:
 	_weapon = Node3D.new()
 	_weapon.position = Vector3(0.38, 1.25, 0.05)
 	_model.add_child(_weapon)
-	if Game.hero_class == "warrior":
-		WarriorModel.build(_model, _body_mat, _weapon)
-		return
+	match Game.hero_class:
+		"warrior":
+			WarriorModel.build(_model, _body_mat, _weapon)
+			return
+		"rogue":
+			RogueModel.build(_model, _body_mat, _weapon)
+			return
+		"pyromancer":
+			MageModel.build(_model, _body_mat, _weapon)
+			return
 	# legs, body, head
 	for side in [-0.15, 0.15]:
 		B.box(Vector3(0.18, 0.8, 0.2), dark, Vector3(side, 0.4, 0), _model)

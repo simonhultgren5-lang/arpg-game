@@ -6,6 +6,8 @@ const Fx = preload("res://scripts/world/fx.gd")
 const Projectile = preload("res://scripts/actors/projectile.gd")
 const HollowModel = preload("res://scripts/models/hollow_model.gd")
 const BoneArcherModel = preload("res://scripts/models/bone_archer_model.gd")
+const CrawlerModel = preload("res://scripts/models/crawler_model.gd")
+const BossModel = preload("res://scripts/models/boss_model.gd")
 
 const KINDS := {
 	"hollow": {"name": "Hollow", "hp": 30, "dmg": 6, "speed": 3.3, "range": 1.6, "cd": 1.3, "windup": 0.45,
@@ -101,30 +103,11 @@ func _build_model(s: float) -> void:
 		"hollow":
 			HollowModel.build(_model, s, col, _m)
 		"crawler":
-			var body := B.sphere(0.45 * s, _m(col), Vector3(0, 0.45 * s, 0), _model, 10)
-			body.scale = Vector3(1.0, 0.6, 1.4)
-			B.sphere(0.22 * s, _m(col.lightened(0.15)), Vector3(0, 0.5 * s, 0.6 * s), _model, 8)
-			for side in [-1.0, 1.0]:
-				B.sphere(0.05 * s, B.mat(Color(1, 0.3, 0.2), 1.0, Color(1, 0.2, 0.1), 4.0), Vector3(side * 0.09 * s, 0.58 * s, 0.78 * s), _model, 4)
-				for j in 2:
-					var leg := B.cylinder(0.03, 0.05, 0.7 * s, _m(col.darkened(0.2)), Vector3(side * 0.45 * s, 0.25 * s, (j - 0.5) * 0.5 * s), _model, 5)
-					leg.rotation.z = side * 1.0
+			CrawlerModel.build(_model, s, col, _m)
 		"archer":
 			BoneArcherModel.build(_model, s, col, _m)
 		"boss":
-			var iron := _m(col)
-			var bell := B.cylinder(0.75, 1.35, 2.3, iron, Vector3(0, 1.4, 0), _model, 14)
-			bell.name = "Bell"
-			B.cylinder(1.4, 1.4, 0.2, _m(col.darkened(0.2)), Vector3(0, 0.3, 0), _model, 14)
-			B.sphere(0.55, _m(col.lightened(0.1)), Vector3(0, 2.85, 0), _model, 12)  # helm
-			B.box(Vector3(0.7, 0.12, 0.2), B.mat(Color(1, 0.4, 0.1), 1.0, Color(1, 0.35, 0.1), 5.0), Vector3(0, 2.85, 0.48), _model)  # visor glow
-			B.sphere(0.35, B.mat(B.EMBER, 1.0, B.EMBER, 6.0), Vector3(0, 1.5, 1.05), _model, 10)  # the clapper in his chest
-			B.omni(B.EMBER, 2.0, 6.0, Vector3(0, 1.6, 1.4), _model)
-			for side in [-1.0, 1.0]:
-				B.sphere(0.45, iron, Vector3(side * 1.05, 2.3, 0), _model, 8)  # pauldrons
-			var haft := B.cylinder(0.08, 0.08, 2.6, B.mat(Color(0.15, 0.1, 0.07)), Vector3(1.4, 1.5, 0.3), _model, 6)
-			haft.rotation.x = 0.4
-			B.sphere(0.45, _m(Color(0.2, 0.18, 0.18)), Vector3(1.4, 2.7, 0.85), _model, 8)
+			BossModel.build(_model, s, col, _m)
 	if elite:
 		B.omni(Color(0.6, 0.3, 0.9), 1.5, 4.0, Vector3(0, 1.0, 0), _model)
 		for m in _mats:
