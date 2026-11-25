@@ -10,6 +10,18 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.5.0-beta.4 — Forged in Hollowmere (2026-11-25)
+
+### New
+- **All three heroes have new, fully modelled bodies.** The Warrior wears plate, a great helm, a tabard in your armour colour and carries a sword and heater shield. The Pyromancer has a hooded robe and an ember-tipped staff. The Rogue wears leathers, a mask and twin daggers.
+- **Every monster of Act I is remodelled:** hunched Hollow, skeletal Bone Archers with bow and quiver, six-legged Grave Crawlers and Hask, the bell-bodied Bell-Warden, with his maul.
+- Heroes and monsters now **walk, strike, cast, flinch and fall** with real animations.
+- Hollowmere's streets are paved in **textured cobbles**, the crypt in **worn flagstones**, and the walls are built of **cut stone** that catches the torchlight.
+- New props: carved crypt pillars, sarcophagi, banded barrels, three kinds of gravestone and iron lamp posts with flickering lanterns.
+
+### Fixes
+- Building a release now stops early when that version is already published or the disk is too full, instead of failing halfway.
+
 ## 0.5.0-beta.3 — Moon over Hollowmere
 
 - Moonlight picks out cottage chimneys and timber window frames above Hollowmere's streets.
