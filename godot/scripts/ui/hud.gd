@@ -16,6 +16,10 @@ var _slots: Array = []  # [slot, kind, index]
 var _xp_bar: ProgressBar
 var _xp_label: Label
 var _quest_label: Label
+var _quest_title: Label
+var _side_title: Label
+var _side_label: Label
+var _act_complete: PanelContainer
 var _area_label: Label
 var _target_panel: PanelContainer
 var _target_name: Label
@@ -56,6 +60,7 @@ func _ready() -> void:
 	_build_inventory()
 	_build_pause()
 	_build_death()
+	_build_act_complete()
 	Game.message.connect(_on_message)
 	Game.quest_changed.connect(_refresh_quest)
 	Game.inventory_changed.connect(_refresh_inventory)
@@ -131,8 +136,8 @@ func _build_bottom() -> void:
 	_add_slot(row, "LMB", cls["basic"], "basic", 0)
 	_add_slot(row, "RMB/1", cls["skills"][0], "skill", 0)
 	_add_slot(row, "2", cls["skills"][1], "skill", 1)
-	_add_slot(row, "3", {}, "locked", 2)
-	_add_slot(row, "4", {}, "locked", 3)
+	_add_slot(row, "3", cls["skills"][2], "skill", 2)
+	_add_slot(row, "4", cls["skills"][3], "skill", 3)
 	var sep := Control.new()
 	sep.custom_minimum_size = Vector2(10, 10)
 	row.add_child(sep)
@@ -168,7 +173,10 @@ func _add_slot(row: HBoxContainer, key: String, sk: Dictionary, kind: String, in
 		var cd := ""
 		if sk.has("cooldown") and kind == "skill":
 			cd = "  ·  Cooldown: %.1fs" % float(sk["cooldown"])
-		s.tooltip_text = "%s\n%s%s%s" % [s.title, sk.get("desc", ""), cost, cd]
+		var unlock := ""
+		if int(sk.get("unlock", 1)) > 1:
+			unlock = "\nUnlocks at level %d." % int(sk["unlock"])
+		s.tooltip_text = "%s\n%s%s%s%s" % [s.title, sk.get("desc", ""), cost, cd, unlock]
 	row.add_child(s)
 	_slots.append([s, kind, index])
 
@@ -188,11 +196,19 @@ func _build_top() -> void:
 	tl.add_child(q)
 	var qv := VBoxContainer.new()
 	q.add_child(qv)
-	qv.add_child(UiTheme.label("The Silent Bell", 16, UiTheme.EMBER.lightened(0.2)))
+	_quest_title = UiTheme.label("", 16, UiTheme.EMBER.lightened(0.2))
+	qv.add_child(_quest_title)
 	_quest_label = UiTheme.label("", 14)
 	_quest_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_quest_label.custom_minimum_size = Vector2(320, 0)
 	qv.add_child(_quest_label)
+	# The optional quest in progress (The Wardens' Oath), under the main one.
+	_side_title = UiTheme.label("", 15, Color(0.6, 0.7, 0.95))
+	qv.add_child(_side_title)
+	_side_label = UiTheme.label("", 14)
+	_side_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_side_label.custom_minimum_size = Vector2(320, 0)
+	qv.add_child(_side_label)
 
 	_target_panel = PanelContainer.new()
 	_target_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -364,6 +380,42 @@ func _build_death() -> void:
 	v.add_child(_button("Rise again in Hollowmere", func(): world.respawn_in_town()))
 
 
+## The end of Act I, shown when the hero goes down the undercroft stair.
+func _build_act_complete() -> void:
+	_act_complete = _panel(640)
+	_act_complete.set_anchors_preset(Control.PRESET_CENTER)
+	_act_complete.offset_left = -320
+	_act_complete.offset_right = 320
+	_act_complete.offset_top = -190
+	_act_complete.offset_bottom = 190
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	_act_complete.add_child(v)
+	var k := UiTheme.label("ACT I COMPLETE", 15, UiTheme.GOLD_DIM)
+	k.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(k)
+	var t := UiTheme.label("The Tolling of Hollowmere", 34, UiTheme.GOLD)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	var body := UiTheme.label(
+		"The stair goes down past the crypt, past the bell-pit, past anything Corwin ever dug. The air turns dry and cold. Somewhere below, thirteen voices that stopped praying long ago are listening to your footsteps.\n\nAct II, The Ossuary of the Thirteen, is coming. Until then, Hollowmere and its crypt are yours to walk: there are still uniques to find, and Hask still rises.", 16)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(590, 0)
+	v.add_child(body)
+	v.add_child(_button("Climb back up to Hollowmere", func():
+		_act_complete.visible = false
+		get_tree().paused = false
+	))
+
+
+func show_act_complete() -> void:
+	ActAudio.toll(self)
+	_dialogue.visible = false
+	_inventory.visible = false
+	_act_complete.visible = true
+	get_tree().paused = true
+
+
 func _button(text: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -379,7 +431,10 @@ func _process(_delta: float) -> void:
 		return
 	var mhp: float = Game.max_hp()
 	var mmana: float = Game.max_mana()
-	_hp_orb.set_values(p.hp / mhp, "%d / %d" % [int(ceil(p.hp)), int(mhp)])
+	var life_text := "%d / %d" % [int(ceil(p.hp)), int(mhp)]
+	if p.ward > 0.0:
+		life_text += "  +%d" % int(ceil(p.ward))
+	_hp_orb.set_values(p.hp / mhp, life_text)
 	_mana_orb.set_values(p.mana / mmana, "%d / %d" % [int(p.mana), int(mmana)])
 	var cls: Dictionary = Game.class_data
 	for entry in _slots:
@@ -389,6 +444,10 @@ func _process(_delta: float) -> void:
 				s.update_state(clampf(p.attack_cd / float(cls["basic"]["cooldown"]), 0.0, 1.0), true)
 			"skill":
 				var sk: Dictionary = cls["skills"][entry[2]]
+				var locked: bool = not p.skill_unlocked(entry[2])
+				if s.locked != locked:
+					s.locked = locked
+					s.queue_redraw()
 				s.update_state(clampf(p.skill_cd[entry[2]] / float(sk["cooldown"]), 0.0, 1.0), p.mana >= float(sk["mana"]))
 			"potion":
 				var n := int(Game.progress.get("potions", 0))
@@ -427,7 +486,7 @@ func _input(event: InputEvent) -> void:
 			close_dialogue()
 		elif _inventory.visible:
 			_inventory.visible = false
-		elif not _death.visible:
+		elif not _death.visible and not _act_complete.visible:
 			_toggle_pause()
 		get_viewport().set_input_as_handled()
 		return
@@ -441,7 +500,7 @@ func _input(event: InputEvent) -> void:
 
 
 func is_blocking() -> bool:
-	return _dialogue.visible or _pause.visible or _death.visible
+	return _dialogue.visible or _pause.visible or _death.visible or _act_complete.visible
 
 
 func _toggle_pause() -> void:
@@ -486,7 +545,15 @@ func _on_save_status(text: String) -> void:
 
 
 func _refresh_quest() -> void:
-	_quest_label.text = Game.quest_text()
+	var main: Array = Game.main_quest()
+	_quest_title.text = main[0]
+	_quest_label.text = main[1]
+	var side: Array = Game.side_quest()
+	_side_title.visible = not side.is_empty()
+	_side_label.visible = not side.is_empty()
+	if not side.is_empty():
+		_side_title.text = "%s  (optional)" % side[0]
+		_side_label.text = side[1]
 
 
 func show_boss(e: Node3D) -> void:
@@ -509,7 +576,10 @@ func show_death() -> void:
 
 func open_dialogue(npc_id: String) -> void:
 	_dlg_npc = npc_id
-	_dlg_art.texture = load("res://assets/textures/field_guide/previews/%s.jpg" % npc_id)
+	# Not every NPC has a portrait yet (the Lamplighter doesn't).
+	var art := "res://assets/textures/field_guide/previews/%s.jpg" % npc_id
+	_dlg_art.texture = load(art) if ResourceLoader.exists(art) else null
+	_dlg_art.visible = _dlg_art.texture != null
 	_show_node(Game.dialogue_entry(npc_id))
 
 

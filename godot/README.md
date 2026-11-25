@@ -33,7 +33,10 @@ Press **F1** or **`** (backtick) to open the developer console. It works in buil
 | `spawn <hollow\|archer\|crawler\|boss> [n] [elite]` | Spawn monsters near you |
 | `kill` | Kill every monster in the area |
 | `tp <town\|crypt\|boss>` | Go to an area (`boss`: next to Hask) |
-| `quest <0-3>` | Set the Act I quest step |
+| `quest <0-3>` | Set The Silent Bell's step |
+| `quest <silent_bell\|lamps\|act_end\|wardens> <step>` | Set any Act I quest's step (`wardens 2` also gives every name-stone) |
+| `quests` | List every Act I quest and its step |
+| `unique <id>` | Put a unique item in the pack (`unique list` names them) |
 | `speed <0.1-5>`, `fps` | Game speed, FPS counter |
 | `stats`, `save`, `clear` | Print the hero's stats, save now, clear the log |
 
@@ -52,7 +55,7 @@ Server owners set them with `admin.mjs flag-set` (see `game-server/README.md`).
 
 ### Smoke test
 
-Plays the slice headless for all three classes (walk, talk, crypt, fight, boss, loot, portal, quest hand-in, death, save) and exits with code 0 when every check passes:
+Plays Act I headless for all three classes (walk, talk, crypt, fight, boss, loot, portal, every quest to the end of the act, skills 3 and 4, uniques, music, death, save) and exits with code 0 when every check passes:
 
 ```powershell
 godot --headless --path godot res://tests/smoke_test.tscn
@@ -62,7 +65,7 @@ godot --headless --path godot res://tests/smoke_test.tscn
 
 `res://tests/screenshots.tscn` renders a few screenshots into a folder (needs a window): `godot --path godot res://tests/screenshots.tscn -- --out C:\temp\shots --class rogue`.
 
-Preview the procedural assets with `godot --path godot res://tests/model_gallery.tscn` from the repository root. Add `-- --out C:/temp/gallery` to save the rendered lineup. Include `--effects` after `--` to capture a melee strike and hit sparks. `res://tests/townsfolk_gallery.tscn` does the same for Sister Maud, Edda and Old Corwin.
+Preview the procedural assets with `godot --path godot res://tests/model_gallery.tscn` from the repository root. Add `-- --out C:/temp/gallery` to save the rendered lineup. Include `--effects` after `--` to capture a melee strike and hit sparks. `res://tests/townsfolk_gallery.tscn` does the same for Sister Maud, Edda and Old Corwin, and `res://tests/act1_lineup.tscn` renders every hero and monster of Act I side by side.
 
 ## Controls
 
@@ -73,7 +76,7 @@ Preview the procedural assets with `godot --path godot res://tests/model_gallery
 | Shift + left click | Attack toward the cursor without moving |
 | Right click or 1 | First skill, aimed at the cursor |
 | 2 | Second skill |
-| 3, 4 | Locked slots (new skills in later acts) |
+| 3, 4 | Third and fourth skills (they unlock at level 3 and level 5) |
 | Q | Drink a grave-moss draught (heals 45%) |
 | W A S D / arrows | Move directly |
 | E | Talk to or use the nearest NPC, gate or stairs |
@@ -83,16 +86,26 @@ Preview the procedural assets with `godot --path godot res://tests/model_gallery
 | Esc | Close a panel, or pause (save and return to title, save and quit) |
 | 1Ã¢â‚¬â€œ9 in a dialogue | Pick a reply |
 
-## The slice
+## Act I
 
-- **Classes:** **Warrior** (Grave Cleave; Earthsplitter stun slam, Iron Rush charge), **Pyromancer** (Ember Bolt; Cinder Nova knockback ring, Pyre delayed fire pillar with burning ground) and **Rogue** (Twin Cuts; Knife Fan, Veilstep blink with a guaranteed critical hit). The armor color chosen in the launcher tints the hero.
-- **Hollowmere** (town hub): Sister Maud (quest giver), Edda the smith (sells draughts), Old Corwin the gravedigger (lore, a gift charm), St. Aldric's chapel, the graveyard and the Mausoleum Gate down to the crypt.
-- **The Sunken Crypt**: a new layout every visit. Rooms on a 4Ãƒâ€”4 slot grid are chained by a random walk from the entry stairs to the bell-pit, with side rooms branching off; each room is one of four tiles (hall, pillared nave, ossuary, flooded chapel). Torch-lit, with Hollows and Grave Crawlers (melee), Bone Archers (ranged) and elite packs.
-- **Boss: Hask, the Bell-Warden**: telegraphed bell tolls, summons the dead at half health, enrages at a quarter. Drops the Black Clapper and opens a portal home.
-- **Quest "The Silent Bell"**: talk to Maud, descend, slay Hask, bring the clapper back. Rewards gold, XP and an item.
+- **Classes:** four skills each, besides the basic attack. Skills 3 and 4 unlock at level 3 and level 5.
+  - **Warrior:** Grave Cleave; Earthsplitter (stun slam), Iron Rush (charge), Grave Roar (more damage, less damage taken), Sexton's Whirl (spin).
+  - **Pyromancer:** Ember Bolt; Cinder Nova (knockback ring), Pyre (delayed fire pillar, burning ground), Ashen Ward (absorbs damage), Cinder Rain (cinders over an area).
+  - **Rogue:** Twin Cuts; Knife Fan, Veilstep (blink, guaranteed critical), Bone Caltrops (slowing, bleeding ground), Death Flurry (strike up to five nearby foes).
+  - The armor color chosen in the launcher tints the hero.
+- **Hollowmere** (town hub): Sister Maud (quest giver), Edda the smith (sells draughts), Old Corwin the gravedigger (lore, a gift charm, The Wardens' Oath), the Lamplighter (after the bell is silent), St. Aldric's chapel, the graveyard and the Mausoleum Gate down to the crypt.
+- **The Sunken Crypt**: a new layout every visit. Rooms on a 4×4 slot grid are chained by a random walk from the entry stairs to the bell-pit, with side rooms branching off; each room is one of four tiles (hall, pillared nave, ossuary, flooded chapel). Torch-lit, with Hollows and Grave Crawlers (melee), Bone Archers (ranged) and elite packs.
+- **Boss: Hask, the Bell-Warden**: telegraphed bell tolls, summons the dead at half health, enrages at a quarter. Drops the Black Clapper (and Hask's Toll) and opens a portal home.
+- **Story** (`scripts/data/act1_dialogue.gd` lists every quest step):
+  1. **The Silent Bell**: talk to Maud, descend, slay Hask, bring the clapper back.
+  2. **Lamps Without Oil**: the Lamplighter's lamps lead to an unmarked grave and the Founders' Charter; Maud reads it.
+  3. **The Wells Toll**: the wells toll and Maud opens the undercroft stair. Going down it ends Act I (you can keep playing afterwards).
+  4. **The Wardens' Oath** (optional, from Corwin): three name-stones in the crypt go back on the plinth by the mausoleum.
+- **Unique items** (`scripts/data/items.gd`, `UNIQUES`), each with a power: the Warden's Vigil and the Lamplighter's Wick (quest rewards), Hask's Toll (Hask; sure the first time) and the Knuckle of the Thirteenth (elite monsters, rare).
 - **Progression**: XP and level-ups (life, resource and damage grow), gold, draughts, and random gear (weapon, armor, charm) in four rarities: Worn, Hallowed, Cursed, Relic.
+- **Music and ambience**: a track each for the title, Hollowmere, the crypt and Hask's fight, with wind in town and dripping water below (`scripts/autoload/act_audio.gd`; made by `scripts/audio/act1-audio.mjs`).
 
-The full four-act story outline is in [`story/ACTS.md`](story/ACTS.md). Only Act I's opening quest is in the game.
+The full four-act story outline is in [`story/ACTS.md`](story/ACTS.md). Act I is complete; Act II is next.
 
 ## Launcher contract
 

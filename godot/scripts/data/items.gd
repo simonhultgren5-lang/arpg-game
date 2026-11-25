@@ -1,11 +1,57 @@
 extends RefCounted
 ## Item generation. Items are plain Dictionaries so they save as JSON:
 ## {uid, name, slot, rarity, ilvl, stats: {damage, armor, life, mana, crit, speed}}
+## Unique items also carry `unique` (an id from UNIQUES) and `power` (what it does, shown to the player).
 
-const RARITY_NAMES := ["Worn", "Hallowed", "Cursed", "Relic"]
+const RARITY_NAMES := ["Worn", "Hallowed", "Cursed", "Relic", "Unique"]
 const RARITY_COLORS := [
 	Color(0.74, 0.70, 0.66), Color(0.50, 0.62, 0.90), Color(0.89, 0.71, 0.49), Color(0.92, 0.42, 0.18),
+	Color(0.97, 0.89, 0.64),
 ]
+const UNIQUE := 4
+
+## Act I uniques. Each has a power that the game checks with Game.has_unique(id):
+##   wardens_vigil      player.gd take_damage: a ward when a blow would leave you below a third of your life
+##   lamplighters_wick  player.gd roll_damage and the hero light: +12% damage, a wider light
+##   hasks_toll         player.gd _basic_attack: every fifth attack strikes all foes around you
+##   saints_knuckle     world.gd _on_enemy_died: kills restore life
+const UNIQUES := {
+	"wardens_vigil": {
+		"name": "The Warden's Vigil", "slot": "armor", "ilvl": 5, "stats": {"armor": 26, "life": 30},
+		"power": "When a blow would leave you below a third of your life, the wardens' oath wards you: the next 40% of your life in damage is absorbed. Once every 45 seconds.",
+		"lore": "Twelve names, cut in iron. It is heavier than it looks.",
+		"source": "Reward for The Wardens' Oath",
+	},
+	"lamplighters_wick": {
+		"name": "The Lamplighter's Wick", "slot": "charm", "ilvl": 5, "stats": {"life": 14, "mana": 12},
+		"power": "You deal 12% more damage, and your light reaches further into the dark.",
+		"lore": "It is still warm. Nobody has ever seen it lit.",
+		"source": "Reward for Lamps Without Oil",
+	},
+	"hasks_toll": {
+		"name": "Hask's Toll", "slot": "weapon", "ilvl": 5, "stats": {"damage": 9, "crit": 4},
+		"power": "Every fifth attack tolls: a shockwave strikes every foe around you for 120% damage.",
+		"lore": "The haft is warm where his hand was.",
+		"source": "Hask, the Bell-Warden",
+	},
+	"saints_knuckle": {
+		"name": "Knuckle of the Thirteenth", "slot": "charm", "ilvl": 4, "stats": {"life": 10, "crit": 3},
+		"power": "Each kill restores 4% of your life.",
+		"lore": "A saint's finger bone, polished by three hundred years of praying hands.",
+		"source": "Elite monsters of the Sunken Crypt (rare)",
+	},
+}
+
+
+static func make_unique(id: String) -> Dictionary:
+	var u: Dictionary = UNIQUES[id]
+	return {
+		"uid": "unique-%s-%d" % [id, Time.get_ticks_usec()], "name": u["name"], "slot": u["slot"],
+		"rarity": UNIQUE, "ilvl": u["ilvl"], "stats": (u["stats"] as Dictionary).duplicate(),
+		"unique": id, "power": u["power"], "lore": u["lore"],
+	}
+
+
 const SLOTS := ["weapon", "armor", "charm"]
 const SLOT_NAMES := {"weapon": "Weapon", "armor": "Armor", "charm": "Charm"}
 
@@ -76,6 +122,8 @@ static func describe(item: Dictionary) -> String:
 	var stats: Dictionary = item.get("stats", {})
 	for key in stats:
 		lines.append(stat_line(key, int(stats[key])))
+	if item.has("power"):
+		lines.append("\n" + str(item["power"]))
 	if item.has("lore"):
 		lines.append(str(item["lore"]))
 	return "\n".join(lines)
@@ -93,4 +141,4 @@ static func stat_line(key: String, v: int) -> String:
 
 
 static func value(item: Dictionary) -> int:
-	return 4 + int(item.get("ilvl", 1)) * 3 * (1 + int(item.get("rarity", 0)))
+	return 4 + int(item.get("ilvl", 1)) * 3 * (1 + mini(int(item.get("rarity", 0)), 3)) + (60 if item.has("unique") else 0)

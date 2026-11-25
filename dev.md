@@ -152,7 +152,10 @@ Shown when running from source, or for an installed launcher started with `--dev
 | `spawn <hollow\|archer\|crawler\|boss> [n] [elite]` | Spawn monsters |
 | `kill` | Kill every monster in the area |
 | `tp <town\|crypt\|boss>` | Go somewhere (`boss`: next to Hask) |
-| `quest <0-3>` | Set the Act I quest step |
+| `quest <0-3>` | Set The Silent Bell's step |
+| `quest <silent_bell\|lamps\|act_end\|wardens> <step>` | Set any Act I quest's step (`wardens 2` also gives every name-stone) |
+| `quests` | List every Act I quest and its step |
+| `unique <id>` | Put a unique item in the pack (`unique list` names them) |
 | `speed <0.1-5>`, `fps` | Game speed, FPS counter |
 | `stats`, `save`, `clear` | Hero stats, save now, clear the log |
 
@@ -211,7 +214,7 @@ godot/assets/            game-ready (what the game loads)
 ├── textures/            UI art, portraits, branding
 ├── models/              imported 3D models (.glb preferred)
 ├── animations/
-├── audio/               spells/, voice/
+├── audio/               spells/, voice/, music/, ambience/, sfx/
 └── cinematics/
 source-assets/           editable originals, never loaded by the game
 ├── Textures/ ├── Models/ ├── Animations/ ├── Audio/ └── Cinematics/

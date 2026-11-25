@@ -16,6 +16,7 @@ static func build(parent: Node3D, npc_id: String) -> void:
 		"maud": _maud(root)
 		"edda": _edda(root)
 		"corwin": _corwin(root)
+		"lamplighter": _lamplighter(root)
 
 
 # ------------------------------------------------------------------ shared parts
@@ -241,3 +242,47 @@ static func _corwin(root: Node3D) -> void:
 	hip.position = Vector3(-0.22, 0.86, 0.22)
 	root.add_child(hip)
 	_lantern(hip, Vector3(0, -0.05, 0))
+
+
+# ------------------------------------------------------------------ The Lamplighter
+
+## A child in a too-big hooded cloak, holding a lamp-pole taller than they are. Their face stays in
+## shadow; only the lamp is bright.
+static func _lamplighter(root: Node3D) -> void:
+	var cloak := B.stylized_mat(Color(0.16, 0.15, 0.2), Color(0.8, 0.75, 1.0))
+	var hem := B.stylized_mat(Color(0.1, 0.09, 0.13), Color(0.8, 0.75, 1.0))
+	var wood := B.stylized_mat(Color(0.3, 0.22, 0.14), Color(1.0, 0.7, 0.4))
+	var shadow := B.stylized_mat(Color(0.02, 0.02, 0.03), Color(0.3, 0.3, 0.4))
+	var eye := B.stylized_mat(Color(0.9, 0.85, 0.6), Color(1, 0.9, 0.6), Color(1.0, 0.9, 0.6), 3.0)
+	# Cloak to the ground, ragged hem.
+	K.add(root, K.lathe(PackedVector2Array([
+		Vector2(0, 0.0), Vector2(0.3, 0.0), Vector2(0.26, 0.35), Vector2(0.19, 0.75),
+		Vector2(0.17, 0.95), Vector2(0.2, 1.05), Vector2(0, 1.1)]), 12), cloak)
+	for i in 7:
+		var a := TAU * i / 7.0
+		K.add(root, K.spike(0.06, 0.1, 4), hem, Vector3(cos(a) * 0.28, 0.04, sin(a) * 0.28), Vector3(PI, 0, 0))
+	# Deep hood with only two pale eyes in the dark.
+	var head := Node3D.new()
+	head.position = Vector3(0, 1.08, 0.0)
+	root.add_child(head)
+	K.add(head, K.lathe(PackedVector2Array([
+		Vector2(0.15, -0.02), Vector2(0.17, 0.12), Vector2(0.14, 0.26), Vector2(0.06, 0.36), Vector2(0, 0.38)]), 12),
+		cloak, Vector3(0, 0, -0.04), Vector3.ZERO, Vector3(1, 1, 0.95))
+	K.add(head, K.lathe(PackedVector2Array([
+		Vector2(0, 0), Vector2(0.11, 0.02), Vector2(0.12, 0.14), Vector2(0.08, 0.24), Vector2(0, 0.26)]), 8),
+		shadow, Vector3(0, 0.01, 0.03))
+	for side in [-1.0, 1.0]:
+		K.add(head, K.spike(0.016, 0.03, 4), eye, Vector3(side * 0.04, 0.13, 0.13), Vector3(PI * 0.5, 0, 0))
+	# The lamp-pole, held in both small hands, with a lantern hanging from a hook at the top.
+	var pole_base := Vector3(0.22, 0.0, 0.18)
+	var pole_top := Vector3(0.3, 2.05, 0.28)
+	K.link(root, pole_top, pole_base, 0.018, 0.022, wood)
+	K.link(root, pole_top, pole_top + Vector3(0.2, -0.02, 0.06), 0.012, 0.012, wood)  # hook
+	for h in [0.75, 0.95]:
+		var hand := pole_base.lerp(pole_top, h / 2.05)
+		K.link(root, Vector3(0.12, 0.98, 0.04), hand + Vector3(-0.03, 0, 0), 0.04, 0.035, cloak)
+		K.add(root, K.bevel_box(Vector3(0.05, 0.05, 0.05), 0.01), shadow, hand)
+	var hook := Node3D.new()
+	hook.position = pole_top + Vector3(0.2, -0.02, 0.06)
+	root.add_child(hook)
+	_lantern(hook, Vector3(0, -0.12, 0))

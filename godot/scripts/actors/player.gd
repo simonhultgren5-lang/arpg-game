@@ -5,6 +5,8 @@ extends CharacterBody3D
 
 const B = preload("res://scripts/world/build.gd")
 const WarriorModel = preload("res://scripts/models/warrior_model.gd")
+const RogueModel = preload("res://scripts/models/rogue_model.gd")
+const MageModel = preload("res://scripts/models/mage_model.gd")
 const Fx = preload("res://scripts/world/fx.gd")
 const Projectile = preload("res://scripts/actors/projectile.gd")
 
@@ -14,7 +16,16 @@ var hp := 100.0
 var mana := 50.0
 var dead := false
 var attack_cd := 0.0
-var skill_cd := [0.0, 0.0]
+var skill_cd := [0.0, 0.0, 0.0, 0.0]
+## Damage the hero can take before losing life (Ashen Ward, the Warden's Vigil).
+var ward := 0.0
+var ward_t := 0.0
+## Grave Roar: time left, damage bonus and damage reduction.
+var buff_t := 0.0
+var _buff := {}
+var _whirl := {}
+var _toll_count := 0
+var _vigil_cd := 0.0
 var potion_cd := 0.0
 var crit_buff := 0.0
 
@@ -69,9 +80,16 @@ func _build_model() -> void:
 	_weapon = Node3D.new()
 	_weapon.position = Vector3(0.38, 1.25, 0.05)
 	_model.add_child(_weapon)
-	if Game.hero_class == "warrior":
-		WarriorModel.build(_model, _body_mat, _weapon)
-		return
+	match Game.hero_class:
+		"warrior":
+			WarriorModel.build(_model, _body_mat, _weapon)
+			return
+		"rogue":
+			RogueModel.build(_model, _body_mat, _weapon)
+			return
+		"pyromancer":
+			MageModel.build(_model, _body_mat, _weapon)
+			return
 	# legs, body, head
 	for side in [-0.15, 0.15]:
 		B.box(Vector3(0.18, 0.8, 0.2), dark, Vector3(side, 0.4, 0), _model)
@@ -112,8 +130,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		cast_skill(0)
 	elif event.is_action_pressed("skill_2"):
 		cast_skill(1)
-	elif event.is_action_pressed("skill_3") or event.is_action_pressed("skill_4"):
-		world.message("That skill slot unlocks in a later act.", Color(0.6, 0.55, 0.6))
+	elif event.is_action_pressed("skill_3"):
+		cast_skill(2)
+	elif event.is_action_pressed("skill_4"):
+		cast_skill(3)
 	elif event.is_action_pressed("potion"):
 		drink_potion()
 	elif event.is_action_pressed("interact"):
@@ -177,6 +197,16 @@ func _physics_process(delta: float) -> void:
 	crit_buff -= delta
 	for i in skill_cd.size():
 		skill_cd[i] = maxf(0.0, skill_cd[i] - delta)
+	_vigil_cd -= delta
+	buff_t -= delta
+	ward_t -= delta
+	if ward_t <= 0.0:
+		ward = 0.0
+	_whirl_step(delta)
+	# The Lamplighter's Wick widens the hero's light.
+	var light := get_node_or_null("HeroLight") as OmniLight3D
+	if light:
+		light.omni_range = 14.0 if Game.has_unique("lamplighters_wick") else 10.0
 	var mhp: float = Game.max_hp()
 	var mmana: float = Game.max_mana()
 	hp = minf(mhp, hp + mhp * 0.006 * delta)
@@ -307,6 +337,10 @@ func _animate(delta: float) -> void:
 func roll_damage(mult: float) -> Array:
 	var r: Vector2 = Game.damage_range()
 	var amount := randf_range(r.x, r.y) * mult
+	if buff_t > 0.0:
+		amount *= 1.0 + float(_buff.get("damage", 0.0))
+	if Game.has_unique("lamplighters_wick"):
+		amount *= 1.12
 	var crit := randf() < Game.crit_chance() or crit_buff > 0.0
 	if crit:
 		amount *= 2.5 if crit_buff > 0.0 else 1.75
@@ -334,6 +368,14 @@ func _basic_attack(at: Vector3) -> void:
 		"bolt":
 			var roll := roll_damage(basic["mult"])
 			_projectile(dir, "bolt", basic["speed"], roll[0], roll[1], basic["range"], basic["color"], 0)
+	# Hask's Toll: every fifth attack strikes everything around the hero.
+	if Game.has_unique("hasks_toll"):
+		_toll_count += 1
+		if _toll_count >= 5:
+			_toll_count = 0
+			world.hit_radius(global_position, 4.0, 1.2, self, {"knockback": 1.5})
+			Fx.ring(world, global_position, 4.0, Color(1.0, 0.55, 0.2), 0.45)
+			world.shake(0.25)
 
 
 func _projectile(dir: Vector3, style: String, spd: float, dmg: float, crit: bool, dist: float, color: Color, pierce: int) -> void:
@@ -353,10 +395,18 @@ func _projectile(dir: Vector3, style: String, spd: float, dmg: float, crit: bool
 	pr.setup()
 
 
+## Whether skill i can be used at the hero's level.
+func skill_unlocked(i: int) -> bool:
+	return i < cls["skills"].size() and Game.level() >= int(cls["skills"][i].get("unlock", 1))
+
+
 func cast_skill(i: int) -> void:
 	if dead or i >= cls["skills"].size():
 		return
 	var sk: Dictionary = cls["skills"][i]
+	if not skill_unlocked(i):
+		world.message("%s unlocks at level %d." % [sk["name"], int(sk["unlock"])], Color(0.6, 0.55, 0.6))
+		return
 	if skill_cd[i] > 0.0:
 		return
 	if mana < float(sk["mana"]):
@@ -406,6 +456,27 @@ func cast_skill(i: int) -> void:
 			Fx.flash(world, global_position, color, 4.0, 6.0)
 			world.hit_radius(global_position, sk["radius"], sk["mult"], self, {})
 			crit_buff = sk["crit_window"]
+		"buff":
+			buff_t = sk["duration"]
+			_buff = {"damage": sk["damage"], "guard": sk["guard"]}
+			Fx.ring(world, global_position, 3.0, color, 0.5)
+			Fx.flash(world, global_position, color, 5.0, 6.0, 0.5)
+			world.shake(0.2)
+		"whirl":
+			_whirl = {"left": sk["duration"], "tick": 0.0, "every": sk["tick"], "radius": sk["radius"], "mult": sk["mult"], "color": color}
+		"ward":
+			ward = maxf(ward, Game.max_hp() * float(sk["absorb"]))
+			ward_t = sk["duration"]
+			Fx.ring(world, global_position, 1.6, color, 0.6)
+			Fx.flash(world, global_position, color, 3.0, 4.0, 0.4)
+		"rain":
+			var at := global_position + dir * minf(dist, sk["range"])
+			world.cast_rain(at, sk, self)
+		"trap":
+			var at := global_position + dir * minf(dist, sk["range"])
+			world.cast_trap(at, sk, self)
+		"flurry":
+			_flurry(sk)
 
 
 func _dash_step(delta: float) -> void:
@@ -452,6 +523,22 @@ func take_damage(amount: float) -> void:
 	if dead or Dev.god_mode:
 		return
 	var dealt: float = Game.mitigate(amount)
+	if buff_t > 0.0:
+		dealt *= 1.0 - float(_buff.get("guard", 0.0))
+	# The Warden's Vigil: a blow that would leave the hero below a third of their life calls the oath.
+	if Game.has_unique("wardens_vigil") and _vigil_cd <= 0.0 and hp - dealt < Game.max_hp() / 3.0:
+		_vigil_cd = 45.0
+		ward = maxf(ward, Game.max_hp() * 0.4)
+		ward_t = 10.0
+		Fx.pillar(world, global_position, 0.9, Color(0.55, 0.65, 0.95), 0.6)
+		world.message("The wardens' oath holds.", Color(0.6, 0.7, 0.95))
+	if ward > 0.0:
+		var absorbed := minf(ward, dealt)
+		ward -= absorbed
+		dealt -= absorbed
+		if dealt <= 0.0:
+			Fx.number(world, global_position, "warded", Color(0.6, 0.7, 0.95))
+			return
 	hp -= dealt
 	_hurt = 1.0
 	Fx.number(world, global_position, str(int(ceil(dealt))), Color(1.0, 0.3, 0.25))
@@ -462,6 +549,51 @@ func take_damage(amount: float) -> void:
 		var tw := create_tween()
 		tw.tween_property(_model, "rotation:x", -PI * 0.5, 0.5).set_trans(Tween.TRANS_BOUNCE)
 		world.player_died()
+
+
+## Sexton's Whirl: hits all around every tick while it lasts.
+func _whirl_step(delta: float) -> void:
+	if _whirl.is_empty():
+		return
+	_whirl["left"] -= delta
+	_whirl["tick"] -= delta
+	_model.rotation.y += delta * 18.0
+	if _whirl["tick"] <= 0.0:
+		_whirl["tick"] = _whirl["every"]
+		world.hit_radius(global_position, _whirl["radius"], _whirl["mult"], self, {})
+		Fx.ring(world, global_position, _whirl["radius"], _whirl["color"], 0.2)
+	if _whirl["left"] <= 0.0:
+		_whirl = {}
+
+
+## Death Flurry: strike up to N nearby foes in turn, appearing next to each.
+func _flurry(sk: Dictionary) -> void:
+	var foes: Array = []
+	for e in world.enemies():
+		if is_instance_valid(e) and not e.dead and e.global_position.distance_to(global_position) <= float(sk["range"]):
+			foes.append(e)
+	foes.sort_custom(func(a, b): return a.global_position.distance_to(global_position) < b.global_position.distance_to(global_position))
+	if foes.is_empty():
+		Fx.ring(world, global_position, 1.5, sk["color"], 0.3)
+		return
+	_clear_targets()
+	for e in foes.slice(0, int(sk["targets"])):
+		if not is_instance_valid(e) or e.dead or dead:
+			continue
+		var side: Vector3 = (global_position - e.global_position)
+		side.y = 0.0
+		var land: Vector3 = e.global_position + (side.normalized() if side.length() > 0.1 else Vector3.BACK) * (float(e.radius) + 0.7)
+		if world.grid.walkable_at(land):
+			Fx.ring(world, global_position, 1.0, sk["color"], 0.2)
+			global_position = Vector3(land.x, 0, land.z)
+		_face(e.global_position - global_position, 1.0)
+		_swing = 1.0
+		var roll := roll_damage(sk["mult"])
+		e.take_damage(roll[0], roll[1], e.global_position - global_position)
+		Fx.slash(world, global_position, (e.global_position - global_position).normalized(), 1.6, 120.0, sk["color"])
+		await get_tree().create_timer(0.12).timeout
+		if not is_inside_tree():
+			return
 
 
 func on_level_up() -> void:

@@ -4,6 +4,7 @@ extends RefCounted
 ##  H  house               C  St. Aldric's chapel  B  mausoleum   G  crypt gate
 ##  S  grave               T  dead tree         L  lamp post      W  well
 ##  M  Sister Maud         K  Edda the smith    D  Old Corwin     P  hero start
+##  A  the Lamplighter     U  the unmarked grave                 Y  the wardens' plinth
 
 const LevelGrid = preload("res://scripts/world/level_grid.gd")
 const LevelMesh = preload("res://scripts/world/level_mesh.gd")
@@ -14,9 +15,9 @@ const TownsfolkModel = preload("res://scripts/models/townsfolk_model.gd")
 const MAP := [
 	"####################################",
 	"#T...S.S.S..#CCCCCCCC#..S..S.S..T..#",
-	"#...........#CCCCCCCC#.............#",
+	"#...........#CCCCCCCC#.........U...#",
 	"#..S.S.S....#CCCCCCCC#..S.BBBB..S..#",
-	"#...........#CCCCCCCC#....BBBB.....#",
+	"#...........#CCCCCCCC#....BBBBY....#",
 	"#.T.........#CCCCCCCC#..S..GG...S..#",
 	"#...........,CCCCCCCC,.......D.....#",
 	"#...L.......,,,,,,,,,,,..S.....S.T.#",
@@ -24,7 +25,7 @@ const MAP := [
 	"#..HHHH....,L,,,,,,,,L,,....HHHH...#",
 	"#..HHHH....,,,,,WW,,,,,,....HHHH...#",
 	"#..HHHH....,,,,,WW,,,,,,....HHHH...#",
-	"#..........,,,,,,,,,,,,,...........#",
+	"#..........,,A,,,,,,,,,,...........#",
 	"#.T..K.....,L,,,,,,,,L,,......T....#",
 	"#..HHHHH....,,,,,,,,,,.....HHHH....#",
 	"#..HHHHH.....,,,,,,,,......HHHH....#",
@@ -38,7 +39,11 @@ const MAP := [
 	"#.............,,,,,,...............#",
 	"####################################",
 ]
-const NPC_CHARS := {"M": "maud", "K": "edda", "D": "corwin"}
+const NPC_CHARS := {"M": "maud", "K": "edda", "D": "corwin", "A": "lamplighter"}
+## Lamps Without Oil: the lamps that light up from the Lamplighter to the unmarked grave.
+const LAMP_TRAIL := [Vector2i(13, 10), Vector2i(14, 8), Vector2i(19, 7), Vector2i(23, 7), Vector2i(26, 6), Vector2i(30, 5), Vector2i(31, 3)]
+## Where the undercroft stair opens, in front of the chapel door.
+const UNDERCROFT := Vector2i(18, 7)
 const NPC_COLORS := {
 	"maud": Color(0.12, 0.1, 0.14), "edda": Color(0.35, 0.22, 0.16), "corwin": Color(0.25, 0.24, 0.2),
 }
@@ -104,7 +109,11 @@ func build(world: Node3D, rng: RandomNumberGenerator) -> void:
 				"S": _grave(level, p, rng)
 				"T": _tree(level, p, rng)
 				"L": _lamp(level, p)
-				"M", "K", "D": _npc(world, level, NPC_CHARS[ch], p)
+				"M", "K", "D", "A": _npc(world, level, NPC_CHARS[ch], p)
+				"U": _unmarked_grave(world, level, p, rng)
+				"Y": _plinth(world, level, p)
+	_lamp_trail(level)
+	_undercroft(world, level)
 	# The road south vanishes into fog.
 	var fog_light := B.omni(Color(0.4, 0.38, 0.55), 0.45, 10.0, grid.center(Vector2i(17, 24)) + Vector3(0, 3, 4), level)
 	fog_light.name = "RoadGlow"
@@ -273,6 +282,8 @@ func _npc(world: Node3D, level: Node3D, npc_id: String, p: Vector3) -> void:
 	level.add_child(node)
 	TownsfolkModel.build(node, npc_id)
 	match npc_id:
+		"lamplighter":
+			node.shown_when = Game.lamplighter_present
 		"maud":
 			B.omni(Color(0.9, 0.7, 0.45), 0.5, 4.0, Vector3(0.4, 1.8, 0.8), node)
 		"edda":
@@ -288,6 +299,91 @@ func _npc(world: Node3D, level: Node3D, npc_id: String, p: Vector3) -> void:
 			preload("res://scripts/models/props_model.gd").barrel(node, Vector3(1.25, 0, -0.6))
 			B.omni(B.EMBER, 1.4, 5.0, Vector3(-0.8, 0.6, 0.5), node)
 			B.sphere(0.25, B.mat(B.EMBER, 1.0, B.EMBER, 3.0), Vector3(-0.9, 0.3, 0.3), node, 6)
-	node.marker = B.label("!", B.GOLD, Vector3(0, 2.7, 0), node, 96)
-	B.label(info.get("name", npc_id), Color(0.85, 0.82, 0.78), Vector3(0, 2.25, 0), node, 32)
+	var tall := npc_id != "lamplighter"
+	node.marker_height = 2.7 if tall else 2.2
+	node.marker = B.label("!", B.GOLD, Vector3(0, node.marker_height, 0), node, 96)
+	B.label(info.get("name", npc_id), Color(0.85, 0.82, 0.78), Vector3(0, 2.25 if tall else 1.75, 0), node, 32)
+	world.call("register_interactable", node)
+
+
+# ------------------------------------------------------------------ Act I quest objects
+
+func _quest_label(text: String, node: Node3D, height := 2.2) -> void:
+	B.label(text, B.GOLD, Vector3(0, height, 0), node, 34)
+
+
+## Lamps Without Oil: an unmarked grave in the graveyard's far corner, where the Founders' Charter lies.
+func _unmarked_grave(world: Node3D, level: Node3D, p: Vector3, rng: RandomNumberGenerator) -> void:
+	var node := Interactable.new()
+	node.kind = "grave"
+	node.display_name = "Unmarked Grave"
+	node.radius = 2.2
+	node.position = p
+	level.add_child(node)
+	var earth := B.mat(Color(0.12, 0.1, 0.08))
+	var mound := B.box(Vector3(1.0, 0.3, 1.9), earth, Vector3(0, 0.12, 0), node)
+	mound.rotation.y = 0.2
+	# Dug open once the charter has been found.
+	var hole := B.box(Vector3(0.9, 0.06, 1.7), B.mat(Color(0.02, 0.015, 0.01)), Vector3(0, 0.29, 0), node)
+	hole.rotation.y = 0.2
+	hole.set_script(preload("res://scripts/world/quest_visibility.gd"))
+	hole.set_meta("when", func(): return Game.quest("lamps") >= 2)
+	var marker := B.box(Vector3(0.12, 0.7, 0.12), B.mat(Color(0.2, 0.15, 0.1)), Vector3(0.1, 0.4, -0.9), node)
+	marker.rotation.z = rng.randf_range(-0.3, 0.3)
+	_quest_label("Unmarked Grave", node, 1.4)
+	world.call("register_interactable", node)
+
+
+## Lamps Without Oil: small lamps that burn from the Lamplighter to the grave while the quest is on.
+func _lamp_trail(level: Node3D) -> void:
+	for c in LAMP_TRAIL:
+		var lamp := Node3D.new()
+		lamp.position = grid.center(c) + Vector3(0.6, 0, 0.6)
+		lamp.set_script(preload("res://scripts/world/quest_visibility.gd"))
+		lamp.set_meta("when", func(): return Game.quest("lamps") == 1)
+		level.add_child(lamp)
+		var iron := B.mat(Color(0.08, 0.07, 0.08), 0.6, Color.BLACK, 1.0, 0.6)
+		B.cylinder(0.03, 0.04, 0.9, iron, Vector3(0, 0.45, 0), lamp, 6)
+		B.sphere(0.09, B.mat(Color(1, 0.9, 0.6), 1.0, Color(1.0, 0.85, 0.5), 5.0), Vector3(0, 0.98, 0), lamp, 6)
+		B.omni(Color(1.0, 0.85, 0.55), 1.2, 4.5, Vector3(0, 1.1, 0), lamp)
+
+
+## The Wardens' Oath: the plinth by the mausoleum door, where the name-stones go back.
+func _plinth(world: Node3D, level: Node3D, p: Vector3) -> void:
+	var node := Interactable.new()
+	node.kind = "plinth"
+	node.display_name = "The Wardens' Plinth"
+	node.radius = 2.2
+	node.position = p
+	level.add_child(node)
+	var stone := B.mat(Color(0.26, 0.24, 0.27))
+	B.box(Vector3(0.9, 0.9, 0.7), stone, Vector3(0, 0.45, 0), node)
+	B.box(Vector3(1.05, 0.12, 0.85), stone, Vector3(0, 0.95, 0), node)
+	# The three stones, set back once the oath is kept.
+	var set_stones := Node3D.new()
+	set_stones.set_script(preload("res://scripts/world/quest_visibility.gd"))
+	set_stones.set_meta("when", func(): return Game.quest("wardens") >= 3)
+	node.add_child(set_stones)
+	for i in 3:
+		B.box(Vector3(0.22, 0.3, 0.1), B.mat(Color(0.5, 0.55, 0.65), 0.6, Color(0.35, 0.45, 0.7), 1.2), Vector3(-0.3 + i * 0.3, 1.16, 0), set_stones)
+	B.omni(Color(0.55, 0.65, 0.95), 0.9, 3.5, Vector3(0, 1.5, 0.4), set_stones)
+	_quest_label("The Wardens' Plinth", node, 1.8)
+	world.call("register_interactable", node)
+
+
+## The end of Act I: Maud opens the stair under the chapel once the wells toll.
+func _undercroft(world: Node3D, level: Node3D) -> void:
+	var node := Interactable.new()
+	node.kind = "undercroft"
+	node.display_name = "The Undercroft Stair"
+	node.radius = 2.2
+	node.position = grid.center(UNDERCROFT)
+	node.shown_when = func(): return Game.quest("act_end") >= 1
+	level.add_child(node)
+	var dark := B.mat(Color(0.02, 0.015, 0.03))
+	B.box(Vector3(1.6, 0.05, 1.6), dark, Vector3(0, 0.03, 0), node)
+	for i in 4:
+		B.box(Vector3(1.4, 0.15, 0.3), B.mat(Color(0.18, 0.16, 0.18)), Vector3(0, 0.02 - i * 0.12, -0.55 + i * 0.32), node)
+	B.omni(Color(0.55, 0.75, 0.95), 1.6, 5.0, Vector3(0, -0.3, 0), node)
+	_quest_label("The Undercroft Stair", node, 1.6)
 	world.call("register_interactable", node)
