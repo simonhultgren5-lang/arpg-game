@@ -9,7 +9,7 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
-## 0.3.3
+## 0.3.3 (2026-11-25)
 
 ### New
 - **The Act I film plays behind the launcher.** It loops quietly behind the title. **Watch the Act I film** plays it full size with sound and captions, and Esc brings you back.
