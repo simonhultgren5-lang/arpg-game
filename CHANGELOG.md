@@ -12,9 +12,13 @@ How to write a section:
 
 ## 0.5.0-beta.1 — Survey of Hollowmere
 
-- Follow the minimap through town and the crypt. Press **M** or click the map to see the whole area, your heading, townsfolk and passages. Press **Esc** to resume.
-- The combat bar, dialogue, inventory and menus have a slate-and-brass finish. Press **H** to show the controls.
-- All three heroes take alternating steps, sway with their stride and leave fading boot scuffs.
+### Maps
+- The **minimap** follows your hero through Hollowmere and the Sunken Crypt. North stays at the top, and the white arrow shows which way your hero faces.
+- Press **M** or click the minimap to pause and unfold the **area map**. It shows the layout of your current crypt, including passages and any oath stones present. In town, look for the dots marking townsfolk. Press **M** or **Esc** to resume.
+
+### Interface and movement
+- A slate-and-brass frame groups your combat skills and experience bar. The pack, dialogue and menus use the same finish. Press **H** to show or hide the controls.
+- The Warrior, Pyromancer and Rogue now plant alternating feet as they walk. Their weapons sway with each stride, and their boots leave scuffs that fade behind them.
 
 ## 0.5.0-beta.0 — Act I: Complete
 
