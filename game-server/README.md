@@ -163,9 +163,9 @@ docker cp depths-server:/data/backups ./depths-backups     # copy the backups of
 
 | Command | What it writes |
 | --- | --- |
-| `node admin.mjs backup [file]` | A `pg_dump` archive (`.dump`) when the PostgreSQL client tools are installed (they are in the Docker image); otherwise the built-in format |
+| `node admin.mjs backup [file]` | A `pg_dump` archive (`.dump`) when PostgreSQL client tools of the database's own version are installed (they are in the Docker image); otherwise the built-in format |
 | `node admin.mjs backup [file] --format json` | The built-in format (`.json.gz`): every table as gzip'd JSON. Needs nothing but Node.js |
-| `node admin.mjs backup [file] --format pg_dump` | Always `pg_dump` (fails if it isn't installed, or is older than the database) |
+| `node admin.mjs backup [file] --format pg_dump` | Always `pg_dump` (fails unless its version matches the database's) |
 
 To restore, stop the server first (the command refuses while it runs), then:
 

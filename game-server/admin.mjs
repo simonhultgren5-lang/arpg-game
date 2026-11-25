@@ -126,12 +126,14 @@ const toolMajor = (name) => {
   const r = spawnSync(tool(name), ['--version'], { encoding: 'utf8' });
   return r.status === 0 ? Number((/(\d+)(?:\.\d+)?/.exec(r.stdout) || [])[1]) || 0 : 0;
 };
-// pg_dump refuses a server newer than itself, so an older client counts as not installed.
+// Only client tools of the server's own major version count: pg_dump refuses a newer server, and an
+// archive from a newer pg_dump has settings an older server rejects on restore (PostgreSQL 17's
+// "SET transaction_timeout" on 16). Docker and install.sh always have matching versions.
 async function hasTool(name) {
   const major = toolMajor(name);
   if (!major) return false;
   const { v } = await one("SELECT current_setting('server_version_num')::int / 10000 AS v");
-  return major >= v;
+  return major === v;
 }
 function runTool(name, args) {
   const r = spawnSync(tool(name), args, { encoding: 'utf8' });
@@ -149,7 +151,7 @@ const isPgDump = (file) => {
 async function makeBackup(file, format) {
   const usePgDump = format ? format === 'pg_dump' : await hasTool('pg_dump');
   if (format && !['pg_dump', 'json'].includes(format)) fail('--format must be pg_dump or json.');
-  if (usePgDump && !(await hasTool('pg_dump'))) fail('pg_dump is not installed (or older than the database server). Install the PostgreSQL client, or use --format json.');
+  if (usePgDump && !(await hasTool('pg_dump'))) fail("No pg_dump of the database server's version is installed. Install the matching PostgreSQL client, or use --format json.");
   const ext = usePgDump ? 'dump' : 'json.gz';
   const target = path.resolve(file || path.join(DATA_DIR, 'backups', `depths-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`));
   if (fs.existsSync(target)) fail(`${target} already exists.`);
@@ -255,7 +257,7 @@ const run = {
     const pgDump = isPgDump(source);
     let backup = null;
     if (pgDump) {
-      if (!(await hasTool('pg_restore'))) fail('This backup was made with pg_dump; restoring it needs pg_restore (the PostgreSQL client).');
+      if (!(await hasTool('pg_restore'))) fail("This backup was made with pg_dump; restoring it needs pg_restore of the database server's version (the PostgreSQL client).");
       const list = runTool('pg_restore', ['--list', source]);
       if (!/TABLE public accounts\b/.test(list) || !/TABLE public characters\b/.test(list)) fail(`${source} isn't a Depths of Darkness backup.`);
     } else {

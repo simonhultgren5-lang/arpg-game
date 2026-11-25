@@ -383,11 +383,11 @@ describe('game server', { skip }, () => {
       assert.ok(c.id > Math.max(...before.characters.map((x) => x.id)));
     });
     test('a backup restores everything once the server is stopped', async () => {
-      // pg_dump too, when a client at least as new as the server is installed (it is in CI).
+      // pg_dump too, when the client has the server's major version (it does in CI).
       const client = Number((/(\d+)/.exec(spawnSync('pg_dump', ['--version'], { encoding: 'utf8' }).stdout || '') || [])[1]) || 0;
       const serverMajor = (await query(mainUrl, "SELECT current_setting('server_version_num')::int / 10000 AS v"))[0].v;
-      const formats = ['json', ...(client >= serverMajor ? ['pg_dump'] : [])];
-      if (formats.length === 1) console.log('# pg_dump backups not tested: no pg_dump as new as the server here');
+      const formats = ['json', ...(client === serverMajor ? ['pg_dump'] : [])];
+      if (formats.length === 1) console.log("# pg_dump backups not tested: no pg_dump of the server's version here");
       for (const format of formats) {
         const file = path.join(mainDir, `restore-${format}.${format === 'json' ? 'json.gz' : 'dump'}`);
         const b = admin('backup', file, '--format', format);

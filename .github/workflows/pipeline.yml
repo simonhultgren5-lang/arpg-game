@@ -67,8 +67,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        # 16 = the runner's own pg_dump, so the pg_dump backup path is tested too.
-        image: postgres:16-alpine
+        # The runner's pg_dump is 17 (and Docker uses 17); the same major version on both sides,
+        # so the pg_dump backup path is tested too.
+        image: postgres:17-alpine
         env:
           POSTGRES_USER: depths
           POSTGRES_PASSWORD: depths
