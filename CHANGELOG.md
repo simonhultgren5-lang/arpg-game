@@ -10,6 +10,12 @@ How to write a section:
 - Optional `### ` subheadings group changes (for example New, Changes, Fixes).
 - One `- ` line per change, in plain language for players. `**bold**` works.
 
+## 0.4.1
+
+### Changes
+- Faster updates: the game's art, sound and video are now stored separately from its code, so downloads and builds are smaller and quicker.
+- Behind the scenes, the game's files are organized the way large game studios do it, ready for new 3D models, animations and cinematics.
+
 ## 0.4.0 — Act I: The Tolling of Hollowmere
 
 The bells of St. Aldric's have started ringing on their own, and every toll brings the dead closer to the surface. Act I is here.
