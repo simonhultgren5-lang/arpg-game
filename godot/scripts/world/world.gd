@@ -269,7 +269,7 @@ func cast_rain(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 ## Rogue's Bone Caltrops: ground at `at` that slows foes and makes them bleed while it lasts.
 func cast_trap(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 	var color: Color = sk["color"]
-	var ground := B.cylinder(sk["radius"], sk["radius"], 0.04, Fx.glow_mat(color, 0.18), at + Vector3(0, 0.05, 0), self, 24)
+	var ground := B.cylinder(sk["radius"], sk["radius"], 0.04, Fx.glow_mat(color.darkened(0.7), 0.35, false), at + Vector3(0, 0.05, 0), self, 24)
 	for i in 14:
 		var a := rng.randf() * TAU
 		var bone := B.box(Vector3(0.05, 0.05, 0.3), B.mat(Color(0.85, 0.8, 0.7)), at + Vector3(cos(a), 0.06, sin(a)) * rng.randf_range(0.2, float(sk["radius"]) - 0.2), self)

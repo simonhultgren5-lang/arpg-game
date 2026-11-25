@@ -21,11 +21,11 @@ const MAP := [
 	"#.T.........#CCCCCCCC#..S..GG...S..#",
 	"#...........,CCCCCCCC,.......D.....#",
 	"#...L.......,,,,,,,,,,,..S.....S.T.#",
-	"#....A.....,,,,M,,,,,,,,...........#",
+	"#..........,,,,M,,,,,,,,...........#",
 	"#..HHHH....,L,,,,,,,,L,,....HHHH...#",
 	"#..HHHH....,,,,,WW,,,,,,....HHHH...#",
 	"#..HHHH....,,,,,WW,,,,,,....HHHH...#",
-	"#..........,,,,,,,,,,,,,...........#",
+	"#..........,,A,,,,,,,,,,...........#",
 	"#.T..K.....,L,,,,,,,,L,,......T....#",
 	"#..HHHHH....,,,,,,,,,,.....HHHH....#",
 	"#..HHHHH.....,,,,,,,,......HHHH....#",
@@ -41,7 +41,7 @@ const MAP := [
 ]
 const NPC_CHARS := {"M": "maud", "K": "edda", "D": "corwin", "A": "lamplighter"}
 ## Lamps Without Oil: the lamps that light up from the Lamplighter to the unmarked grave.
-const LAMP_TRAIL := [Vector2i(8, 8), Vector2i(11, 7), Vector2i(19, 7), Vector2i(23, 7), Vector2i(26, 6), Vector2i(30, 5), Vector2i(31, 3)]
+const LAMP_TRAIL := [Vector2i(13, 10), Vector2i(14, 8), Vector2i(19, 7), Vector2i(23, 7), Vector2i(26, 6), Vector2i(30, 5), Vector2i(31, 3)]
 ## Where the undercroft stair opens, in front of the chapel door.
 const UNDERCROFT := Vector2i(18, 7)
 const NPC_COLORS := {
