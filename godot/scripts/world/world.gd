@@ -22,6 +22,7 @@ var wall_material: ShaderMaterial
 var rng := RandomNumberGenerator.new()
 var boss: Node3D = null
 var _interactables: Array = []
+var _env: Environment
 
 
 func _ready() -> void:
@@ -66,12 +67,21 @@ func _ready() -> void:
 
 	Game.leveled_up.connect(_on_level_up)
 	Game.story_event.connect(_on_story_event)
+	apply_settings()
 	ActAudio.play_area("crypt" if Game.area == "catacomb" else "town")
 	hud.banner(Game.area_title(), "Act I · The Tolling of Hollowmere" if Game.area == "town" else "Beneath St. Aldric's")
 	if Game.area == "town" and Game.quest_state() == 0:
 		message("Sister Maud waits by the chapel. Click her to speak.", B.GOLD)
 	elif Game.area == "town" and Game.quest("act_end") == 1:
 		message("The wells of Hollowmere are tolling. The undercroft stair is open behind the chapel door.", Color(0.6, 0.75, 0.95))
+
+
+## Graphics settings (quality, shadows, brightness) on this level; Settings calls it when they change.
+func apply_settings() -> void:
+	if _env:
+		Settings.apply_world(_env, find_children("*", "Light3D", true, false))
+	for l in get_tree().get_nodes_in_group("loot_labels"):
+		l.visible = bool(Settings.get_value("gameplay", "loot_labels"))
 
 
 func _exit_tree() -> void:
@@ -107,6 +117,7 @@ func _build_environment() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
+	_env = env
 	if town:
 		var moon := DirectionalLight3D.new()
 		moon.light_color = Color(0.55, 0.58, 0.9)
@@ -320,6 +331,8 @@ func cast_trap(at: Vector3, sk: Dictionary, source: Node3D) -> void:
 
 
 func damage_number(pos: Vector3, amount: float, crit: bool) -> void:
+	if not Settings.get_value("gameplay", "damage_numbers"):
+		return
 	var text := str(int(ceil(amount)))
 	if crit:
 		text += "!"
@@ -331,7 +344,7 @@ func pickup_text(pos: Vector3, text: String, color: Color) -> void:
 
 
 func shake(amount: float) -> void:
-	if camera:
+	if camera and Settings.get_value("gameplay", "screen_shake"):
 		camera.shake(amount)
 
 

@@ -22,11 +22,11 @@ func setup() -> void:
 			var m := B.mat(Color(0.95, 0.75, 0.3), 0.3, Color(0.6, 0.4, 0.1), 1.2, 0.9)
 			for i in 3:
 				B.cylinder(0.14, 0.14, 0.05, m, Vector3(randf_range(-0.15, 0.15), 0.05 + i * 0.05, randf_range(-0.15, 0.15)), _visual, 10)
-			B.label("%d gold" % gold, Color(0.95, 0.8, 0.45), Vector3(0, 0.7, 0), self, 28)
+			_label(B.label("%d gold" % gold, Color(0.95, 0.8, 0.45), Vector3(0, 0.7, 0), self, 28))
 		"potion":
 			B.cylinder(0.12, 0.16, 0.3, B.mat(Color(0.8, 0.15, 0.15), 0.2, Color(0.7, 0.1, 0.1), 1.5), Vector3(0, 0.2, 0), _visual, 8)
 			B.cylinder(0.05, 0.05, 0.12, B.mat(Color(0.3, 0.2, 0.1)), Vector3(0, 0.42, 0), _visual, 6)
-			B.label("Grave-moss draught", Color(0.9, 0.45, 0.45), Vector3(0, 0.8, 0), self, 28)
+			_label(B.label("Grave-moss draught", Color(0.9, 0.45, 0.45), Vector3(0, 0.8, 0), self, 28))
 		"item":
 			var rarity := int(item.get("rarity", 0))
 			var col: Color = Items.RARITY_COLORS[rarity]
@@ -54,7 +54,7 @@ func setup() -> void:
 				beam.material_override = bm
 				beam.position = Vector3(0, 2.5, 0)
 				add_child(beam)
-			B.label(str(item.get("name", "Item")), col, Vector3(0, 0.75, 0), self, 30)
+			_label(B.label(str(item.get("name", "Item")), col, Vector3(0, 0.75, 0), self, 30))
 
 
 func _process(delta: float) -> void:
@@ -87,3 +87,9 @@ func _process(delta: float) -> void:
 			elif not _full_warned:
 				_full_warned = true
 				Game.message.emit("Your pack is full. Salvage something (right-click in the pack, I).", Color(0.9, 0.4, 0.3))
+
+
+## Loot names show unless the player turned them off (Settings, Gameplay).
+func _label(l: Label3D) -> void:
+	l.add_to_group("loot_labels")
+	l.visible = bool(Settings.get_value("gameplay", "loot_labels"))

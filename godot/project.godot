@@ -26,6 +26,7 @@ Boot="*res://scripts/autoload/boot.gd"
 SaveSystem="*res://scripts/autoload/save_system.gd"
 Game="*res://scripts/autoload/game_state.gd"
 Dev="*res://scripts/autoload/dev_console.gd"
+Settings="*res://scripts/autoload/settings.gd"
 
 [display]
 

@@ -47,6 +47,10 @@ func _run() -> void:
 	await _skills()
 	print("== skills in the world")
 	await _skills_in_world()
+	print("== settings")
+	await _settings()
+	print("== panels")
+	await _panels()
 	if _failures.is_empty():
 		print("UI TEST PASSED")
 		get_tree().quit(0)
@@ -257,3 +261,93 @@ func _skills_in_world() -> void:
 		await _frames(60)
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 		await _frames(5)
+
+
+# ------------------------------------------------------------------ settings
+
+func _settings() -> void:
+	Settings.path = "user://settings_test.cfg"
+	Settings.reset()
+	_check(int(Settings.get_value("audio", "music")) == int(Settings.DEFAULTS["audio"]["music"]), "settings start at defaults")
+	Settings.set_value("audio", "music", 40)
+	Settings.set_value("gameplay", "screen_shake", false)
+	Settings.load_settings()
+	_check(int(Settings.get_value("audio", "music")) == 40, "a volume survives a reload")
+	_check(Settings.get_value("gameplay", "screen_shake") == false, "a gameplay switch survives a reload")
+	_check(AudioServer.get_bus_index("Music") >= 0 and AudioServer.get_bus_index("Effects") >= 0, "audio buses exist")
+	_check(absf(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Music")) - linear_to_db(0.4)) < 0.5, "music volume applied")
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_1
+	var lost: String = Settings.rebind("potion", key)
+	_check(lost == "bar_3", "rebinding 1 to the draught takes it from skill slot 3 (%s)" % lost)
+	var has_one := false
+	for ev in InputMap.action_get_events("bar_3"):
+		if ev is InputEventKey and ev.physical_keycode == KEY_1:
+			has_one = true
+	_check(not has_one, "the old action lost the key")
+	_check(Settings.key_text("potion") == "1", "the draught key reads 1 (%s)" % Settings.key_text("potion"))
+	Settings.load_settings()
+	_check(Settings.key_text("potion") == "1", "a rebind survives a reload")
+	Settings.reset()
+	_check(Settings.key_text("potion") == "Q" and Settings.key_text("bar_3") == "1", "reset restores keys")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://settings_test.cfg"))
+
+
+# ------------------------------------------------------------------ panels
+
+func _panels() -> void:
+	await _hero("warrior")
+	Game.progress["level"] = 10
+	Game.area = "town"
+	get_tree().change_scene_to_file("res://scenes/world.tscn")
+	await _frames(20)
+	var w = get_tree().current_scene
+	var hud = w.hud
+	for name in ["character", "skills", "settings"]:
+		hud.open_panel(name)
+		await _frames(2)
+		_check(hud.panel_open() == name and hud.is_blocking(), "%s panel opens and blocks clicks" % name)
+		_check(not get_tree().paused or name == "settings", "%s panel doesn't pause the game" % name)
+		hud.close_panels()
+		_check(hud.panel_open() == "" and not hud.is_blocking(), "%s panel closes" % name)
+	# Esc: panel first, then the pause menu.
+	hud.open_panel("character")
+	hud.escape()
+	_check(hud.panel_open() == "" and not hud.is_paused(), "Esc closes the open panel first")
+	hud.escape()
+	_check(hud.is_paused(), "Esc with nothing open pauses")
+	hud.escape()
+	_check(not hud.is_paused(), "Esc again resumes")
+
+	# Character panel: drag a bag item onto its slot, and back.
+	hud.open_panel("character")
+	var cp = hud.panel("character")
+	Game.inventory().clear()
+	var helm := Items.roll_item(3, "warrior", 0.0, "head")
+	Game.add_item(helm)
+	await _frames(2)
+	_check(cp.bag_cells() == Game.INVENTORY_SIZE, "the bag shows 60 cells")
+	_check(cp.drop({"slot": "head"}, {"bag": 0}), "drag a helm from the bag to the head slot")
+	_check(Game.progress["equipped"]["head"] == helm and Game.inventory().is_empty(), "the helm is worn")
+	_check(not cp.drop({"slot": "feet"}, {"slot": "head"}), "a helm can't go on the feet")
+	_check(cp.drop({"bag": 5}, {"slot": "head"}), "drag the helm back to the bag")
+	_check(Game.progress["equipped"]["head"] == null and Game.inventory().size() == 1, "the helm is in the bag")
+	var t: String = cp.tooltip_for({"bag": 0})
+	_check(t.contains(helm["name"]), "the tooltip names the item")
+	hud.close_panels()
+
+	# Skills panel lists the class's skills, and locks with a foe near.
+	hud.open_panel("skills")
+	var sp = hud.panel("skills")
+	_check(sp.skill_ids().size() == 8, "the skills panel lists 8 skills")
+	_check(sp.locked_reason() == "", "skills can change in town")
+	var foe = w.spawn_enemy("hollow", w.player.global_position + Vector3(3, 0, 0), 1, false) if w.has_method("spawn_enemy") else null
+	if foe:
+		await _frames(2)
+		_check(sp.locked_reason() != "", "skills lock with a foe near")
+		foe.queue_free()
+		await _frames(2)
+	hud.close_panels()
+	_check(hud.hotbar_slots() == Game.BAR_SIZE, "the hotbar shows six skill slots")
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	await _frames(5)
