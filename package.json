@@ -4,7 +4,7 @@
   "description": "Dark fantasy action RPG",
   "author": "afiniel",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "main": "electron/main.cjs",
   "desktop": {
