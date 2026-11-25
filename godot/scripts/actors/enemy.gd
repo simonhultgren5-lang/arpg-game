@@ -39,6 +39,7 @@ var aggro := false
 
 var _cd := 0.0
 var _windup := 0.0
+var _warning_audio: AudioStreamPlayer3D
 var _stun := 0.0
 ## Slowed (Bone Caltrops): time left and the speed multiplier while it lasts.
 var _slow_t := 0.0
@@ -193,6 +194,8 @@ func _physics_process(delta: float) -> void:
 	if _anim:
 		_anim.update(delta, clampf(get_position_delta().length() / maxf(delta * float(data["speed"]), 0.001), 0.0, 1.0))
 	if _stun > 0.0:
+		if is_instance_valid(_warning_audio):
+			_warning_audio.stream_paused = true
 		_stun -= delta
 		_windup = 0.0
 		velocity = _knock
@@ -201,6 +204,8 @@ func _physics_process(delta: float) -> void:
 	var p: Node3D = world.player
 	if p == null:
 		return
+	if is_instance_valid(_warning_audio):
+		_warning_audio.stream_paused = p.dead
 	var to_p := p.global_position - global_position
 	to_p.y = 0.0
 	var dist := to_p.length()
@@ -234,6 +239,7 @@ func _physics_process(delta: float) -> void:
 			move = -to_p.normalized() * 0.8  # back off
 		if _cd <= 0.0:
 			_windup = data["windup"]
+			ActAudio.cue("tell_" + kind, -15.0, self, 100)
 			if _anim:
 				_anim.one_shot("attack", _anim.player.get_animation("attack").length / maxf(float(data["windup"]) + 0.25, 0.1) if _anim.player.has_animation("attack") else 1.0)
 			_cd = data["cd"] * (0.75 if _enraged else 1.0)
@@ -326,6 +332,8 @@ func _boss_logic(delta: float, p: Node3D, dist: float) -> void:
 	_toll_cd -= delta
 	if not _summoned and hp < max_hp * 0.5:
 		_summoned = true
+		ActAudio.cue("boss_summon", -11.0, self)
+		ActAudio.boss_phase(false)
 		world.message("Hask strikes his chest. The bell answers, and the dead rise.", Color(0.92, 0.42, 0.18))
 		for i in 4:
 			var c: Vector2i = world.grid.random_floor_near(world.grid.cell_of(global_position), 4, world.rng)
@@ -333,11 +341,14 @@ func _boss_logic(delta: float, p: Node3D, dist: float) -> void:
 			e.set_aggro()
 	if not _enraged and hp < max_hp * 0.25:
 		_enraged = true
+		ActAudio.cue("boss_enrage", -11.0, self)
+		ActAudio.boss_phase(true)
 		world.message("Hask's chest burns white-hot.", Color(1.0, 0.5, 0.2))
 	if _toll_pending >= 0.0:
 		_toll_pending -= delta
 		if _toll_pending < 0.0:
 			_toll_pending = -1.0
+			ActAudio.cue("boss_release", -6.0, self)
 			Fx.ring(world, global_position, 7.0, Color(1.0, 0.45, 0.15), 0.5)
 			Fx.flash(world, global_position, Color(1.0, 0.4, 0.15), 8.0, 14.0, 0.5)
 			world.shake(0.6)
@@ -351,7 +362,7 @@ func _boss_logic(delta: float, p: Node3D, dist: float) -> void:
 			_anim.one_shot("cast", 0.6)
 		Fx.telegraph(world, global_position, 7.0, Color(1.0, 0.35, 0.1), 1.2)
 		world.message("THE BELL TOLLS", Color(1.0, 0.5, 0.25))
-		ActAudio.toll(self)
+		_warning_audio = ActAudio.cue("boss_prepare", -8.0, self)
 
 
 func set_aggro() -> void:
@@ -371,6 +382,9 @@ func take_damage(amount: float, crit := false, push := Vector3.ZERO) -> void:
 	if dead:
 		return
 	hp -= amount
+	ActAudio.cue("hit_" + kind, -13.0, self, 55)
+	if crit:
+		ActAudio.cue("crit", -9.0, self, 120)
 	if _anim and _windup <= 0.0 and hp > 0.0:
 		_anim.one_shot("hit")
 	_flash = 1.0
@@ -404,6 +418,10 @@ func knockback(dir: Vector3, strength: float) -> void:
 
 func _die() -> void:
 	dead = true
+	if is_instance_valid(_warning_audio):
+		_warning_audio.stop()
+		_warning_audio.queue_free()
+	ActAudio.cue("boss_death" if is_boss else "death_" + kind, -6.0 if is_boss else -14.0, self, 100)
 	remove_from_group("enemies")
 	collision_layer = 0
 	collision_mask = 0

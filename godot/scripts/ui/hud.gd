@@ -408,6 +408,8 @@ func open_panel(name: String) -> void:
 		toggle_map()
 	close_panels()
 	_panels[name].visible = true
+	if name == "character":
+		ActAudio.cue("inventory", -18.0)
 	if world and world.player:
 		world.player.stop()
 
@@ -532,7 +534,7 @@ func _build_act_complete() -> void:
 
 
 func show_act_complete() -> void:
-	ActAudio.toll(self)
+	ActAudio.cue("act_complete", -10.0)
 	_dialogue.visible = false
 	close_panels()
 	_act_complete.visible = true

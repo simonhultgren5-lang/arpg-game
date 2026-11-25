@@ -184,6 +184,14 @@ func _ensure_buses() -> void:
 			AudioServer.add_bus()
 			AudioServer.set_bus_name(AudioServer.bus_count - 1, bus)
 			AudioServer.set_bus_send(AudioServer.bus_count - 1, "Master")
+	# Scene dynamics have their own faders so player preferences always compose with ducking.
+	for parent in ["Music", "Ambience"]:
+		var mix_bus: String = parent + " Mix"
+		if AudioServer.get_bus_index(mix_bus) < 0:
+			AudioServer.add_bus()
+			var index := AudioServer.bus_count - 1
+			AudioServer.set_bus_name(index, mix_bus)
+			AudioServer.set_bus_send(index, parent)
 
 
 func _apply(section: String, key: String) -> void:

@@ -162,6 +162,7 @@ static func _edda(root: Node3D) -> void:
 		brass, Vector3(0.12, 1.36, 0.24), Vector3(PI * 0.5, 0, 0))  # badge
 	# Head with a long braid over the right shoulder.
 	var head := _head(root, Vector3(0, 1.52, 0.02), skin)
+	head.name = "EddaHead"
 	K.add(head, K.lathe(PackedVector2Array([
 		Vector2(0.135, 0.06), Vector2(0.14, 0.18), Vector2(0.11, 0.27), Vector2(0, 0.3)]), 10), hair,
 		Vector3(0, 0, -0.02))
@@ -173,6 +174,8 @@ static func _edda(root: Node3D) -> void:
 	for side in [-1.0, 1.0]:
 		var hand := K.arm(root, shirt, Vector3(side * 0.36, 1.42, 0.0), 0.085, 0.075, 0.06, 0.32, 0.3,
 			Vector3(0.05, 0, side * 0.16), -0.25 if side > 0 else -0.9)
+		if side < 0:
+			hand.name = "EddaLeftHand"
 		K.add(hand, K.limb(0.065, 0.065, 0.12, 6), strap, Vector3(0, 0.15, 0))  # bracer
 		K.add(hand, K.bevel_box(Vector3(0.09, 0.1, 0.08), 0.02), skin)
 		if side > 0:

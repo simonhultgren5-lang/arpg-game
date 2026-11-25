@@ -168,4 +168,7 @@ func _start() -> void:
 	_busy = true
 	_status.text = "Loading the hero..." if not Boot.is_online() else "Loading the hero from %s..." % Boot.server_url
 	await Game.load_hero()
-	get_tree().change_scene_to_file("res://scenes/world.tscn")
+	if Game.is_new_hero() and not Game.flags().get("saw_second_cup", false):
+		get_tree().change_scene_to_file("res://scenes/act1_opening.tscn")
+	else:
+		get_tree().change_scene_to_file("res://scenes/world.tscn")

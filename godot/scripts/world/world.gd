@@ -23,6 +23,11 @@ var rng := RandomNumberGenerator.new()
 var boss: Node3D = null
 var _interactables: Array = []
 var _env: Environment
+var _danger_check := 1.0
+var _quiet_time := 0.0
+var _zone_check := 0.0
+var _thunder_in := 12.0
+var _audio_rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
@@ -60,6 +65,11 @@ func _ready() -> void:
 	camera.target = player
 	add_child(camera)
 	camera.current = true
+	# Hero perspective follows movement, independent of camera zoom, shake and model facing.
+	var listener := AudioListener3D.new()
+	player.add_child(listener)
+	listener.position = Vector3.UP
+	listener.make_current()
 
 	hud = Hud.new()
 	hud.world = self
@@ -127,9 +137,62 @@ func _build_environment() -> void:
 		add_child(moon)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if wall_material and player:
 		wall_material.set_shader_parameter("player_pos", player.global_position)
+	if player:
+		_zone_check -= delta
+		if _zone_check <= 0:
+			_zone_check = 0.25
+			_update_environment()
+	if Game.area != "catacomb" or not player or player.dead:
+		return
+	_danger_check -= delta
+	if _danger_check > 0.0:
+		return
+	_danger_check = 0.5
+	if _quiet_time < 0.0:
+		_quiet_time += 0.5
+		return
+	for foe in enemies():
+		if foe.aggro and not foe.dead and player.global_position.distance_squared_to(foe.global_position) < 196.0:
+			ActAudio.combat(true)
+			_quiet_time = 0.0
+			return
+	_quiet_time += 0.5
+	if _quiet_time > 6.0:
+		ActAudio.combat(false)
+
+
+func step_surface(at: Vector3) -> String:
+	var zone := _audio_zone("surface")
+	if zone:
+		return zone.get("surface")
+	var cell: Vector2i = grid.cell_of(at)
+	if Game.area == "town" and grid.inside(cell) and cell.x < Town.MAP[cell.y].length():
+		return "dirt" if Town.MAP[cell.y][cell.x] == "." else "stone"
+	return "stone"
+
+
+func _audio_zone(field: String) -> Area3D:
+	var selected: Area3D = null
+	for zone in get_tree().get_nodes_in_group("audio_zones"):
+		if zone.get(field) and zone.overlaps_body(player) and (not selected or zone.priority > selected.priority):
+			selected = zone
+	return selected
+
+
+func _update_environment() -> void:
+	var zone := _audio_zone("bed")
+	var bed := str(zone.get("bed")) if zone else ("wind" if Game.area == "town" else "drips")
+	ActAudio.environment(bed)
+	if zone and bed == "rain" and zone.get("thunder_enabled"):
+		_thunder_in -= 0.25
+		if _thunder_in <= 0:
+			ActAudio.cue("thunder", -17.0)
+			_thunder_in = _audio_rng.randf_range(18.0, 46.0)
+	else:
+		_thunder_in = 12.0
 
 
 # ------------------------------------------------------------------ queries
@@ -431,6 +494,7 @@ func _on_enemy_died(e: Node3D) -> void:
 		hud.boss_defeated()
 		message("Hask, the Bell-Warden, falls silent.", Color(0.92, 0.42, 0.18))
 		ActAudio.play_area("crypt")
+		_quiet_time = -3.0
 		_open_portal(pos)
 		Game.save()
 		return
@@ -470,6 +534,15 @@ func _drop(pos: Vector3, kind: String, gold := 0, item := {}) -> void:
 	add_child(l)
 	l.global_position = _scatter(pos)
 	l.setup()
+	var sound := "loot_" + kind
+	if kind == "item" and item.get("slot") != "quest":
+		if int(item.get("rarity", 0)) == Items.UNIQUE:
+			sound = "unique"
+		elif int(item.get("rarity", 0)) == 3:
+			sound = "relic"
+	var drop_sound := ActAudio.cue(sound, -11.0 if sound in ["unique", "relic"] else -18.0, l, 90)
+	if drop_sound:
+		drop_sound.reparent(self)
 
 
 func drop_gold(pos: Vector3, amount: int) -> void:
@@ -547,6 +620,7 @@ func boss_engaged(e: Node3D) -> void:
 
 
 func player_died() -> void:
+	ActAudio.cue("hero_fall", -12.0)
 	hud.show_death()
 
 
@@ -561,12 +635,13 @@ func respawn_in_town() -> void:
 func _on_story_event(id: String) -> void:
 	match id:
 		"wells_toll":
-			ActAudio.toll(self)
+			ActAudio.cue("wells", -11.0)
 			shake(0.4)
 			hud.banner("The Wells Toll", "Far below the water, every well in Hollowmere answers the bell")
 
 
 func _on_level_up(lv: int) -> void:
+	ActAudio.cue("level_up", -16.0, null, 400)
 	if player:
 		player.on_level_up()
 	hud.banner("Level %d" % lv, "Your strength grows. The dark notices.")

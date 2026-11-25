@@ -72,16 +72,19 @@ func _process(delta: float) -> void:
 	match kind:
 		"gold":
 			Game.add_gold(gold)
+			ActAudio.cue("inventory", -21.0, null, 120)
 			world.pickup_text(global_position, "+%d gold" % gold, Color(0.95, 0.8, 0.45))
 			queue_free()
 		"potion":
 			if int(Game.progress["potions"]) < 9:
 				Game.add_potion(1)
+				ActAudio.cue("inventory", -19.0, null, 120)
 				world.pickup_text(global_position, "+1 draught", Color(0.95, 0.45, 0.45))
 				queue_free()
 		"item":
 			if Game.inventory().size() < Game.INVENTORY_SIZE:
 				Game.add_item(item)
+				ActAudio.cue("inventory", -18.0, null, 120)
 				world.pickup_text(global_position, str(item.get("name", "Item")), Items.RARITY_COLORS[int(item.get("rarity", 0))])
 				queue_free()
 			elif not _full_warned:

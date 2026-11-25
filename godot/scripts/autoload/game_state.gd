@@ -506,6 +506,7 @@ func equip_to(index: int, slot := "") -> bool:
 	if old is Dictionary:
 		inventory().insert(index, old)
 	eq[slot] = item
+	ActAudio.cue("equipment", -15.0)
 	inventory_changed.emit()
 	stats_changed.emit()
 	return true
@@ -520,6 +521,7 @@ func unequip(slot: String) -> bool:
 		message.emit("Your pack is full.", Color(0.9, 0.4, 0.3))
 		return false
 	progress["equipped"][slot] = null
+	ActAudio.cue("inventory", -17.0)
 	inventory().append(item)
 	inventory_changed.emit()
 	stats_changed.emit()
@@ -537,6 +539,7 @@ func move_item(from: int, to: int) -> void:
 		var t = bag[to]
 		bag[to] = bag[from]
 		bag[from] = t
+	ActAudio.cue("inventory", -17.0)
 	inventory_changed.emit()
 
 
@@ -547,6 +550,7 @@ func salvage(index: int) -> void:
 	if item.get("slot") == "quest":
 		return
 	var gold := Items.value(item)
+	ActAudio.cue("equipment", -18.0)
 	inventory().remove_at(index)
 	add_gold(gold)
 	message.emit("Salvaged %s for %d gold." % [item.get("name", "item"), gold], Color(0.89, 0.71, 0.49))
@@ -572,7 +576,13 @@ func quest(id: String) -> int:
 
 
 func set_quest(id: String, st: int) -> void:
+	var old_state := quest(id)
 	progress["quests"][id] = clampi(st, 0, int(QUESTS.get(id, 3)))
+	if id != "act_end" and old_state != quest(id):
+		if quest(id) == 1:
+			ActAudio.cue("quest_accept", -14.0)
+		elif quest(id) == 3:
+			ActAudio.cue("quest_complete", -12.0)
 	quest_changed.emit()
 	save()
 
@@ -673,9 +683,13 @@ func run_action(action: String) -> void:
 			if int(progress["gold"]) >= POTION_PRICE and int(progress["potions"]) < 9:
 				progress["gold"] = int(progress["gold"]) - POTION_PRICE
 				add_potion(1)
+				ActAudio.cue("vendor", -15.0)
 				message.emit("Bought a grave-moss draught.", Color(0.85, 0.4, 0.4))
 			elif int(progress["potions"]) >= 9:
+				ActAudio.cue("deny", -18.0)
 				message.emit("You cannot carry more draughts.", Color(0.9, 0.4, 0.3))
+			else:
+				ActAudio.cue("deny", -18.0)
 		"accept_lamps":
 			if quest("lamps") == 0:
 				set_quest("lamps", 1)

@@ -31,6 +31,7 @@
     "godot:export": "node scripts/export-godot.mjs",
     "assets:build": "node scripts/assets/build.mjs",
     "audio:act1": "node scripts/audio/act1-audio.mjs",
+    "audio:hollowmere": "node scripts/audio/hollowmere-bank.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:reset": "node scripts/dev-reset.mjs",
     "test": "node scripts/test.mjs",
