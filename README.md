@@ -155,6 +155,7 @@ release/                Builds (created by `bun run dist` and `bun run release`,
 
 The repo is laid out like an AAA depot: source code in its own folders, game-ready assets in `godot/assets/{textures,models,animations,audio,cinematics}`, and the editable originals in `source-assets/{Textures,Models,Animations,Audio,Cinematics}`.
 
+- **The look of the game** (visual pillars, palette, lighting, budgets, the quality checklist) is set by the [art bible](art-bible.md).
 - **Models and textures are built by Blender scripts** in `scripts/assets/` (`bun run assets:build`). How to make or change an asset: [assets.md](assets.md).
 - **Large binaries are stored with Git LFS** (images, audio, video, models, fonts; the full list is in `.gitattributes`). After `git lfs install`, cloning and pulling download them like normal files. Without Git LFS you get small pointer files instead, which is fine for running the game server, but not for the game.
 - **Source files lock like a Perforce checkout.** `.blend`, `.psd`, `.ma`, `.max`, `.prproj` and everything in `source-assets/` arrive read-only. Run `git lfs lock <file>` before editing, push, then `git lfs unlock <file>`. GitHub refuses a push to a file someone else has locked. `git lfs locks` lists who has what.
