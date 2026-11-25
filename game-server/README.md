@@ -102,6 +102,46 @@ cd ~/arpg-game && git pull
 bash game-server/update.sh --auto
 ```
 
+### Manage accounts (admin commands)
+
+`admin.mjs` manages accounts and characters directly in the server's database. It works while the server runs, and changes apply right away. With Docker, run it inside the container:
+
+```bash
+docker exec -it depths-server node admin.mjs                      # list of commands
+docker exec -it depths-server node admin.mjs accounts             # accounts, characters, last login
+docker exec -it depths-server node admin.mjs characters edda      # one account's characters (or everyone's)
+docker exec -it depths-server node admin.mjs reset-password edda  # new random password, signs out everywhere
+docker exec -it depths-server node admin.mjs reset-password edda hunter22
+docker exec -it depths-server node admin.mjs rename-character edda "Old Name" "New Name"
+docker exec -it depths-server node admin.mjs delete-character edda "Old Name" --yes
+docker exec -it depths-server node admin.mjs delete-account edda --yes
+docker exec -it depths-server node admin.mjs sign-out edda        # end all logins of an account
+docker exec -it depths-server node admin.mjs stats                # counts and database size
+docker exec -it depths-server node admin.mjs backup               # copy to /data/backups/depths-<date>.db
+
+# News in the launcher
+docker exec -it depths-server node admin.mjs news-post "Double XP weekend" "Friday to Sunday, every kill counts twice."
+docker exec -it depths-server node admin.mjs news-post "Beta testers" "Try the new crypt." --channel beta
+docker exec -it depths-server node admin.mjs news                 # list (with ids)
+docker exec -it depths-server node admin.mjs news-delete 3 --yes
+
+# Feature flags (applied the next time a player presses Play)
+docker exec -it depths-server node admin.mjs flag-set game.xp_multiplier 2 --note "Double XP weekend"
+docker exec -it depths-server node admin.mjs flag-set launcher.banner "Double XP weekend: every kill counts twice"
+docker exec -it depths-server node admin.mjs flag-set game.dev_console true --channel dev
+docker exec -it depths-server node admin.mjs flags
+docker exec -it depths-server node admin.mjs flag-unset game.xp_multiplier
+
+# Crash reports and usage statistics (from players who said yes)
+docker exec -it depths-server node admin.mjs crashes              # newest 20
+docker exec -it depths-server node admin.mjs crash 12             # one report, with stack trace or game log
+docker exec -it depths-server node admin.mjs telemetry 30         # summary of the last 30 days
+```
+
+Without Docker, run `node admin.mjs <command>` in the server folder. From a clone of the repo, `bun run admin <command>` uses `game-server/data`. Commands that delete something ask for `--yes` first.
+
+To restore a backup made with `admin.mjs backup`, stop the server first: the command refuses while the server runs. Then `node admin.mjs restore <file> --yes` replaces the database and keeps the old one next to it as `depths.db.before-restore-<time>`.
+
 ### Back up the data
 
 ```bash
@@ -174,6 +214,11 @@ All responses are JSON. Logged-in requests send `Authorization: Bearer <token>`.
 | GET | `/api/characters/:id/save` | | `save` with `data` (the full hero), or `null` |
 | PUT | `/api/characters/:id/save` | `data` (game keys), `meta` (level, depth) | `updatedAt` |
 | GET / PUT | `/api/save` | as above | For launchers before 0.3: reads and writes the account's first character |
+| POST | `/api/auth/password` | `current`, `password` | `ok`; signs out the account's other sessions |
+| GET | `/api/news?channel=` | | `news`: `[{ id, title, body, date }]`, newest first |
+| GET | `/api/flags?channel=` | | `flags`: `{ name: value }`; a channel's value wins over the one for everyone |
+| POST | `/api/crash` | `source`, `message`, `detail`, `version`, `channel`, `platform`, `installId` | `ok` (no login; 30 per hour per address) |
+| POST | `/api/telemetry` | `events: [{ event, at, props }]` (up to 50), `version`, `channel`, `installId` | `ok` (no login; 120 per hour per address) |
 
 Each account has up to **5 characters**. Names are 2–18 letters (spaces, `-` and `'` allowed) and unique per account; classes are `warrior`, `pyromancer` and `rogue`. A server upgraded from an older version moves each account's existing hero into its first character slot on start-up.
 

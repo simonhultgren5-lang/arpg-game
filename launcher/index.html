@@ -3,181 +3,341 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src data:; img-src 'self' data:">
-<title>Depths of Darkness — Launcher</title>
+<title>Depths of Darkness</title>
 <link rel="stylesheet" href="assets/fonts.css">
 <link rel="stylesheet" href="launcher.css">
 </head>
 <body>
-<header class="titlebar">
-  <div class="titlebar-brand"><img class="sigil" src="assets/emblem.svg" alt="" width="18" height="18"> Depths of Darkness</div>
-  <div class="titlebar-buttons">
-    <button type="button" id="btnMinimize" aria-label="Minimize">&#x2013;</button>
-    <button type="button" id="btnClose" class="close" aria-label="Close">&#x2715;</button>
+<!-- The Act I film loops silently behind every page; "Watch the Act I film" plays it full size with sound. -->
+<video class="backdrop-film" id="actFilm" muted loop playsinline preload="auto" poster="assets/act-i-poster.jpg" aria-hidden="true">
+  <source src="assets/act-i.mp4" type="video/mp4">
+  <track kind="captions" srclang="en" label="English" src="assets/act-i.en.vtt">
+</video>
+<div class="backdrop-shade" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <img src="assets/emblem.svg" alt="" width="26" height="26">
+    <span>Depths of Darkness</span>
+  </div>
+  <nav class="nav" aria-label="Launcher">
+    <button type="button" data-view="play" aria-current="page">Play</button>
+    <button type="button" data-view="news">News<span class="nav-dot" id="newsDot" hidden></span></button>
+    <button type="button" data-view="settings">Settings</button>
+    <button type="button" data-view="dev" id="navDev" hidden>Dev tools</button>
+  </nav>
+  <div class="topbar-end">
+    <button type="button" class="who" id="whoChip" data-view="settings" title="Account and servers">
+      <span class="who-dot" id="whoDot"></span><span id="whoText">Not signed in</span>
+    </button>
+    <div class="window-buttons">
+      <button type="button" id="btnMinimize" aria-label="Minimize">&#x2013;</button>
+      <button type="button" id="btnClose" class="close" aria-label="Close">&#x2715;</button>
+    </div>
   </div>
 </header>
 
-<main class="layout">
-  <section class="hero" aria-label="Game">
-    <!-- The Act I film plays silently behind the launcher; "Watch the Act I film" plays it full size with sound. -->
-    <video class="hero-film" id="actFilm" muted loop playsinline preload="auto" poster="assets/act-i-poster.jpg" aria-hidden="true">
-      <source src="assets/act-i.mp4" type="video/mp4">
-      <track kind="captions" srclang="en" label="English" src="assets/act-i.en.vtt">
-    </video>
-    <div class="hero-film-shade" aria-hidden="true"></div>
-    <div class="arch" aria-hidden="true"></div>
-    <div class="hero-content">
-      <img class="logo-emblem" src="assets/emblem.svg" alt="" width="84" height="84">
-      <p class="kicker">Dark Fantasy Action RPG</p>
-      <h1>Depths<br>of Darkness</h1>
-      <button type="button" class="trailer-link" id="btnTrailer"><span class="play-glyph" aria-hidden="true">&#9654;</span> Watch the Act I film</button>
-      <div class="motd" id="motd" hidden>
-        <span class="motd-label" id="motdLabel">Message from the server</span>
-        <p id="motdText"></p>
-      </div>
-      <div class="update-card" id="updateCard" role="status" aria-live="polite" hidden>
-        <span class="update-label" id="updateLabel">Update</span>
+<main class="views">
+  <!-- ============================================================ Play -->
+  <section class="view view-play" id="viewPlay" aria-label="Play">
+    <aside class="rail rail-left">
+      <button type="button" class="news-card" id="newsCard" hidden>
+        <span class="news-card-meta"><span id="newsCardFrom"></span><span class="badge-new" id="newsCardNew" hidden>New</span></span>
+        <b class="news-card-title" id="newsCardTitle"></b>
+        <span class="news-card-text" id="newsCardText"></span>
+      </button>
+      <section class="patch-card" id="notesCard" aria-labelledby="notesCardTitle" hidden>
+        <p class="patch-kicker"><span id="notesCardVersion"></span><span class="badge-new" id="notesNew" hidden>New</span></p>
+        <h2 class="patch-title" id="notesCardTitle"></h2>
+        <ul class="patch-highlights" id="notesHighlights"></ul>
+        <button type="button" class="text-btn" id="btnAllNotes">Read the patch notes</button>
+      </section>
+      <section class="update-card" id="updateCard" role="status" aria-live="polite" hidden>
+        <p class="update-label" id="updateLabel">Update</p>
         <b class="update-title" id="updateTitle"></b>
         <div class="update-progress" id="updateProgress" hidden><span id="updateBar"></span></div>
         <div class="update-notes notes-body" id="updateNotes"></div>
         <p class="update-error" id="updateError" hidden></p>
         <div class="update-actions" id="updateActions"></div>
-      </div>
-      <section class="notes-card" id="notesCard" aria-labelledby="notesCardTitle" hidden>
-        <div class="notes-card-head">
-          <span class="notes-label">What's new</span>
-          <span class="badge-new" id="notesNew" hidden>New</span>
-        </div>
-        <b class="notes-card-title" id="notesCardTitle"></b>
-        <ul class="notes-highlights" id="notesHighlights"></ul>
-        <button type="button" class="link-btn notes-more" id="btnAllNotes">Read the full patch notes →</button>
       </section>
+      <section class="motd" id="motd" hidden>
+        <p class="motd-label" id="motdLabel">Message from the server</p>
+        <p class="motd-text" id="motdText"></p>
+      </section>
+    </aside>
+
+    <!-- The niche: the selected hero, or what to do before you can play -->
+    <div class="stage" id="stage">
+      <p class="flag-banner" id="flagBanner" role="status" hidden></p>
+      <div class="niche" id="niche" aria-live="polite">
+        <div class="niche-arch" aria-hidden="true"><span class="niche-candle l"></span><span class="niche-candle r"></span></div>
+
+        <div class="hero-show" id="heroShow" hidden>
+          <div class="hero-emblem" id="heroEmblem"></div>
+          <h1 class="hero-name" id="heroName"></h1>
+          <p class="hero-line" id="heroLine"></p>
+          <p class="hero-role" id="heroRole"></p>
+        </div>
+
+        <div class="gate" id="gateAuth" hidden>
+          <h1 class="gate-title" id="gateAuthTitle">Sign in to play</h1>
+          <p class="gate-text" id="gateAuthText">Your heroes are kept on the server.</p>
+          <div class="tabs" role="tablist">
+            <button type="button" role="tab" id="tabLogin" aria-selected="true">Log in</button>
+            <button type="button" role="tab" id="tabRegister" aria-selected="false">Create account</button>
+          </div>
+          <form id="authForm" novalidate>
+            <label>Username<input name="username" autocomplete="username" maxlength="20" spellcheck="false" required></label>
+            <label>Password<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+            <label id="confirmRow" hidden>Confirm password<input name="confirm" type="password" autocomplete="new-password" maxlength="128"></label>
+            <p class="form-hint" id="authHint" hidden>3–20 letters, numbers or _, and a password of 6 or more characters.</p>
+            <p class="form-error" id="authError" role="alert" hidden></p>
+            <button type="submit" class="btn wide" id="authSubmit">Log in</button>
+          </form>
+        </div>
+
+        <div class="gate" id="gateMessage" hidden>
+          <h1 class="gate-title" id="gateTitle"></h1>
+          <p class="gate-text" id="gateText"></p>
+          <div class="gate-actions" id="gateActions"></div>
+        </div>
+      </div>
     </div>
-    <footer class="hero-foot">
-      <span id="versionLabel">v—</span>
-      <span class="dot-sep" aria-hidden="true">·</span>
-      <span id="updateState">Progress saves to your account on the selected server</span>
-      <button type="button" class="foot-link" id="btnFooterNotes">Patch notes</button>
+
+    <aside class="rail rail-right">
+      <section class="realm" id="realmCard" aria-label="Where you play">
+        <div class="mode-switch" role="radiogroup" aria-label="Play online or offline">
+          <button type="button" role="radio" id="modeOnline" aria-checked="true">Online</button>
+          <button type="button" role="radio" id="modeOffline" aria-checked="false">Offline</button>
+        </div>
+        <div class="realm-server" id="realmServer">
+          <span class="status-dot" id="realmDot"></span>
+          <div class="realm-text">
+            <b id="realmName">No server</b>
+            <small id="realmMeta"></small>
+          </div>
+          <button type="button" class="text-btn small" id="btnChangeServer">Change</button>
+        </div>
+        <p class="realm-note" id="realmNote"></p>
+      </section>
+      <button type="button" class="film-link" id="btnTrailer">
+        <span class="film-thumb" aria-hidden="true"><span class="play-glyph">&#9654;</span></span>
+        <span><b>Act I film</b><small>The Tolling of Hollowmere</small></span>
+      </button>
+    </aside>
+
+    <footer class="dock">
+      <div class="roster">
+        <p class="roster-label"><span id="charactersTitle">Characters</span> <span class="slot-count" id="slotCount"></span></p>
+        <ul class="roster-list" id="charList" role="listbox" aria-labelledby="charactersTitle"></ul>
+        <p class="form-error roster-error" id="charError" role="alert" hidden></p>
+      </div>
+      <div class="play-cluster">
+        <button type="button" class="play-btn" id="btnPlay" disabled>
+          <span id="playLabel">Play</span>
+        </button>
+        <p class="play-sub" id="playSub">Choose a server</p>
+      </div>
     </footer>
   </section>
 
-  <aside class="side">
-    <!-- Servers -->
-    <section class="card" aria-labelledby="serversTitle">
-      <div class="card-head">
-        <h2 id="serversTitle">Server</h2>
-        <div class="card-actions">
-          <button type="button" class="icon-btn" id="btnRefresh" title="Check servers again" aria-label="Check servers again">&#x21bb;</button>
-          <button type="button" class="icon-btn" id="btnAddServer" title="Add a server" aria-label="Add a server">+</button>
+  <!-- ============================================================ News (patch notes) -->
+  <section class="view view-news" id="viewNews" aria-labelledby="notesPanelTitle" hidden>
+    <div class="page">
+      <header class="page-head">
+        <h1 id="notesPanelTitle">News</h1>
+        <div class="tabs page-tabs" role="tablist" aria-label="News">
+          <button type="button" role="tab" id="tabServerNews" aria-selected="true">From the server</button>
+          <button type="button" role="tab" id="tabPatchNotes" aria-selected="false">Patch notes</button>
+        </div>
+        <p class="page-sub" id="notesSource"></p>
+      </header>
+      <div class="server-news" id="serverNews">
+        <p class="panel-text" id="serverNewsEmpty"></p>
+        <ol class="server-news-list" id="serverNewsList"></ol>
+      </div>
+      <div class="news-body" id="patchNotesBody" hidden>
+        <nav class="news-versions" id="notesVersions" aria-label="Versions"></nav>
+        <article class="news-article" id="notesArticle" tabindex="-1">
+          <header>
+            <p class="news-meta"><span id="notesArticleVersion"></span> <span class="news-date" id="notesArticleDate"></span></p>
+            <h2 id="notesArticleTitle"></h2>
+          </header>
+          <div class="notes-body" id="notesArticleBody"></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ Settings -->
+  <section class="view view-settings" id="viewSettings" aria-labelledby="settingsTitle" hidden>
+    <div class="page">
+      <header class="page-head"><h1 id="settingsTitle">Settings</h1></header>
+      <div class="settings-grid">
+        <section class="panel" aria-labelledby="serversTitle">
+          <div class="panel-head">
+            <h2 id="serversTitle">Servers</h2>
+            <div class="panel-actions">
+              <button type="button" class="icon-btn" id="btnRefresh" title="Check servers again" aria-label="Check servers again">&#x21bb;</button>
+              <button type="button" class="icon-btn" id="btnAddServer" title="Add a server" aria-label="Add a server">+</button>
+            </div>
+          </div>
+          <ul class="server-list" id="serverList" role="listbox" aria-label="Servers"></ul>
+          <form class="add-server" id="addServerForm" hidden>
+            <label>Name<input name="name" maxlength="40" placeholder="My Raspberry Pi" autocomplete="off"></label>
+            <label>Address<input name="url" required placeholder="192.168.1.50:4100" autocomplete="off" spellcheck="false"></label>
+            <p class="form-error" id="addServerError" hidden></p>
+            <div class="row-end">
+              <button type="button" class="btn ghost" id="btnCancelAdd">Cancel</button>
+              <button type="submit" class="btn">Add server</button>
+            </div>
+          </form>
+        </section>
+
+        <div class="settings-col">
+          <section class="panel" aria-labelledby="accountTitle">
+            <div class="panel-head"><h2 id="accountTitle">Account</h2></div>
+            <div class="account-row" id="accountRow">
+              <div class="avatar" id="avatar" aria-hidden="true">?</div>
+              <div class="account-text"><b id="ownerName">Not signed in</b><small id="ownerSub"></small></div>
+              <button type="button" class="btn ghost small" id="btnLogout" hidden>Log out</button>
+            </div>
+            <form class="password-form" id="passwordForm" hidden novalidate>
+              <label>Current password<input type="password" name="current" autocomplete="current-password" maxlength="128"></label>
+              <label>New password<input type="password" name="next" autocomplete="new-password" maxlength="128" placeholder="6 or more characters"></label>
+              <p class="form-error" id="passwordError" hidden></p>
+              <p class="form-ok" id="passwordOk" hidden>Password changed. Your other devices are signed out.</p>
+              <div class="row-start"><button type="submit" class="btn ghost small">Change password</button></div>
+            </form>
+          </section>
+          <section class="panel" aria-labelledby="updatesTitle">
+            <div class="panel-head"><h2 id="updatesTitle">Updates</h2></div>
+            <p class="setting-line"><span id="versionLabel">Version —</span><span id="updateState"></span></p>
+            <label>Release channel
+              <select id="channelSelect">
+                <option value="stable">Stable: tested releases</option>
+                <option value="beta">Beta: new features a little early</option>
+                <option value="dev">Dev: everything, as soon as it's built</option>
+              </select>
+            </label>
+            <p class="panel-text" id="channelNote"></p>
+            <label class="check"><input type="checkbox" id="autoDownload"> Download updates automatically</label>
+            <div class="row-start">
+              <button type="button" class="btn ghost small" id="btnCheckUpdates">Check for updates</button>
+              <button type="button" class="text-btn small" id="btnFooterNotes">Patch notes</button>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="privacyTitle">
+            <div class="panel-head"><h2 id="privacyTitle">Privacy</h2></div>
+            <p class="panel-text">Reports go to the game server you play on, never to anyone else, and aren't linked to your account.</p>
+            <label class="check"><input type="checkbox" id="consentCrashes"> Send crash reports</label>
+            <label class="check"><input type="checkbox" id="consentUsage"> Send usage statistics</label>
+            <p class="panel-text small-note" id="privacyNote"></p>
+          </section>
         </div>
       </div>
-      <ul class="server-list" id="serverList" role="listbox" aria-label="Servers"></ul>
-      <form class="add-server" id="addServerForm" hidden>
-        <label>Name<input name="name" maxlength="40" placeholder="My Raspberry Pi" autocomplete="off"></label>
-        <label>Address<input name="url" required placeholder="192.168.1.50:4100" autocomplete="off" spellcheck="false"></label>
-        <p class="form-error" id="addServerError" hidden></p>
-        <div class="row-end">
-          <button type="button" class="btn ghost" id="btnCancelAdd">Cancel</button>
-          <button type="submit" class="btn">Add server</button>
-        </div>
-      </form>
-    </section>
+    </div>
+  </section>
 
-    <!-- Account -->
-    <section class="card account" aria-labelledby="accountTitle">
-      <div class="card-head"><h2 id="accountTitle">Account</h2></div>
+  <!-- ============================================================ Dev tools (dev builds or --dev) -->
+  <section class="view view-dev" id="viewDev" aria-labelledby="devTitle" hidden>
+    <div class="page">
+      <header class="page-head">
+        <h1 id="devTitle">Dev tools</h1>
+        <p class="page-sub">Shown in builds run from source, or when the launcher starts with <code>--dev</code>.</p>
+      </header>
+      <div class="settings-grid dev-grid">
+        <section class="panel" aria-labelledby="devLaunchTitle">
+          <div class="panel-head"><h2 id="devLaunchTitle">Game launch</h2></div>
+          <p class="panel-text">Applied every time you press Play.</p>
+          <label class="check"><input type="checkbox" id="devConsole"> In-game dev console (F1)</label>
+          <label class="check"><input type="checkbox" id="devWindowed"> Windowed, 1280 × 720</label>
+          <label class="check"><input type="checkbox" id="devVerbose"> Verbose engine log</label>
+          <label>Start in
+            <select id="devStart">
+              <option value="">Hollowmere (town)</option>
+              <option value="crypt">The Sunken Crypt</option>
+              <option value="boss">Next to the boss</option>
+            </select>
+          </label>
+          <p class="panel-text" id="devGameExe"></p>
+        </section>
 
-      <div id="accountOffline" class="account-note" hidden>
-        <p>This server is offline. Check that it's running, or play offline with local saves.</p>
+        <section class="panel" aria-labelledby="devFoldersTitle">
+          <div class="panel-head"><h2 id="devFoldersTitle">Folders</h2></div>
+          <div class="dev-buttons">
+            <button type="button" class="btn ghost small" data-open="gameSaves">Game saves</button>
+            <button type="button" class="btn ghost small" data-open="gameLogs">Game logs</button>
+            <button type="button" class="btn ghost small" data-open="launcherData">Launcher data</button>
+            <button type="button" class="btn ghost small" data-open="gameFolder">Game build</button>
+          </div>
+          <p class="panel-text">Last boot file sent to the game (token hidden):</p>
+          <pre class="dev-pre" id="devLastBoot">Nothing launched yet.</pre>
+        </section>
+
+        <section class="panel" aria-labelledby="devUpdatesTitle">
+          <div class="panel-head"><h2 id="devUpdatesTitle">Update source</h2></div>
+          <p class="panel-text">Point update checks at a local folder server for this session, for example <code>http://127.0.0.1:4310/</code>.</p>
+          <form class="dev-inline" id="devUpdateForm">
+            <input id="devUpdateUrl" spellcheck="false" autocomplete="off" aria-label="Update source address">
+            <button type="submit" class="btn small">Use</button>
+            <button type="button" class="btn ghost small" id="devUpdateReset">Reset</button>
+          </form>
+          <p class="form-error" id="devUpdateError" hidden></p>
+          <pre class="dev-pre" id="devUpdateStatus"></pre>
+        </section>
+
+        <section class="panel" aria-labelledby="devStateTitle">
+          <div class="panel-head"><h2 id="devStateTitle">Reset</h2></div>
+          <div class="dev-buttons">
+            <button type="button" class="btn ghost small" id="devClearPrefs">Forget launcher choices</button>
+            <button type="button" class="btn ghost small" id="devClearUpdates">Delete downloaded updates</button>
+            <button type="button" class="btn ghost small" id="devReload">Reload launcher</button>
+          </div>
+          <p class="panel-text" id="devResetNote"></p>
+          <pre class="dev-pre" id="devVersions"></pre>
+        </section>
       </div>
-
-      <div id="accountForms" hidden>
-        <div class="tabs" role="tablist">
-          <button type="button" role="tab" id="tabLogin" aria-selected="true">Log in</button>
-          <button type="button" role="tab" id="tabRegister" aria-selected="false">Register</button>
-        </div>
-        <form id="authForm" novalidate>
-          <label>Username<input name="username" autocomplete="username" maxlength="20" spellcheck="false" required></label>
-          <label>Password<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
-          <label id="confirmRow" hidden>Confirm password<input name="confirm" type="password" autocomplete="new-password" maxlength="128"></label>
-          <p class="form-hint" id="authHint" hidden>3–20 letters, numbers or _ · password 6+ characters</p>
-          <p class="form-error" id="authError" role="alert" hidden></p>
-          <button type="submit" class="btn wide" id="authSubmit">Log in</button>
-        </form>
-      </div>
-    </section>
-
-    <!-- Characters: up to 5 per account (online) or on this PC (offline) -->
-    <section class="card characters" id="charactersCard" aria-labelledby="charactersTitle" hidden>
-      <div class="card-head">
-        <h2 id="charactersTitle">Characters</h2>
-        <span class="slot-count" id="slotCount"></span>
-      </div>
-      <div class="char-owner" id="charOwner">
-        <div class="avatar" id="avatar" aria-hidden="true">?</div>
-        <div class="char-owner-text">
-          <b id="ownerName">—</b>
-          <small id="ownerSub"></small>
-        </div>
-        <button type="button" class="btn ghost small" id="btnLogout">Log out</button>
-      </div>
-      <ul class="char-list" id="charList" role="listbox" aria-labelledby="charactersTitle"></ul>
-      <p class="form-error" id="charError" role="alert" hidden></p>
-    </section>
-
-    <!-- Play -->
-    <section class="play">
-      <button type="button" class="play-btn" id="btnPlay" disabled>
-        <span id="playLabel">Play</span>
-        <small id="playSub">Select a server</small>
-      </button>
-      <button type="button" class="link-btn" id="btnOffline">Play offline (characters on this PC)</button>
-    </section>
-  </aside>
+    </div>
+  </section>
 </main>
 
 <!-- Shown over the film while it plays with sound. -->
 <div class="film-bar" id="filmBar" hidden>
   <button type="button" class="btn ghost" id="btnFilmBack">&#8592; Back to the launcher</button>
-  <span class="film-hint">Esc to return</span>
+  <span class="film-hint">Esc returns</span>
   <button type="button" class="btn ghost" id="btnFilmCaptions" aria-pressed="true">Captions on</button>
 </div>
 
-<!-- Patch Notes panel: every version from CHANGELOG.md -->
-<div class="notes-panel" id="notesPanel" role="dialog" aria-modal="true" aria-labelledby="notesPanelTitle" hidden>
-  <div class="notes-sheet">
-    <header class="notes-sheet-head">
-      <div>
-        <span class="notes-label">Depths of Darkness</span>
-        <h2 id="notesPanelTitle">Patch Notes</h2>
-      </div>
-      <button type="button" class="icon-btn" id="btnCloseNotes" aria-label="Close patch notes">✕</button>
-    </header>
-    <div class="notes-sheet-body">
-      <nav class="notes-versions" id="notesVersions" aria-label="Versions"></nav>
-      <article class="notes-article" id="notesArticle" tabindex="-1">
-        <header>
-          <h3 id="notesArticleTitle"></h3>
-          <span class="notes-date" id="notesArticleDate"></span>
-        </header>
-        <div class="notes-body" id="notesArticleBody"></div>
-      </article>
+<!-- First launch: ask before sending anything -->
+<div class="modal" id="consentPanel" role="dialog" aria-modal="true" aria-labelledby="consentTitle" hidden>
+  <form class="delete-sheet consent-sheet" id="consentForm">
+    <h2 id="consentTitle">Help us improve Depths of Darkness</h2>
+    <p>The launcher can send two kinds of reports to the game server you play on. Nothing is sent unless you turn it on, and you can change this any time in Settings.</p>
+    <label class="check consent-row"><input type="checkbox" id="consentAskCrashes">
+      <span><b>Crash reports</b><small>When the game or launcher crashes: the error, the end of the game's log, your version and Windows version.</small></span></label>
+    <label class="check consent-row"><input type="checkbox" id="consentAskUsage">
+      <span><b>Usage statistics</b><small>When you start and stop playing, which class you play, and your version. No names, chat or account details.</small></span></label>
+    <div class="row-end">
+      <button type="button" class="btn ghost" id="btnConsentNone">Send nothing</button>
+      <button type="submit" class="btn">Save choices</button>
     </div>
-    <footer class="notes-sheet-foot" id="notesSource"></footer>
-  </div>
+  </form>
 </div>
+
 <!-- Create a character -->
 <div class="modal" id="createPanel" role="dialog" aria-modal="true" aria-labelledby="createTitle" hidden>
   <form class="create-sheet" id="createForm" novalidate>
     <header class="create-head">
       <div>
-        <span class="notes-label" id="createWhere">New character</span>
-        <h2 id="createTitle">Create a Character</h2>
+        <p class="sheet-where" id="createWhere">New character</p>
+        <h2 id="createTitle">Create a character</h2>
       </div>
       <button type="button" class="icon-btn" id="btnCloseCreate" aria-label="Close">✕</button>
     </header>
     <div class="create-body">
       <div class="create-preview" id="createPreview" aria-hidden="true">
-        <div class="preview-glow"></div>
+        <div class="niche-arch small"></div>
         <div class="preview-emblem" id="previewEmblem"></div>
         <b class="preview-name" id="previewName">Your hero</b>
         <span class="preview-class" id="previewClass"></span>

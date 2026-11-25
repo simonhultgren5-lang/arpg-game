@@ -1,0 +1,164 @@
+# Build pipeline: Developer commit → Build server → Compile → Test + Package → Automated QA → Deployment
+#
+# Runs on every push and pull request. Deployment only runs on main, and only when package.json has a
+# version that isn't released yet: bump the version, merge, and the tested build is published. The
+# "release" environment can require an approval first (Settings → Environments → release → Required
+# reviewers). Versions like 0.4.1-beta.1 deploy to the beta channel as a GitHub pre-release.
+name: Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+  GODOT_VERSION: '4.7.2'
+
+jobs:
+  compile:
+    name: Compile
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+      - name: Patch notes from CHANGELOG.md
+        run: node scripts/patch-notes.mjs
+      - name: Compile (JavaScript syntax, JSON, GDScript)
+        run: node scripts/ci/compile.mjs
+
+  test:
+    name: Test
+    needs: compile
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+      - name: Tests (game server, admin CLI, Godot smoke test, dev console)
+        run: node scripts/test.mjs
+
+  package:
+    name: Package
+    needs: compile
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: oven-sh/setup-bun@v2
+      - name: Install packages
+        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-godot
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          templates: 'true'
+      - id: version
+        name: Version
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Build the game, installer and server package
+        run: node scripts/release.mjs --dry-run
+      - name: Keep the release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.version }}
+          path: release/upload/
+          retention-days: 14
+      - name: Keep the unpacked app for QA
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-win-unpacked
+          path: release/win-unpacked/
+          retention-days: 3
+
+  qa:
+    name: Automated QA
+    needs: [test, package]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-win-unpacked
+          path: release/win-unpacked/
+      - name: Play the packaged app
+        run: node scripts/ci/qa.mjs
+      - name: Keep the QA results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-results
+          path: qa-results/
+          retention-days: 14
+
+  release-check:
+    name: New version?
+    needs: package
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.check.outputs.deploy }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "v$VERSION is already released, so there is nothing to deploy. Bump the version to release." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deployment
+    needs: [qa, package, release-check]
+    if: needs.release-check.outputs.deploy == 'true'
+    runs-on: windows-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      VERSION: ${{ needs.package.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ env.VERSION }}
+          path: release/upload/
+      - name: Publish the tested build
+        run: node scripts/release.mjs --publish-only
+      - name: Summary
+        shell: bash
+        run: echo "Published [v$VERSION](https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION)." >> "$GITHUB_STEP_SUMMARY"

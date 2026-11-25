@@ -2,6 +2,9 @@
 // through window.launcher (see electron/launcher-preload.cjs).
 (() => {
   const api = window.launcher;
+  // Errors in this window become crash reports (sent only if the player agreed; see electron/studio.cjs).
+  window.addEventListener('error', (e) => api?.reportError?.({ message: e.message, stack: e.error?.stack || `${e.filename}:${e.lineno}` }));
+  window.addEventListener('unhandledrejection', (e) => api?.reportError?.({ message: String(e.reason?.message || e.reason), stack: e.reason?.stack || '' }));
   const $ = (id) => document.getElementById(id);
   const POLL_MS = 8000;
   // ---------------------------------------------------------------- Act I film
@@ -78,6 +81,23 @@
   if (film.readyState >= 2) playBackground();
   else film.addEventListener('canplay', playBackground, { once: true });
 
+  // ---------------------------------------------------------------- views (Play, News, Settings, Dev tools)
+  const VIEWS = { play: 'viewPlay', news: 'viewNews', settings: 'viewSettings', dev: 'viewDev' };
+  let view = 'play';
+  function setView(name) {
+    if (!VIEWS[name]) return;
+    view = name;
+    for (const [key, id] of Object.entries(VIEWS)) $(id).hidden = key !== name;
+    for (const b of document.querySelectorAll('.nav [data-view]')) {
+      if (b.dataset.view === name) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    }
+    document.body.classList.toggle('view-away', name !== 'play');
+    if (name === 'news') (newsTab === 'server' ? renderServerNewsPage() : renderNewsView());
+    if (name === 'dev') renderDev();
+  }
+  for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('click', () => setView(b.dataset.view));
+
   // ---------------------------------------------------------------- classes & colors
   // Same classes and skills as the game (godot/scripts/data/classes.gd).
   const CLASSES = {
@@ -143,6 +163,10 @@
   let upd = null; // update status from electron/updates.cjs
   let playAction = 'play'; // 'play' | 'install-launcher' | 'open-releases'
   let gameInstalled = true; // the game export (godot/) ships with the launcher
+  let prefs = { channel: 'stable', autoDownload: true, consent: { asked: true, crashes: false, usage: false } };
+  const serverNews = {}; // serverId -> [{ id, title, body, date }]
+  const serverFlags = {}; // serverId -> { flag: value }
+  const NEWS_SEEN_KEY = 'dodServerNewsSeenV1';
   let playError = '';
 
   function readPref(key) {
@@ -269,51 +293,137 @@
   }
   const charLine = (c) => `Lv ${c.level ?? 1} ${className(c.heroClass)} · Depth ${c.depth ?? 1}`;
 
+  // Top bar chip, Settings account panel, the "where you play" card and the online/offline switch.
   function renderAccount() {
     const offline = mode === 'offline';
     const server = selected();
     const st = server ? statusOf(server.id) : null;
     const account = server ? state.accounts[server.id] : null;
-    const online = st?.state === 'online';
-    const signedIn = Boolean(account && online && st.account);
+    const signedIn = Boolean(account && st?.state === 'online' && st.account);
 
-    document.querySelector('[aria-labelledby="serversTitle"]').hidden = offline;
-    document.querySelector('.card.account').hidden = offline || signedIn;
-    $('accountOffline').hidden = !(server && st.state === 'offline');
-    $('accountForms').hidden = !(server && online && !signedIn);
-    $('btnOffline').textContent = offline ? '← Back to online play' : 'Play offline (characters on this PC)';
-    renderCharacters();
-  }
+    $('modeOnline').setAttribute('aria-checked', String(!offline));
+    $('modeOffline').setAttribute('aria-checked', String(offline));
+    $('realmServer').hidden = offline;
+    $('realmNote').textContent = offline ? 'Characters stay on this PC. Progress is not saved to a server.' : '';
+    if (!offline) {
+      $('realmDot').className = `status-dot ${server ? st.state : ''}`;
+      $('realmName').textContent = server ? st.info?.name || server.name : 'No server yet';
+      $('realmMeta').textContent = !server
+        ? 'Add one in Settings'
+        : st.state === 'online'
+          ? `Online, ${st.pingMs} ms ping`
+          : st.state === 'offline'
+            ? "Can't be reached"
+            : 'Connecting…';
+    }
 
-  function renderCharacters() {
-    const scope = currentScope();
-    const card = $('charactersCard');
-    card.hidden = !scope;
-    if (!scope) return;
-    const server = selected();
-    const offline = Boolean(scope.offline);
-    const data = rosterOf(scope);
-    const list = data?.characters || [];
-    const max = data?.maxCharacters || 5;
+    // top bar chip
+    $('whoDot').className = `who-dot ${offline ? '' : st?.state || ''}`;
+    $('whoText').textContent = offline ? 'Offline play' : signedIn ? `${account.username} on ${server.name}` : server ? 'Not signed in' : 'No server';
 
-    $('charactersTitle').textContent = offline ? 'Characters on this PC' : 'Characters';
-    $('slotCount').textContent = data ? `${list.length} / ${max}` : '';
-    $('btnLogout').hidden = offline;
+    // Settings: account panel
+    $('btnLogout').hidden = offline || !signedIn;
+    $('passwordForm').hidden = offline || !signedIn;
     if (offline) {
       $('avatar').textContent = '⌂';
       $('ownerName').textContent = 'Offline play';
-      $('ownerSub').textContent = 'Saved on this PC only';
+      $('ownerSub').textContent = 'Characters are saved on this PC only.';
+    } else if (signedIn) {
+      $('avatar').textContent = account.username.slice(0, 1).toUpperCase();
+      $('ownerName').textContent = account.username;
+      $('ownerSub').textContent = `Signed in on ${server.name}`;
     } else {
-      const username = state.accounts[server.id].username;
-      $('avatar').textContent = username.slice(0, 1).toUpperCase();
-      $('ownerName').textContent = username;
-      $('ownerSub').textContent = server.name;
+      $('avatar').textContent = '?';
+      $('ownerName').textContent = 'Not signed in';
+      $('ownerSub').textContent = server ? `Log in on the Play page to use ${server.name}.` : 'Add a server to play online.';
     }
+    renderStage();
+    renderCharacters();
+  }
+
+  // The niche in the middle of the Play page: the selected hero, or what to do before you can play.
+  function gate(title, text, actions = []) {
+    $('gateTitle').textContent = title;
+    $('gateText').textContent = text;
+    const box = $('gateActions');
+    box.textContent = '';
+    for (const [label, onClick, ghost] of actions) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = ghost ? 'btn ghost' : 'btn';
+      b.textContent = label;
+      b.addEventListener('click', onClick);
+      box.append(b);
+    }
+    return 'message';
+  }
+  function renderStage() {
+    const offline = mode === 'offline';
+    const server = selected();
+    const st = server ? statusOf(server.id) : null;
+    const scope = currentScope();
+    const data = rosterOf(scope);
+    const hero = currentCharacter();
+    let show = 'hero';
+    if (!offline && !server) {
+      show = gate('Choose a server', 'Add the address of a game server, or play offline on this PC.', [
+        ['Add a server', () => { setView('settings'); $('btnAddServer').click(); }],
+        ['Play offline', () => setMode('offline'), true],
+      ]);
+    } else if (!offline && st.state === 'checking') {
+      show = gate(`Connecting to ${server.name}`, 'This takes a moment.');
+    } else if (!offline && st.state === 'offline') {
+      show = gate(`${server.name} is offline`, "Check that the server is running and the address is right, or play offline.", [
+        ['Try again', () => checkAll(true)],
+        ['Play offline', () => setMode('offline'), true],
+      ]);
+    } else if (!offline && !scope) {
+      show = 'auth';
+      $('gateAuthTitle').textContent = authMode === 'register' ? 'Create an account' : 'Sign in to play';
+      $('gateAuthText').textContent = `Your heroes are kept on ${server.name}.`;
+    } else if (!data) {
+      show = gate('Loading characters', '');
+    } else if (!hero) {
+      show = data.characters.length
+        ? gate('Choose a hero', 'Pick one of your characters below.')
+        : gate('Create your first hero', 'Choose a class, a name and an armor color.', [['Create a character', () => openCreate(scope)]]);
+    }
+    $('heroShow').hidden = show !== 'hero';
+    $('gateAuth').hidden = show !== 'auth';
+    $('gateMessage').hidden = show !== 'message';
+    const tint = hero?.color || '#c08a4d';
+    $('niche').style.setProperty('--tint', tint);
+    if (show === 'hero') {
+      $('heroEmblem').textContent = '';
+      $('heroEmblem').append(emblem(hero.heroClass, hero.color, 168));
+      $('heroEmblem').style.setProperty('--tint', tint);
+      $('heroName').textContent = hero.name;
+      $('heroLine').textContent = `Level ${hero.level ?? 1} ${className(hero.heroClass)}, depth ${hero.depth ?? 1}`;
+      $('heroRole').textContent = CLASSES[hero.heroClass]?.role || '';
+    }
+  }
+
+  // The dock: one tile per character, then a tile to create one.
+  function renderCharacters() {
+    const scope = currentScope();
+    const data = rosterOf(scope);
+    const list = data?.characters || [];
+    const max = data?.maxCharacters || 5;
+    $('charactersTitle').textContent = mode === 'offline' ? 'Characters on this PC' : 'Characters';
+    $('slotCount').textContent = data ? `${list.length} of ${max}` : '';
     $('charError').hidden = !data?.error;
     $('charError').textContent = data?.error || '';
 
     const ul = $('charList');
     ul.textContent = '';
+    if (!scope) {
+      const li = document.createElement('li');
+      li.className = 'char-empty';
+      const st = selected() ? statusOf(selected().id) : null;
+      li.textContent = mode === 'offline' || st?.state !== 'online' ? '' : 'Sign in to see your characters.';
+      ul.append(li);
+      return;
+    }
     if (!data) {
       const li = document.createElement('li');
       li.className = 'char-empty';
@@ -328,13 +438,14 @@
       li.setAttribute('role', 'option');
       li.tabIndex = 0;
       li.dataset.id = c.id;
+      li.title = `${c.name}: ${charLine(c)}. Double-click to play.`;
       li.setAttribute('aria-selected', String(current?.id === c.id));
       const text = document.createElement('div');
       text.className = 'char-text';
       const name = document.createElement('b');
       name.textContent = c.name;
       const meta = document.createElement('small');
-      meta.textContent = charLine(c);
+      meta.textContent = `Level ${c.level ?? 1} ${className(c.heroClass)}`;
       text.append(name, meta);
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -346,7 +457,7 @@
         e.stopPropagation();
         openDelete(scope, c);
       });
-      li.append(emblem(c.heroClass, c.color, 36), text, remove);
+      li.append(emblem(c.heroClass, c.color, 40), text, remove);
       li.addEventListener('click', () => {
         selectCharacter(scope, c.id);
         playError = '';
@@ -361,10 +472,10 @@
         } else if (e.key === 'Delete') {
           e.preventDefault();
           openDelete(scope, c);
-        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
           e.preventDefault();
           const items = [...ul.querySelectorAll('li[tabindex]')];
-          items[items.indexOf(li) + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
+          items[items.indexOf(li) + (e.key === 'ArrowRight' ? 1 : -1)]?.focus();
         }
       });
       ul.append(li);
@@ -375,7 +486,7 @@
       btn.type = 'button';
       btn.className = 'char-new';
       btn.innerHTML = '<span class="plus" aria-hidden="true">+</span>';
-      btn.append(document.createTextNode(list.length ? 'Create character' : 'Create your first character'));
+      btn.append(document.createTextNode(list.length ? 'New character' : 'Create a character'));
       btn.addEventListener('click', () => openCreate(scope));
       li.append(btn);
       ul.append(li);
@@ -401,7 +512,7 @@
     let label = 'Play';
     let sub = '';
     let enabled = false;
-    if (!server) sub = 'Select or add a server';
+    if (!server) sub = 'Add a server in Settings';
     else if (st.state === 'checking') sub = `Connecting to ${server.name}…`;
     else if (st.state === 'offline') {
       label = 'Offline';
@@ -414,7 +525,7 @@
       else if (!c) sub = data?.characters.length ? 'Pick a character' : 'Create a character to begin';
       else {
         enabled = true;
-        sub = `${c.name} · ${charLine(c)}`;
+        sub = `${c.name} on ${server.name}`;
       }
     }
     if (mode === 'offline') {
@@ -422,7 +533,7 @@
       const data = rosterOf(currentScope());
       label = 'Play';
       enabled = Boolean(c);
-      sub = c ? `${c.name} · ${charLine(c)} · offline` : data?.characters.length ? 'Pick a character' : 'Create a character to begin';
+      sub = c ? `${c.name}, offline` : data?.characters.length ? 'Pick a character' : 'Create a character to begin';
     }
     if (playError && !busy) {
       sub = playError;
@@ -524,6 +635,8 @@
     }
   };
 
+  const entryTitle = (entry) => entry.title || `Version ${entry.version}`;
+
   function renderNotesCard() {
     const latest = patchNotes.versions[0];
     const card = $('notesCard');
@@ -531,9 +644,14 @@
     const updateShowsNotes = !$('updateCard').hidden && $('updateNotes').childElementCount > 0;
     card.hidden = !latest || updateShowsNotes;
     $('btnFooterNotes').hidden = !latest;
+    const unseen = Boolean(latest) && readSeen() !== latest.version;
     if (!latest) return;
-    $('notesNew').hidden = readSeen() === latest.version;
-    $('notesCardTitle').textContent = `Version ${latest.version}${latest.date ? ` · ${formatDate(latest.date)}` : ''}`;
+    $('notesNew').hidden = !unseen;
+    // A named patch shows "Version x, date" above its name; an unnamed one shows its version as the title.
+    $('notesCardVersion').textContent = latest.title
+      ? `Version ${latest.version}${latest.date ? `, ${formatDate(latest.date)}` : ''}`
+      : formatDate(latest.date);
+    $('notesCardTitle').textContent = entryTitle(latest);
     const list = $('notesHighlights');
     list.textContent = '';
     for (const item of bulletsOf(latest.body).slice(0, 3)) {
@@ -543,23 +661,29 @@
     }
   }
 
+  let newsVersion = null;
   function showNotesVersion(version) {
     const entry = patchNotes.versions.find((v) => v.version === version) || patchNotes.versions[0];
     if (!entry) return;
+    newsVersion = entry.version;
     for (const btn of $('notesVersions').querySelectorAll('button')) {
       btn.setAttribute('aria-current', String(btn.dataset.version === entry.version));
     }
-    $('notesArticleTitle').textContent = `Version ${entry.version}`;
+    $('notesArticleVersion').textContent = `Version ${entry.version}`;
     $('notesArticleDate').textContent = formatDate(entry.date);
+    $('notesArticleTitle').textContent = entryTitle(entry);
     renderNotesBody($('notesArticleBody'), entry.body);
-    $('notesArticle').scrollTop = 0;
+    $('viewNews').scrollTop = 0;
   }
 
-  function openNotes(version) {
-    if (!patchNotes.versions.length) return;
-    notesReturnFocus = document.activeElement;
+  function renderNewsView() {
     const nav = $('notesVersions');
     nav.textContent = '';
+    if (!patchNotes.versions.length) {
+      $('notesArticleTitle').textContent = 'No patch notes yet';
+      $('notesArticleBody').textContent = '';
+      return;
+    }
     const seen = readSeen();
     patchNotes.versions.forEach((entry, index) => {
       const btn = document.createElement('button');
@@ -573,38 +697,56 @@
         badge.textContent = 'New';
         title.append(badge);
       }
+      btn.append(title);
+      if (entry.title) {
+        const t = document.createElement('span');
+        t.className = 'v-title';
+        t.textContent = entry.title;
+        btn.append(t);
+      }
       const date = document.createElement('small');
       date.textContent = entry.date ? formatDate(entry.date) : index === 0 ? 'Latest' : '';
-      btn.append(title, date);
+      btn.append(date);
       btn.addEventListener('click', () => showNotesVersion(entry.version));
       nav.append(btn);
     });
     $('notesSource').textContent =
-      patchNotes.source === 'online' ? '' : "Showing the patch notes included with this launcher. Newer notes appear here once they're published.";
-    $('notesPanel').hidden = false;
-    showNotesVersion(version || patchNotes.versions[0].version);
-    $('btnCloseNotes').focus();
+      patchNotes.source === 'online' ? '' : "Showing the notes included with this launcher. Newer notes appear once they're published.";
+    showNotesVersion(newsVersion || patchNotes.versions[0].version);
     markSeen(patchNotes.versions[0].version);
     renderNotesCard();
   }
 
-  function closeNotes() {
-    $('notesPanel').hidden = true;
-    if (notesReturnFocus && document.contains(notesReturnFocus)) notesReturnFocus.focus();
+  let newsTab = 'server';
+  function setNewsTab(tab) {
+    newsTab = tab;
+    $('tabServerNews').setAttribute('aria-selected', String(tab === 'server'));
+    $('tabPatchNotes').setAttribute('aria-selected', String(tab === 'patch'));
+    $('serverNews').hidden = tab !== 'server';
+    $('patchNotesBody').hidden = tab !== 'patch';
+    $('notesSource').hidden = tab !== 'patch';
+    if (tab === 'server') renderServerNewsPage();
+    else renderNewsView();
+    renderServerNews();
+  }
+  $('tabServerNews').addEventListener('click', () => setNewsTab('server'));
+  $('tabPatchNotes').addEventListener('click', () => setNewsTab('patch'));
+  $('newsCard').addEventListener('click', () => {
+    setView('news');
+    setNewsTab('server');
+  });
+
+  function openNotes(version) {
+    newsVersion = version || null;
+    setView('news');
+    setNewsTab('patch');
   }
 
   $('btnAllNotes').addEventListener('click', () => openNotes());
   $('btnFooterNotes').addEventListener('click', () => openNotes());
-  $('btnCloseNotes').addEventListener('click', closeNotes);
-  $('notesPanel').addEventListener('click', (e) => {
-    if (e.target === $('notesPanel')) closeNotes();
-  });
   document.addEventListener('keydown', (e) => {
-    if ($('notesPanel').hidden) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closeNotes();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (view !== 'news' || !$('createPanel').hidden || !$('deletePanel').hidden) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       // Step through versions with the arrow keys.
       const buttons = [...$('notesVersions').querySelectorAll('button')];
       const current = buttons.findIndex((b) => b.getAttribute('aria-current') === 'true');
@@ -624,7 +766,10 @@
       // Keep whatever we had.
     }
     renderNotesCard();
+    if (view === 'news') renderNewsView();
   }
+
+  const mb = (bytes) => `${(Number(bytes || 0) / 1048576).toFixed(bytes > 104857600 ? 0 : 1)} MB`;
 
   function updateButton(label, onClick, ghost = false) {
     const b = document.createElement('button');
@@ -638,7 +783,7 @@
   function renderUpdates() {
     if (!upd) return;
     const { game, launcher } = upd;
-    $('versionLabel').textContent = `v${launcher.current}`;
+    $('versionLabel').textContent = `Version ${launcher.current}${upd.channel && upd.channel !== 'stable' ? ` (${upd.channel})` : ''}`;
     $('updateState').textContent =
       {
         disabled: 'Updates are off when running from source',
@@ -674,9 +819,16 @@
       error = game.error;
       tone = 'problem';
       actions.append(updateButton('Check again', () => api.checkForUpdates()));
+    } else if (launcher.state === 'available') {
+      label = 'Update';
+      title = `Version ${launcher.latest} is ready to download`;
+      notes = launcher.notes;
+      actions.append(updateButton(launcher.size ? `Download (${mb(launcher.size)})` : 'Download', () => api.downloadUpdate()));
     } else if (launcher.state === 'downloading') {
-      label = 'Launcher update';
-      title = `Downloading launcher v${launcher.latest}`;
+      label = 'Downloading update';
+      title = launcher.total
+        ? `Version ${launcher.latest}: ${mb(launcher.received)} of ${mb(launcher.total)}${launcher.bytesPerSec ? `, ${mb(launcher.bytesPerSec)}/s` : ''}`
+        : `Downloading version ${launcher.latest}`;
       progress = launcher.progress;
     }
 
@@ -699,6 +851,8 @@
     renderUpdates();
     renderNotesCard();
     renderPlay();
+    renderFlags();
+    renderServerNews();
   }
 
   // ---------------------------------------------------------------- server status
@@ -709,8 +863,82 @@
       ? { state: 'online', info: result.info, pingMs: result.pingMs, account: result.account }
       : { state: 'offline', info: null, account: null };
     if (result.account) applyAccountCharacters(serverId, result.account);
+    if (result.online && serverId === state.selectedServerId) loadServerExtras(serverId);
     if (result.sessionExpired) state = await api.getState();
   }
+  // News posts and feature flags of the selected server (admin.mjs news-post / flag-set).
+  let extrasAt = 0;
+  async function loadServerExtras(serverId, force = false) {
+    if (!force && Date.now() - extrasAt < 30e3) return;
+    extrasAt = Date.now();
+    const [news, flags] = await Promise.all([api.getNews?.(serverId) || [], api.getFlags?.(serverId) || {}]);
+    serverNews[serverId] = Array.isArray(news) ? news : [];
+    serverFlags[serverId] = flags && typeof flags === 'object' ? flags : {};
+    renderServerNews();
+    renderFlags();
+  }
+  const newsSeen = () => {
+    try {
+      return Number(localStorage.getItem(NEWS_SEEN_KEY) || 0);
+    } catch {
+      return 0;
+    }
+  };
+  function renderServerNews() {
+    const server = selected();
+    const list = (server && serverNews[server.id]) || [];
+    const newest = list[0];
+    const unseen = Boolean(newest) && newest.date > newsSeen();
+    $('newsCard').hidden = !newest;
+    if (newest) {
+      $('newsCardFrom').textContent = `News from ${statusOf(server.id).info?.name || server.name}`;
+      $('newsCardNew').hidden = !unseen;
+      $('newsCardTitle').textContent = newest.title;
+      $('newsCardText').textContent = newest.body;
+    }
+    const patchUnseen = patchNotes.versions[0] && readSeen() !== patchNotes.versions[0].version;
+    $('newsDot').hidden = !(unseen || patchUnseen);
+    if (view === 'news' && newsTab === 'server') renderServerNewsPage();
+  }
+  function renderServerNewsPage() {
+    const server = selected();
+    const list = (server && serverNews[server.id]) || [];
+    const ol = $('serverNewsList');
+    ol.textContent = '';
+    $('serverNewsEmpty').textContent = !server
+      ? 'Choose a server in Settings to see its news.'
+      : list.length
+        ? ''
+        : `${statusOf(server.id).info?.name || server.name} hasn't posted any news yet.`;
+    for (const n of list) {
+      const li = document.createElement('li');
+      const meta = document.createElement('p');
+      meta.className = 'news-meta';
+      meta.textContent = new Date(n.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+      const h = document.createElement('h2');
+      h.textContent = n.title;
+      const body = document.createElement('p');
+      body.textContent = n.body;
+      li.append(meta, h, body);
+      ol.append(li);
+    }
+    if (list[0]) {
+      try {
+        localStorage.setItem(NEWS_SEEN_KEY, String(list[0].date));
+      } catch {
+        // stays unseen
+      }
+    }
+  }
+  // Flags the launcher itself uses: launcher.banner (text shown above the hero).
+  function renderFlags() {
+    const server = selected();
+    const flags = (mode === 'online' && server && serverFlags[server.id]) || {};
+    const banner = typeof flags['launcher.banner'] === 'string' ? flags['launcher.banner'].slice(0, 140) : '';
+    $('flagBanner').hidden = !banner;
+    $('flagBanner').textContent = banner;
+  }
+
   function applyAccountCharacters(serverId, account) {
     const scope = { key: `server:${serverId}`, serverId };
     if (Array.isArray(account.characters)) setRoster(scope, account);
@@ -728,6 +956,7 @@
 
   async function selectServer(id) {
     state = await api.selectServer(id);
+    extrasAt = 0;
     clearAuthError();
     render();
     await check(id);
@@ -773,6 +1002,7 @@
     $('authHint').hidden = !register;
     $('authSubmit').textContent = register ? 'Create account' : 'Log in';
     $('authForm').password.autocomplete = register ? 'new-password' : 'current-password';
+    $('gateAuthTitle').textContent = register ? 'Create an account' : 'Sign in to play';
     clearAuthError();
   }
   function clearAuthError() {
@@ -851,13 +1081,94 @@
     }
     render();
   });
-  $('btnOffline').addEventListener('click', async () => {
-    mode = mode === 'offline' ? 'online' : 'offline';
+  async function setMode(next) {
+    if (next === mode) return;
+    mode = next;
     writePref('dodLauncherModeV1', mode);
     playError = '';
     render();
     if (mode === 'offline') await loadOfflineCharacters();
+  }
+  $('modeOnline').addEventListener('click', () => setMode('online'));
+  $('modeOffline').addEventListener('click', () => setMode('offline'));
+  for (const id of ['modeOnline', 'modeOffline']) {
+    $(id).addEventListener('keydown', (e) => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      e.preventDefault();
+      setMode(mode === 'offline' ? 'online' : 'offline');
+      $(mode === 'offline' ? 'modeOffline' : 'modeOnline').focus();
+    });
+  }
+  $('btnChangeServer').addEventListener('click', () => setView('settings'));
+
+  // ---------------------------------------------------------------- settings: channel, downloads, privacy
+  const CHANNEL_NOTES = {
+    stable: 'Tested releases. Recommended for everyone.',
+    beta: 'Pre-releases of the next version. They can have rough edges. Switching back to Stable waits until Stable passes your version.',
+    dev: 'Every build as soon as it is published. Expect bugs.',
+  };
+  function renderPrefs() {
+    $('channelSelect').value = prefs.channel;
+    $('channelNote').textContent = CHANNEL_NOTES[prefs.channel];
+    $('autoDownload').checked = prefs.autoDownload;
+    $('consentCrashes').checked = prefs.consent.crashes;
+    $('consentUsage').checked = prefs.consent.usage;
+    $('privacyNote').textContent = prefs.consent.crashes || prefs.consent.usage ? '' : 'Nothing is sent right now.';
+  }
+  async function savePrefs(change) {
+    prefs = await api.setSettings(change);
+    renderPrefs();
+    if (change.channel) {
+      extrasAt = 0;
+      const server = selected();
+      if (server) loadServerExtras(server.id, true);
+      loadPatchNotes();
+    }
+  }
+  $('channelSelect').addEventListener('change', () => savePrefs({ channel: $('channelSelect').value }));
+  $('autoDownload').addEventListener('change', () => savePrefs({ autoDownload: $('autoDownload').checked }));
+  for (const id of ['consentCrashes', 'consentUsage']) {
+    $(id).addEventListener('change', () => savePrefs({ consent: { crashes: $('consentCrashes').checked, usage: $('consentUsage').checked } }));
+  }
+  // First launch: ask once.
+  function askConsent() {
+    $('consentAskCrashes').checked = false;
+    $('consentAskUsage').checked = false;
+    $('consentPanel').hidden = false;
+    $('consentAskCrashes').focus();
+  }
+  $('consentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await savePrefs({ consent: { crashes: $('consentAskCrashes').checked, usage: $('consentAskUsage').checked } });
+    $('consentPanel').hidden = true;
   });
+  $('btnConsentNone').addEventListener('click', async () => {
+    await savePrefs({ consent: { crashes: false, usage: false } });
+    $('consentPanel').hidden = true;
+  });
+
+  // ---------------------------------------------------------------- settings: change password
+  $('passwordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const server = selected();
+    $('passwordError').hidden = true;
+    $('passwordOk').hidden = true;
+    if (form.next.value.length < 6) {
+      $('passwordError').textContent = 'The new password must be at least 6 characters.';
+      $('passwordError').hidden = false;
+      return;
+    }
+    const result = await api.changePassword(server.id, form.current.value, form.next.value);
+    if (result?.error) {
+      $('passwordError').textContent = result.error;
+      $('passwordError').hidden = false;
+      return;
+    }
+    form.reset();
+    $('passwordOk').hidden = false;
+  });
+  $('btnCheckUpdates').addEventListener('click', () => api.checkForUpdates());
   async function loadOfflineCharacters() {
     const scope = { key: 'offline', offline: true };
     setRoster(scope, await api.listCharacters({ offline: true }));
@@ -965,9 +1276,9 @@
     $('createForm').reset();
     $('createError').hidden = true;
     $('charName').removeAttribute('aria-invalid');
-    $('createWhere').textContent = scope.offline ? 'Offline · saved on this PC' : `${state.accounts[scope.serverId]?.username} · ${selected()?.name}`;
+    $('createWhere').textContent = scope.offline ? 'Saved on this PC' : `For ${state.accounts[scope.serverId]?.username} on ${selected()?.name}`;
     const used = data ? data.characters.length : 0;
-    $('createTitle').textContent = used ? `Create a Character · slot ${used + 1} of ${data.maxCharacters}` : 'Create your first Character';
+    $('createTitle').textContent = used ? `Create a character (slot ${used + 1} of ${data.maxCharacters})` : 'Create your first character';
     buildCreatePickers();
     renderCreate();
     $('createPanel').hidden = false;
@@ -1063,9 +1374,10 @@
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
+    if (e.key !== 'Escape' || watching) return;
     if (!$('deletePanel').hidden) closeDelete();
     else if (!$('createPanel').hidden) closeCreate();
+    else if (view !== 'play') setView('play');
   });
 
   function showPlayError(message) {
@@ -1075,6 +1387,69 @@
       renderPlay();
     }, 6000);
   }
+
+  // ---------------------------------------------------------------- dev tools (electron/dev-tools.cjs)
+  let dev = null; // { enabled, flags, paths, versions, updateUrl, defaultUpdateUrl, lastBoot }
+  async function refreshDev() {
+    dev = (await api.getDevInfo?.()) || null;
+  }
+  function renderDev() {
+    if (!dev?.enabled) return;
+    $('devConsole').checked = Boolean(dev.flags.devConsole);
+    $('devWindowed').checked = Boolean(dev.flags.windowed);
+    $('devVerbose').checked = Boolean(dev.flags.verbose);
+    $('devStart').value = dev.flags.start || '';
+    $('devGameExe').textContent = dev.gameInstalled ? `Game: ${dev.paths.gameExe}` : `No game export at ${dev.paths.gameExe}. Run bun run godot:export.`;
+    $('devLastBoot').textContent = dev.lastBoot ? JSON.stringify(dev.lastBoot, null, 2) : 'Nothing launched yet.';
+    if (document.activeElement !== $('devUpdateUrl')) $('devUpdateUrl').value = dev.updateUrl;
+    $('devUpdateStatus').textContent = upd ? JSON.stringify({ launcher: upd.launcher, game: upd.game }, null, 2) : '';
+    $('devVersions').textContent = Object.entries(dev.versions).map(([k, v]) => `${k.padEnd(9)} ${v}`).join('\n');
+  }
+  async function saveDevFlags() {
+    dev = await api.setDevFlags({
+      devConsole: $('devConsole').checked,
+      windowed: $('devWindowed').checked,
+      verbose: $('devVerbose').checked,
+      start: $('devStart').value,
+    });
+    renderDev();
+  }
+  for (const id of ['devConsole', 'devWindowed', 'devVerbose', 'devStart']) $(id).addEventListener('change', saveDevFlags);
+  for (const b of document.querySelectorAll('[data-open]')) {
+    b.addEventListener('click', async () => {
+      const result = await api.devOpen(b.dataset.open);
+      $('devResetNote').textContent = result?.error || '';
+    });
+  }
+  $('devUpdateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const result = await api.devSetUpdateUrl($('devUpdateUrl').value);
+    $('devUpdateError').hidden = !result?.error;
+    $('devUpdateError').textContent = result?.error || '';
+    await refreshDev();
+    renderDev();
+  });
+  $('devUpdateReset').addEventListener('click', async () => {
+    await api.devSetUpdateUrl('');
+    $('devUpdateError').hidden = true;
+    await refreshDev();
+    renderDev();
+  });
+  $('devClearPrefs').addEventListener('click', () => {
+    for (const key of ['dodLauncherModeV1', 'dodSelectedCharacterV1', SEEN_KEY]) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // nothing stored
+      }
+    }
+    $('devResetNote').textContent = 'Launcher choices forgotten. Reload to start fresh.';
+  });
+  $('devClearUpdates').addEventListener('click', async () => {
+    const result = await api.devClearUpdates();
+    $('devResetNote').textContent = result?.error || `Deleted ${result.removed} downloaded update file${result.removed === 1 ? '' : 's'}.`;
+  });
+  $('devReload').addEventListener('click', () => location.reload());
 
   // ---------------------------------------------------------------- window controls
   $('btnMinimize').addEventListener('click', () => api.minimize());
@@ -1091,13 +1466,20 @@
       renderUpdates();
       renderNotesCard();
       renderPlay();
+      if (view === 'dev') renderDev();
     });
+    await refreshDev();
+    $('navDev').hidden = !dev?.enabled;
     setAuthMode('login');
+    prefs = (await api.getSettings?.()) || prefs;
+    renderPrefs();
+    if (!prefs.consent.asked) askConsent();
     gameInstalled = Boolean((await api.getGameStatus())?.installed);
     api.onGameClosed(() => {
       // Back from the game: refresh the character list (levels may have changed).
       if (mode === 'offline') loadOfflineCharacters();
       else checkAll();
+      if (dev?.enabled) refreshDev().then(() => view === 'dev' && renderDev());
     });
     render();
     loadPatchNotes();

@@ -16,6 +16,8 @@ const { spawn } = require('node:child_process');
 const servers = require('./servers.cjs');
 const characters = require('./characters.cjs');
 const updates = require('./updates.cjs');
+const devTools = require('./dev-tools.cjs');
+const studio = require('./studio.cjs');
 
 const LAUNCHER_ROOT = path.join(__dirname, '..', 'launcher');
 const SCHEME = 'app';
@@ -24,6 +26,8 @@ const isDev = !app.isPackaged;
 
 // Running from source keeps its own logins and offline characters, so testing never touches the installed game.
 if (isDev) app.setPath('userData', `${app.getPath('userData')} (dev)`);
+// The build pipeline's QA (scripts/ci/qa.mjs) runs the packaged app in a throwaway profile.
+if (process.env.DOD_USER_DATA) app.setPath('userData', process.env.DOD_USER_DATA);
 
 protocol.registerSchemesAsPrivileged([
   { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -81,10 +85,10 @@ function openLauncher() {
   }
   launcherWindow = new BrowserWindow({
     title: 'Depths of Darkness — Launcher',
-    width: 1080,
-    height: 700,
-    minWidth: 900,
-    minHeight: 640,
+    width: 1240,
+    height: 760,
+    minWidth: 1040,
+    minHeight: 680,
     frame: false,
     resizable: true,
     maximizable: false,
@@ -191,23 +195,94 @@ const GAME_EXE = app.isPackaged
   : path.join(__dirname, '..', 'godot', 'build', 'DepthsOfDarkness.exe');
 let game = null; // the running game process
 
+// ---- settings, news, crash reports and telemetry (electron/studio.cjs)
+function selectedServerUrl() {
+  const id = servers.publicState().selectedServerId;
+  return (id && servers.getServer(id)?.url) || null;
+}
+ipcMain.handle('launcher:settings', () => studio.settings());
+ipcMain.handle('launcher:set-settings', (_e, input) => {
+  const next = studio.update(input || {});
+  updates.configure({ channel: next.channel, autoDownload: next.autoDownload });
+  if (input?.channel) updates.check({ force: true });
+  return next;
+});
+ipcMain.handle('launcher:news', async (_e, serverId) => {
+  const server = servers.getServer(serverId);
+  return server ? studio.newsFor(server.url) : [];
+});
+ipcMain.handle('launcher:flags', async (_e, serverId) => {
+  const server = servers.getServer(serverId);
+  return server ? studio.flagsFor(server.url) : {};
+});
+ipcMain.on('launcher:report-error', (_e, report) => {
+  if (report && typeof report === 'object') {
+    studio.reportCrash({ source: 'launcher', message: `Launcher window: ${String(report.message || 'error')}`, detail: String(report.stack || '') });
+  }
+});
+ipcMain.handle('launcher:download-update', () => updates.downloadNow());
+ipcMain.handle('launcher:change-password', async (_e, serverId, current, next) => {
+  const server = servers.getServer(serverId);
+  const login = server && servers.sessionFor(server.id);
+  if (!login) return { error: 'Log in first.' };
+  try {
+    await servers.request(server.url, '/api/auth/password', { method: 'POST', token: login.token, body: { current, password: next } });
+    return { ok: true };
+  } catch (error) {
+    return { error: error.status === 404 ? 'This server needs an update before you can change your password here.' : error.message };
+  }
+});
+
+// ---- dev tools (electron/dev-tools.cjs); every handler is a no-op unless they're enabled
+const devCtx = () => ({ gameExe: GAME_EXE, updates });
+ipcMain.handle('launcher:dev-info', () => (devTools.enabled ? devTools.info(devCtx()) : { enabled: false }));
+ipcMain.handle('launcher:dev-set-flags', (_e, flags) => {
+  if (!devTools.enabled) return { enabled: false };
+  devTools.setFlags(flags);
+  return devTools.info(devCtx());
+});
+ipcMain.handle('launcher:dev-open', (_e, which) => (devTools.enabled ? devTools.open(String(which), devCtx()) : { error: 'Dev tools are off.' }));
+ipcMain.handle('launcher:dev-update-url', (_e, url) => {
+  if (!devTools.enabled) return { error: 'Dev tools are off.' };
+  const result = updates.setBase(url);
+  if (!result.error) updates.check({ force: true });
+  return result;
+});
+ipcMain.handle('launcher:dev-clear-updates', () => (devTools.enabled ? devTools.clearDownloadedUpdates() : { error: 'Dev tools are off.' }));
+
 ipcMain.handle('launcher:game-status', () => ({ installed: fs.existsSync(GAME_EXE), running: Boolean(game) }));
 
 // Starts the game with a boot file. The token goes in the file rather than on the command line,
 // where other programs could read it.
-function launchGame(boot) {
+async function launchGame(boot, flagSource) {
+  // Feature flags from the server (set with admin.mjs) travel to the game in its boot file.
+  boot = { ...boot, flags: await studio.flagsFor(flagSource) };
+  if (game) return; // a second Play landed while the flags loaded
   const bootFile = path.join(app.getPath('userData'), 'boot-character.json');
   fs.writeFileSync(bootFile, JSON.stringify(boot), { mode: 0o600 });
-  const child = spawn(GAME_EXE, ['--', '--character-json', bootFile], {
+  // Dev tools (dev builds or --dev) can add engine and game options, like the in-game console.
+  const extra = devTools.gameArgs();
+  const args = [...extra.engine, '--', '--character-json', bootFile, ...extra.game];
+  devTools.rememberBoot(boot, args);
+  const child = spawn(GAME_EXE, args, {
     cwd: path.dirname(GAME_EXE),
     stdio: 'ignore',
     windowsHide: false,
   });
   game = child;
   launcherWindow?.hide();
+  const startedAt = Date.now();
+  studio.track('game.start', { mode: boot.serverUrl ? 'online' : 'offline', heroClass: boot.heroClass });
+  let exitCode = null;
   const finished = () => {
     if (game !== child) return;
     game = null;
+    const minutes = Math.round((Date.now() - startedAt) / 6000) / 10;
+    studio.track('game.exit', { minutes, code: exitCode });
+    // A crash ends the game with an error code (a normal quit is 0).
+    if (exitCode !== null && exitCode !== 0) {
+      studio.reportCrash({ source: 'game', message: `The game closed unexpectedly (exit code ${exitCode}) after ${minutes} min`, detail: studio.gameLogTail() });
+    }
     fs.rmSync(bootFile, { force: true });
     characters.refreshOfflineProgress();
     if (launcherWindow) {
@@ -215,7 +290,10 @@ function launchGame(boot) {
       launcherWindow.webContents.send('launcher:game-closed');
     } else openLauncher();
   };
-  child.once('exit', finished);
+  child.once('exit', (code) => {
+    exitCode = code;
+    finished();
+  });
   child.once('error', (error) => {
     console.error('Could not start the game:', error);
     finished();
@@ -230,7 +308,7 @@ ipcMain.handle('launcher:play', async (_e, options = {}) => {
   if (options.offline) {
     const character = characters.getOffline(String(options.characterId));
     if (!character) return { error: 'Pick a character first.' };
-    launchGame(characters.bootCharacter(character));
+    await launchGame(characters.bootCharacter(character), selectedServerUrl());
     return { ok: true };
   }
   const server = servers.getServer(options.serverId);
@@ -245,7 +323,7 @@ ipcMain.handle('launcher:play', async (_e, options = {}) => {
     const list = await servers.request(server.url, '/api/characters', { token: login.token, timeoutMs: 10000 });
     const character = list.characters.find((c) => String(c.id) === String(options.characterId));
     if (!character) return { error: 'That character no longer exists.' };
-    launchGame({ ...characters.bootCharacter(character), serverUrl: server.url, token: login.token });
+    await launchGame({ ...characters.bootCharacter(character), serverUrl: server.url, token: login.token }, server.url);
     return { ok: true };
   } catch (error) {
     if (error.status === 401) servers.forgetSession(server.id);
@@ -268,6 +346,12 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     serveAppScheme(session.defaultSession);
+    studio.catchLauncherErrors();
+    studio.setServerResolver(selectedServerUrl);
+    const prefs = studio.settings();
+    updates.configure({ channel: prefs.channel, autoDownload: prefs.autoDownload });
+    studio.track('launcher.open', { channel: prefs.channel });
+    studio.flush().catch(() => {});
     updates.removeOldGamePatches();
     openLauncher();
   });

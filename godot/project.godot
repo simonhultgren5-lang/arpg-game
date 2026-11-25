@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Depths of Darkness"
 config/description="A grim gothic action RPG. Act I: The Tolling of Hollowmere."
-config/version="0.3.3"
+config/version="0.4.0"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 boot_splash/bg_color=Color(0.047, 0.039, 0.071, 1)
@@ -16,6 +16,8 @@ boot_splash/image="res://art/splash.png"
 boot_splash/fullsize=false
 boot_splash/use_filter=true
 config/icon="res://icon.svg"
+; Write each log line to the log file right away, so a crash report has the end of the log.
+run/flush_stdout_on_print=true
 
 [autoload]
 
@@ -23,6 +25,7 @@ ActAudio="*res://scripts/autoload/act_audio.gd"
 Boot="*res://scripts/autoload/boot.gd"
 SaveSystem="*res://scripts/autoload/save_system.gd"
 Game="*res://scripts/autoload/game_state.gd"
+Dev="*res://scripts/autoload/dev_console.gd"
 
 [display]
 

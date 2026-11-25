@@ -36,7 +36,7 @@ const HOST = setting('HOST', '0.0.0.0');
 const DATA_DIR = path.resolve(here, setting('DATA_DIR', 'data'));
 const SERVER_NAME = String(setting('SERVER_NAME', 'Depths Server')).slice(0, 40);
 const MOTD = String(setting('MOTD', '')).slice(0, 200);
-const SERVER_VERSION = '0.3.3'; // kept equal to package.json by scripts/sync-version.mjs
+const SERVER_VERSION = '0.4.0'; // kept equal to package.json by scripts/sync-version.mjs
 const UPDATE_URL = String(
   setting('UPDATE_URL', 'https://github.com/simonhultgren5-lang/arpg-game/releases/latest/download/server-update.json'),
 );
@@ -319,11 +319,15 @@ function legacySaveMeta(accountId) {
 // can't); it reports the new version in /api/status and the log, and update.sh installs it.
 let latestRelease = null;
 const versionParts = (v) => String(v).replace(/^v/, '').split(/[.-]/).map((n) => parseInt(n, 10) || 0);
+// "0.4.1" is newer than "0.4.1-beta.2", which is newer than "0.4.0".
 function newerThan(a, b) {
   const x = versionParts(a);
   const y = versionParts(b);
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
-  return false;
+  const pa = String(a).split('-')[1] || '';
+  const pb = String(b).split('-')[1] || '';
+  if (!pa || !pb) return !pa && Boolean(pb);
+  return pa.localeCompare(pb, 'en', { numeric: true }) > 0;
 }
 async function checkForUpdate() {
   if (!/^https?:\/\//.test(UPDATE_URL)) return;
@@ -344,12 +348,92 @@ async function checkForUpdate() {
 checkForUpdate();
 setInterval(checkForUpdate, 6 * 3600 * 1000).unref();
 
+// ---------------------------------------------------------------- news, feature flags, crash reports, telemetry
+// News posts and feature flags are set by the server owner with admin.mjs. Crash reports and telemetry
+// come from launchers whose players said yes to sending them (see electron/studio.cjs); nothing is
+// tied to an account, only to a random install id.
+const CHANNELS = ['stable', 'beta', 'dev'];
+const TELEMETRY_DAYS = 90;
+db.exec(`
+  CREATE TABLE IF NOT EXISTS news (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    title      TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    channel    TEXT NOT NULL DEFAULT '',  -- '' = everyone, else only launchers on that channel
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS flags (
+    key        TEXT NOT NULL,
+    channel    TEXT NOT NULL DEFAULT '',  -- '' = everyone; a channel value wins over it
+    value      TEXT NOT NULL,              -- JSON
+    note       TEXT,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (key, channel)
+  );
+  CREATE TABLE IF NOT EXISTS crashes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    at         INTEGER NOT NULL,
+    source     TEXT NOT NULL,              -- 'launcher' or 'game'
+    version    TEXT,
+    channel    TEXT,
+    platform   TEXT,
+    install_id TEXT,
+    message    TEXT NOT NULL,
+    detail     TEXT                         -- stack trace or the end of the game's log
+  );
+  CREATE TABLE IF NOT EXISTS telemetry (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    at         INTEGER NOT NULL,
+    install_id TEXT,
+    version    TEXT,
+    channel    TEXT,
+    event      TEXT NOT NULL,
+    props      TEXT                         -- JSON
+  );
+  CREATE INDEX IF NOT EXISTS telemetry_at ON telemetry(at);
+  CREATE INDEX IF NOT EXISTS crashes_at ON crashes(at);
+`);
+db.prepare('DELETE FROM telemetry WHERE at < ?').run(Date.now() - TELEMETRY_DAYS * 864e5);
+const studio = {
+  news: db.prepare(`SELECT id, title, body, created_at FROM news WHERE channel = '' OR channel = ?
+                    ORDER BY created_at DESC, id DESC LIMIT 20`),
+  flags: db.prepare(`SELECT key, channel, value FROM flags WHERE channel = '' OR channel = ?`),
+  crash: db.prepare(`INSERT INTO crashes (at, source, version, channel, platform, install_id, message, detail)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+  event: db.prepare(`INSERT INTO telemetry (at, install_id, version, channel, event, props) VALUES (?, ?, ?, ?, ?, ?)`),
+};
+const channelOf = (url) => (CHANNELS.includes(url.searchParams.get('channel')) ? url.searchParams.get('channel') : 'stable');
+const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : null);
+// At most `limit` reports per address and hour, so a crash loop can't fill the database.
+const reportLimits = new Map();
+function rateLimit(req, kind, limit) {
+  const key = `${kind}|${req.socket.remoteAddress}`;
+  const now = Date.now();
+  const list = (reportLimits.get(key) || []).filter((t) => now - t < 3600e3);
+  if (list.length >= limit) throw new HttpError(429, 'Too many reports. Try again later.');
+  list.push(now);
+  reportLimits.set(key, list);
+}
+function featureFlags(channel) {
+  const out = {};
+  // Channel-specific values win over the ones for everyone.
+  const rows = studio.flags.all(channel).sort((a, b) => (a.channel ? 1 : 0) - (b.channel ? 1 : 0));
+  for (const row of rows) {
+    try {
+      out[row.key] = JSON.parse(row.value);
+    } catch {
+      // skip a broken value
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- routes
 const routes = {
   'GET /api/status': () => ({
     online: true,
     // What this server supports; the launcher checks it before offering features that need it.
-    features: ['characters', 'save-merge'],
+    features: ['characters', 'save-merge', 'news', 'flags', 'crash-reports', 'telemetry', 'change-password'],
     name: SERVER_NAME,
     motd: MOTD,
     version: SERVER_VERSION,
@@ -360,6 +444,59 @@ const routes = {
     accounts: q.countAccounts.get().n,
     uptimeSeconds: Math.round((Date.now() - STARTED_AT) / 1000),
   }),
+
+  // ---- news and feature flags (public; ?channel=stable|beta|dev)
+  'GET /api/news': (req, url) => ({
+    news: studio.news.all(channelOf(url)).map((n) => ({ id: n.id, title: n.title, body: n.body, date: n.created_at })),
+  }),
+  'GET /api/flags': (req, url) => ({ flags: featureFlags(channelOf(url)) }),
+
+  // ---- crash reports and telemetry from launchers whose players opted in
+  'POST /api/crash': async (req) => {
+    rateLimit(req, 'crash', 30);
+    const b = await readJson(req);
+    const message = text(b.message, 500);
+    if (!message) throw new HttpError(400, 'A crash report needs a message.');
+    studio.crash.run(
+      Date.now(),
+      b.source === 'game' ? 'game' : 'launcher',
+      text(b.version, 40),
+      CHANNELS.includes(b.channel) ? b.channel : null,
+      text(b.platform, 60),
+      text(b.installId, 64),
+      message,
+      text(b.detail, 64 * 1024),
+    );
+    console.log(`[crash] ${b.source === 'game' ? 'game' : 'launcher'} ${text(b.version, 40) || '?'}: ${message.slice(0, 120)}`);
+    return { ok: true };
+  },
+  'POST /api/telemetry': async (req) => {
+    rateLimit(req, 'telemetry', 120);
+    const b = await readJson(req);
+    const events = Array.isArray(b.events) ? b.events.slice(0, 50) : [];
+    for (const e of events) {
+      const name = text(e?.event, 40);
+      if (!name || !/^[a-z][a-z0-9_.]*$/.test(name)) continue;
+      const props = e.props && typeof e.props === 'object' && !Array.isArray(e.props) ? JSON.stringify(e.props).slice(0, 2000) : null;
+      studio.event.run(Number(e.at) > 0 ? Math.min(Number(e.at), Date.now()) : Date.now(), text(b.installId, 64), text(b.version, 40),
+        CHANNELS.includes(b.channel) ? b.channel : null, name, props);
+    }
+    return { ok: true, stored: events.length };
+  },
+
+  // ---- change your own password (signs out every other session)
+  'POST /api/auth/password': async (req) => {
+    const { account, token } = requireAccount(req);
+    const b = await readJson(req);
+    const current = typeof b.current === 'string' ? b.current : '';
+    const next = typeof b.password === 'string' ? b.password : '';
+    const row = q.accountByName.get(account.username);
+    if (!row || !(await verifyPassword(current, row.password_hash))) throw new HttpError(401, 'Your current password is wrong.');
+    if (next.length < 6 || next.length > 128) throw new HttpError(400, 'The new password must be at least 6 characters.');
+    db.prepare('UPDATE accounts SET password_hash = ? WHERE id = ?').run(await hashPassword(next), account.id);
+    db.prepare('DELETE FROM sessions WHERE account_id = ? AND token_hash != ?').run(account.id, hashToken(token));
+    return { ok: true };
+  },
 
   'POST /api/auth/register': async (req) => {
     const ip = req.socket.remoteAddress;
@@ -479,7 +616,7 @@ const server = http.createServer(async (req, res) => {
   const handler = routes[`${req.method} ${url.pathname}`] || paramRoute(req.method, url.pathname);
   if (!handler) return send(res, 404, { error: 'Not found.' });
   try {
-    send(res, 200, await handler(req));
+    send(res, 200, await handler(req, url));
   } catch (error) {
     if (error instanceof HttpError) return send(res, error.status, { error: error.message });
     console.error(`[error] ${req.method} ${url.pathname}:`, error);
@@ -487,7 +624,15 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// server.pid tells the admin CLI (admin.mjs) that the server is running, so it won't restore a
+// backup under it.
+const PID_FILE = path.join(DATA_DIR, 'server.pid');
 server.listen(PORT, HOST, () => {
+  try {
+    fs.writeFileSync(PID_FILE, String(process.pid));
+  } catch {
+    // Not fatal: admin restore then can't tell the server is running.
+  }
   console.log(`${SERVER_NAME} v${SERVER_VERSION} listening on http://${HOST}:${PORT}`);
   console.log(`Database: ${path.join(DATA_DIR, 'depths.db')}`);
 });
@@ -495,6 +640,7 @@ server.listen(PORT, HOST, () => {
 const shutdown = () => {
   server.close();
   db.close();
+  fs.rmSync(PID_FILE, { force: true });
   process.exit(0);
 };
 process.on('SIGINT', shutdown);

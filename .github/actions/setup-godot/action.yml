@@ -1,0 +1,69 @@
+name: Set up Godot
+description: Installs Godot (and optionally its Windows export templates) from the official release, cached between runs, and sets GODOT.
+inputs:
+  version:
+    description: Godot version, like 4.7.2
+    default: 4.7.2
+  templates:
+    description: Also install the export templates (about 1.2 GB download, only the Windows files are kept)
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Cache Godot
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/godot-${{ inputs.version }}
+        key: godot-${{ inputs.version }}-win64-templates-${{ inputs.templates }}-v1
+
+    - name: Download Godot
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        $v = "${{ inputs.version }}"
+        $dir = Join-Path $HOME "godot-$v"
+        New-Item -ItemType Directory -Force $dir | Out-Null
+        $base = "https://github.com/godotengine/godot/releases/download/$v-stable"
+        Invoke-WebRequest "$base/SHA512-SUMS.txt" -OutFile "$dir/SHA512-SUMS.txt"
+        $sums = Get-Content "$dir/SHA512-SUMS.txt"
+        function Get-Checked($name) {
+          $file = Join-Path $dir $name
+          Invoke-WebRequest "$base/$name" -OutFile $file
+          $want = ($sums | Where-Object { $_ -match [regex]::Escape($name) + '$' }).Split(' ')[0]
+          $have = (Get-FileHash $file -Algorithm SHA512).Hash.ToLower()
+          if ($want -ne $have) { throw "Checksum mismatch for $name" }
+          return $file
+        }
+        $zip = Get-Checked "Godot_v$v-stable_win64.exe.zip"
+        Expand-Archive $zip -DestinationPath $dir -Force
+        Remove-Item $zip
+        if ("${{ inputs.templates }}" -eq "true") {
+          $tpz = Get-Checked "Godot_v$v-stable_export_templates.tpz"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($tpz)
+          $out = Join-Path $dir "templates"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          foreach ($entry in $archive.Entries) {
+            if ($entry.Name -eq 'version.txt' -or $entry.Name -like 'windows_*_x86_64*') {
+              [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $out $entry.Name), $true)
+            }
+          }
+          $archive.Dispose()
+          Remove-Item $tpz
+        }
+
+    - name: Point GODOT at it
+      shell: pwsh
+      run: |
+        $v = "${{ inputs.version }}"
+        $dir = Join-Path $HOME "godot-$v"
+        $exe = Get-ChildItem $dir -Recurse -Filter "*_console.exe" | Select-Object -First 1
+        if (-not $exe) { throw "Godot console exe not found in $dir" }
+        "GODOT=$($exe.FullName)" >> $env:GITHUB_ENV
+        if ("${{ inputs.templates }}" -eq "true") {
+          $target = Join-Path $env:APPDATA "Godot/export_templates/$v.stable"
+          New-Item -ItemType Directory -Force $target | Out-Null
+          Copy-Item (Join-Path $dir "templates/*") $target -Force
+        }
+        & $exe.FullName --version

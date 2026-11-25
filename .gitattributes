@@ -1,3 +1,7 @@
 # Scripts and files that run on the Raspberry Pi must keep Linux line endings
 *.sh text eol=lf
 game-server/** text eol=lf
+
+# Godot writes its project files with LF line endings. Checking them out the same way keeps
+# exports and imports from showing every .import file as changed on Windows.
+godot/** text=auto eol=lf

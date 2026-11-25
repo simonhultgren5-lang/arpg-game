@@ -3,7 +3,8 @@
 //   node scripts/patch-notes.mjs                 writes launcher/patch-notes.json (bundled, works offline)
 //   node scripts/patch-notes.mjs <output.json>   writes somewhere else (the release script uploads one)
 //
-// Format: { format: 1, generatedAt, latest, versions: [{ version, date, body }] }, newest first.
+// Format: { format: 1, generatedAt, latest, versions: [{ version, title, date, body }] }, newest first.
+// A section heading can name the patch: "## 0.4.0 — Act I: The Tolling of Hollowmere (2026-11-25)".
 // "body" is the section's text (### subheadings, "- " bullets, **bold**); the launcher renders it as text.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,11 +12,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// Newest first; "0.4.1" before "0.4.1-beta.2" before "0.4.1-beta.1".
 const compare = (a, b) => {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
-  return 0;
+  const [ma, pa = ''] = a.split('-');
+  const [mb, pb = ''] = b.split('-');
+  const x = ma.split('.').map(Number);
+  const y = mb.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0);
+  if (!pa || !pb) return (pa ? 1 : 0) - (pb ? 1 : 0);
+  return pb.localeCompare(pa, 'en', { numeric: true });
 };
 
 export function readPatchNotes() {
@@ -24,10 +29,10 @@ export function readPatchNotes() {
   const versions = [];
   for (const part of text.split(/^## /m).slice(1)) {
     const [heading, ...rest] = part.split('\n');
-    const match = heading.match(/^(\d+\.\d+\.\d+)\b(?:.*?\((\d{4}-\d{2}-\d{2})\))?/);
+    const match = heading.trim().match(/^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)(?=\s|$)\s*(?:[—–:]\s*(.*?))?\s*(?:\((\d{4}-\d{2}-\d{2})\))?$/);
     if (!match) continue; // not a version section
     const body = rest.join('\n').trim();
-    if (body) versions.push({ version: match[1], date: match[2] || null, body });
+    if (body) versions.push({ version: match[1], title: match[2]?.trim() || null, date: match[3] || null, body });
   }
   versions.sort((a, b) => compare(a.version, b.version));
   return { format: 1, generatedAt: new Date().toISOString(), latest: versions[0]?.version || null, versions };

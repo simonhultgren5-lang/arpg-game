@@ -180,6 +180,8 @@ func mitigate(amount: float) -> float:
 func add_xp(amount: int) -> void:
 	if level() >= MAX_LEVEL:
 		return
+	# Feature flag game.xp_multiplier (set on the server with admin.mjs), e.g. 2 for a double-XP weekend.
+	amount = int(round(amount * clampf(float(Boot.flag("game.xp_multiplier", 1.0)), 0.0, 10.0)))
 	progress["xp"] = int(progress["xp"]) + amount
 	while level() < MAX_LEVEL and int(progress["xp"]) >= xp_to_next():
 		progress["xp"] = int(progress["xp"]) - xp_to_next()

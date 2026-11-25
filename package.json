@@ -4,7 +4,7 @@
   "description": "Dark fantasy action RPG",
   "author": "afiniel",
   "private": true,
-  "version": "0.3.3",
+  "version": "0.4.0",
   "type": "module",
   "main": "electron/main.cjs",
   "desktop": {
@@ -15,6 +15,8 @@
     "bump:patch": "npm version patch --no-git-tag-version && node scripts/sync-version.mjs",
     "bump:minor": "npm version minor --no-git-tag-version && node scripts/sync-version.mjs",
     "bump:major": "npm version major --no-git-tag-version && node scripts/sync-version.mjs",
+    "bump:beta": "npm version prerelease --preid beta --no-git-tag-version && node scripts/sync-version.mjs",
+    "bump:dev": "npm version prerelease --preid dev --no-git-tag-version && node scripts/sync-version.mjs",
     "launcher": "node scripts/sync-version.mjs && node scripts/patch-notes.mjs && electron .",
     "game": "bun run launcher",
     "dist": "node scripts/sync-version.mjs && node scripts/patch-notes.mjs && node scripts/export-godot.mjs && electron-builder --win",
@@ -27,6 +29,13 @@
     "server:image": "node scripts/pack-server.mjs --image",
     "patch-notes": "node scripts/patch-notes.mjs",
     "godot:export": "node scripts/export-godot.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:reset": "node scripts/dev-reset.mjs",
+    "test": "node scripts/test.mjs",
+    "test:quick": "node scripts/test.mjs --quick",
+    "admin": "node --no-warnings game-server/admin.mjs",
+    "ci:compile": "node scripts/ci/compile.mjs",
+    "ci:qa": "node scripts/ci/qa.mjs",
     "icons": "electron scripts/build-icons.cjs"
   },
   "build": {
